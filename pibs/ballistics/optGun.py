@@ -2,8 +2,17 @@ import logging
 from math import floor, log, pi
 from random import uniform
 
-from .gun import (POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT,
-                  SOL_LAGRANGE, SOL_MAMONTOV, SOL_PIDDUCK, pidduck)
+from . import (
+    POINT_PEAK_AVG,
+    POINT_PEAK_BREECH,
+    POINT_PEAK_SHOT,
+    SOL_LAGRANGE,
+    SOL_MAMONTOV,
+    SOL_PIDDUCK,
+    Points,
+    Solutions,
+)
+from .gun import pidduck
 from .num import RKF78, cubic, dekker, gss
 
 """
@@ -15,8 +24,10 @@ appearance of outlier, at the cost of increased computation times.
 """
 #  maximum number of guesses taken to find valid load fraction.
 MAX_GUESSES = 100
-# maximum iteration to correct for chamberage effects.
+# maximum iteration to correct for chambrage effects.
 MAX_ITER = 10
+
+logger = logging.getLogger(__name__)
 
 
 class Constrained:
@@ -33,27 +44,18 @@ class Constrained:
         tol,
         minWeb=1e-6,
         maxLength=1e3,
-        sol=SOL_LAGRANGE,
+        sol: Solutions = SOL_LAGRANGE,
         ambientRho=1.204,
         ambientP=101.325e3,
         ambientGamma=1.4,
-        control=POINT_PEAK_AVG,
+        control: Points = POINT_PEAK_AVG,
         **_,
     ):
         # constants for constrained designs
 
-        logger = logging.getLogger("opt.gun")
         logger.info("initializing constrained gun object.")
 
-        if any(
-            (
-                caliber <= 0,
-                shotMass <= 0,
-                startPressure <= 0,
-                dragCoefficient < 0,
-                dragCoefficient >= 1,
-            )
-        ):
+        if any((caliber <= 0, shotMass <= 0, startPressure <= 0, dragCoefficient < 0, dragCoefficient >= 1)):
             raise ValueError("Invalid parameters for constrained design")
 
         if any(
@@ -90,16 +92,11 @@ class Constrained:
         logger.info("constraints successfully initialized.")
 
     def __getattr__(self, attrName):
-        if "propellant" in vars(self) and not (
-            attrName.startswith("__") and attrName.endswith("__")
-        ):
+        if "propellant" in vars(self) and not (attrName.startswith("__") and attrName.endswith("__")):
             try:
                 return getattr(self.propellant, attrName)
             except AttributeError:
-                raise AttributeError(
-                    "%r object has no attribute %r"
-                    % (self.__class__.__name__, attrName)
-                )
+                raise AttributeError("%r object has no attribute %r" % (self.__class__.__name__, attrName))
         else:
             raise AttributeError
 
@@ -117,10 +114,8 @@ class Constrained:
         progressQueue=None,
         **_,
     ):
-        logger = logging.getLogger("opt.gun.solve")
-        logger.info(
-            f"solving constraint at specified load fraction, cycle {it}/{MAX_ITER}."
-        )
+
+        logger.info(f"solving constraint at specified load fraction, cycle {it}/{MAX_ITER}.")
         if any((chargeMassRatio <= 0, loadFraction <= 0, loadFraction > 1)):
             raise ValueError("Invalid parameters to solve constrained design problem")
 
@@ -203,7 +198,7 @@ class Constrained:
         Zs = cubic(a=chi * mu, b=chi * labda, c=chi, d=-psi_0)
         # pick a valid solution between 0 and 1
         Zs = tuple(
-            Z for Z in Zs if not isinstance(Z, complex) and (Z > 0.0 and Z < 1.0)
+            Z for Z in Zs if not isinstance(Z, complex) and (0.0 < Z < 1.0)
         )  # evaluated from left to right, guards against complex >/< float
         if len(Zs) < 1:
             raise ValueError(
@@ -221,35 +216,34 @@ class Constrained:
 
             if self.control == POINT_PEAK_AVG:
                 return p_bar
-
             else:
                 prime = (1 / chi_k + l_bar) / (1 + l_bar)
                 labda_1_prime = labda_1 * prime
                 labda_2_prime = labda_2 * prime
 
                 factor_s = 1 + labda_2_prime * (omega / (phi_1 * m))
-                factor_b = (phi_1 * m + labda_2_prime * omega) / (
-                    phi_1 * m + labda_1_prime * omega
-                )
+                factor_b = (phi_1 * m + labda_2_prime * omega) / (phi_1 * m + labda_1_prime * omega)
 
                 if self.control == POINT_PEAK_SHOT:
                     return p_bar / factor_s
                 elif self.control == POINT_PEAK_BREECH:
                     return p_bar / factor_b
+                else:
+                    raise ValueError("tag unhandled.")
 
         """
-        step 1, find grain size that satisifies design pressure
+        step 1, find grain size that satisfies design pressure
         """
         p_bar_s = _f_p_bar(Z_0, 0, 0)
         p_bar_d = p_d / (f * Delta)  # convert to unitless
 
         if p_bar_d < p_bar_s:
             raise ValueError(
-                "Interior ballistics of conventional gun precludes"
-                + " a pressure lower than that at shot start."
+                "Interior ballistics of conventional gun precludes" + " a pressure lower than that at shot start."
             )
         l_bar_d = self.maxLength / l_0
 
+        # noinspection PyUnusedLocal
         def abort_Z(x, ys, record):
             Z = x
             t_bar, l_bar, v_bar = ys
@@ -269,14 +263,9 @@ class Constrained:
             or until the system develops 2x design pressure.
             """
 
-            B = (
-                S**2
-                * e_1**2
-                / (f * phi * omega * m * u_1**2)
-                * (f * Delta) ** (2 * (1 - n))
-            )
+            B = S**2 * e_1**2 / (f * phi * omega * m * u_1**2) * (f * Delta) ** (2 * (1 - n))
 
-            def _ode_Z(Z, t_bar, l_bar, v_bar, _):
+            def _ode_Z(Z, _, l_bar, v_bar, __):
                 """burnup domain ode of internal ballistics"""
                 psi = f_psi_Z(Z)
                 l_psi_bar = 1 - Delta / rho_p - Delta * (alpha - 1 / rho_p) * psi
@@ -286,9 +275,7 @@ class Constrained:
                     v_r = v_bar / c_a_bar
                     p_d_bar = (
                         +0.25 * gamma_1 * (gamma_1 + 1) * v_r**2
-                        + gamma_1
-                        * v_r
-                        * (1 + (0.25 * (gamma_1 + 1)) ** 2 * v_r**2) ** 0.5
+                        + gamma_1 * v_r * (1 + (0.25 * (gamma_1 + 1)) ** 2 * v_r**2) ** 0.5
                     ) * p_a_bar
 
                 else:
@@ -375,9 +362,7 @@ class Constrained:
         probeWeb = self.minWeb
 
         if dp_bar_probe < 0:
-            raise ValueError(
-                "Design pressure cannot be achieved by varying web down to minimum"
-            )
+            raise ValueError("Design pressure cannot be achieved by varying web down to minimum")
 
         while dp_bar_probe > 0:
             probeWeb *= 2
@@ -405,9 +390,7 @@ class Constrained:
             Z_i = Z_b + tol
 
         if abs(p_bar_dev) > tol * p_bar_d:
-            raise ValueError(
-                f"Design pressure is not met, delta = {p_bar_dev * f * Delta * 1e-6:.6f} MPa"
-            )
+            raise ValueError(f"Design pressure is not met, delta = {p_bar_dev * f * Delta * 1e-6:.6f} MPa")
 
         logger.info("solved web satisfying pressure constraint.")
 
@@ -418,29 +401,18 @@ class Constrained:
 
         if v_j * v_bar_i > v_d:
             if suppress:
-                logger.warning(
-                    "velocity target point occured before peak pressure point."
-                )
-                logger.warning(
-                    "this is currently being suppressed due to program control."
-                )
+                logger.warning("velocity target point occured before peak pressure point.")
+                logger.warning("this is currently being suppressed due to program control.")
             else:
-                raise ValueError(
-                    f"Design velocity exceeded before peak pressure point (V = {v_bar_i * v_j:.4g} m/s)."
-                )
+                raise ValueError(f"Design velocity exceeded before peak pressure point (V = {v_bar_i * v_j:.4g} m/s).")
 
         """
         step 2, find the requisite muzzle length to achieve design velocity
         """
 
-        B = (
-            S**2
-            * e_1**2
-            / (f * phi * omega * m * u_1**2)
-            * (f * Delta) ** (2 * (1 - n))
-        )
+        B = S**2 * e_1**2 / (f * phi * omega * m * u_1**2) * (f * Delta) ** (2 * (1 - n))
 
-        def _ode_v(v_bar, t_bar, Z, l_bar, _):
+        def _ode_v(v_bar, _, Z, l_bar, __):
             psi = f_psi_Z(Z)
 
             l_psi_bar = 1 - Delta / rho_p - Delta * (alpha - 1 / rho_p) * psi
@@ -467,6 +439,7 @@ class Constrained:
 
             return [dt_bar, dZ, dl_bar]
 
+        # noinspection PyUnusedLocal
         def abort_v(x, ys, record):
             _, _, l_bar = ys
             return l_bar > l_bar_d
@@ -529,14 +502,11 @@ class Constrained:
         if progressQueue is not None:
             progressQueue.put(100)
 
-        # if abs(cc_n - cc) > tol and it < MAX_ITER:
         if abs((l_bar_g - l_bar_g_0) / l_bar_g_prime) > tol and it < MAX_ITER:
             # successive better approximations will eventually
             # result in value within tolerance.
 
-            logger.info(
-                "recursively approaching stable solution under chambrage specification."
-            )
+            logger.info("recursively approaching stable solution under chambrage specification.")
             return self.solve(
                 loadFraction=loadFraction,
                 chargeMassRatio=chargeMassRatio,
@@ -549,11 +519,8 @@ class Constrained:
                 suppress=suppress,
                 progressQueue=progressQueue,
             )
-            # TODO: Maximum recursion depth exceeded in comparison is
-            # occasionally thrown here. Investigate why.
+            # TODO: Maximum recursion depth exceeded in comparison is occasionally thrown here. Investigate why.
         else:
-            # if it == MAX_ITER:
-            #    print("Return on maximum iteration.", abs(cc_n - cc))
             logger.info("solution satisfying chambrage found.")
             return e_1, l_bar_g * l_0
 
@@ -561,7 +528,6 @@ class Constrained:
         """
         find the minimum volume solution.
         """
-        logger = logging.getLogger("opt.gun.minimize")
         if progressQueue is not None:
             progressQueue.put(1)
         logger.info("solving minimum chamber volume for constraint.")
@@ -577,7 +543,6 @@ class Constrained:
         omega = m * chargeMassRatio
         rho_p = self.rho_p
         S = self.S
-        solve = self.solve
         phi_1 = self.phi_1
         theta = self.theta
         gamma = theta + 1
@@ -594,12 +559,12 @@ class Constrained:
 
         logger.info(f"solved parameters for gas distribution {self.sol}")
 
-        def f(lf):
+        def f(lf: float) -> tuple[float, float, float]:
             logger.info(f"dispatching calculation at load factor = {lf:.3%}")
             V_0 = omega / (rho_p * lf)
             l_0 = V_0 / S
 
-            e_1, l_g = solve(
+            e_1, l_g = self.solve(
                 loadFraction=lf,
                 chargeMassRatio=chargeMassRatio,
                 labda_1=labda_1,
@@ -610,9 +575,7 @@ class Constrained:
 
             return e_1, (l_g + l_0), l_g
 
-        logger.info(
-            f"attempting to find valid load fraction with {MAX_GUESSES} guesses."
-        )
+        logger.info(f"attempting to find valid load fraction with {MAX_GUESSES} guesses.")
 
         records = []
         for i in range(MAX_GUESSES):
@@ -626,8 +589,7 @@ class Constrained:
                     progressQueue.put(round(i / MAX_GUESSES * 33))
         else:
             raise ValueError(
-                "Unable to find any valid load fraction"
-                + " with {:d} random samples.".format(MAX_GUESSES)
+                "Unable to find any valid load fraction" + " with {:d} random samples.".format(MAX_GUESSES)
             )
 
         if progressQueue is not None:

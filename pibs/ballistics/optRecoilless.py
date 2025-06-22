@@ -1,19 +1,23 @@
-from .num import gss, RKF78, cubic, dekker
-from .prop import Propellant
-from random import uniform
-from math import pi, log, floor, inf
-from .recoiless import Recoiless
-from .optGun import MAX_GUESSES
-from .gun import POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT
-from .recoiless import POINT_PEAK_STAG
-
-
 import logging
+from math import floor, inf, log, pi
+from random import uniform
 
-logger = logging.getLogger("opt")
+from . import (
+    POINT_PEAK_AVG,
+    POINT_PEAK_BREECH,
+    POINT_PEAK_SHOT,
+    POINT_PEAK_STAG,
+    Points,
+)
+from .num import RKF78, cubic, dekker, gss
+from .optGun import MAX_GUESSES
+from .prop import Propellant
+from .recoilless import Recoilless
+
+logger = logging.getLogger(__name__)
 
 
-class ConstrainedRecoiless:
+class ConstrainedRecoilless:
     def __init__(
         self,
         caliber,
@@ -32,7 +36,7 @@ class ConstrainedRecoiless:
         ambientRho=1.204,
         ambientP=101.325e3,
         ambientGamma=1.4,
-        control=POINT_PEAK_AVG,
+        control: Points = POINT_PEAK_AVG,
         **_,
     ):
         # constants for constrained designs
@@ -90,16 +94,11 @@ class ConstrainedRecoiless:
         logger.info("constraints successfully initialized.")
 
     def __getattr__(self, attrName):
-        if "propellant" in vars(self) and not (
-            attrName.startswith("__") and attrName.endswith("__")
-        ):
+        if "propellant" in vars(self) and not (attrName.startswith("__") and attrName.endswith("__")):
             try:
                 return getattr(self.propellant, attrName)
             except AttributeError:
-                raise AttributeError(
-                    "%r object has no attribute %r"
-                    % (self.__class__.__name__, attrName)
-                )
+                raise AttributeError("%r object has no attribute %r" % (self.__class__.__name__, attrName))
         else:
             raise AttributeError
 
@@ -163,7 +162,7 @@ class ConstrainedRecoiless:
 
         phi = phi_1 + omega / (3 * m)
 
-        S_j_bar = 1 / (Recoiless._getCf(gamma, A_bar, tol) * chi_0)
+        S_j_bar = 1 / (Recoilless._getCf(gamma, A_bar, tol) * chi_0)
         if S_j_bar > chi_k:
             raise ValueError(
                 "Achieving recoiless condition necessitates"
@@ -236,26 +235,19 @@ class ConstrainedRecoiless:
                 m_dot = C_A * v_j * S_j * p_bar * Delta / (tau**0.5)
                 vb = m_dot * (V_0 + S * l_bar * l_0) / (Sb * (omega - y))
 
-                H_1, H_2 = (
-                    vb / (v_j * v_bar) if v_bar != 0 else inf,
-                    2 * phi_1 * m / (omega - y) + 1,
-                )
+                H_1, H_2 = vb / (v_j * v_bar) if v_bar != 0 else inf, 2 * phi_1 * m / (omega - y) + 1
 
                 H = min(H_1, H_2)
 
                 p_s_bar = p_bar / (1 + (omega - y) / (3 * phi_1 * m) * (1 - 0.5 * H))
                 if self.control == POINT_PEAK_SHOT:
                     return p_s_bar
-
                 elif self.control == POINT_PEAK_STAG:
                     return p_s_bar * (1 + (omega - y) / (2 * phi_1 * m) * (1 + H) ** -1)
-
                 elif self.control == POINT_PEAK_BREECH:
-                    return (
-                        p_s_bar * (1 + (omega - y) / (2 * phi_1 * m) * (1 - H))
-                        if H == H_1
-                        else 0
-                    )
+                    return p_s_bar * (1 + (omega - y) / (2 * phi_1 * m) * (1 - H)) if H == H_1 else 0
+                else:
+                    raise ValueError("tag unhandled.")
 
         p_bar_d = p_d / (f * Delta)  # convert to unitless
         l_bar_d = self.maxLength / l_0
@@ -264,8 +256,9 @@ class ConstrainedRecoiless:
         step 1, find grain size that satisifies design pressure
         """
 
+        # noinspection PyUnusedLocal
         def abort_Z(x, ys, record):
-            Z, _, l_bar, v_bar, eta, tau = x, *ys
+            Z, (_, l_bar, v_bar, eta, tau) = x, ys
             p_bar = _f_p_bar(Z, l_bar, v_bar, eta, tau)
             return (p_bar > 2 * p_bar_d) or l_bar > l_bar_d
 
@@ -276,11 +269,7 @@ class ConstrainedRecoiless:
             l_bar < l_bar_d,
             p_bar < 2 * p_bar_d.
             """
-            B = (
-                (S**2 * e_1**2)
-                / (f * phi * omega * m * u_1**2)
-                * (f * Delta) ** (2 * (1 - n))
-            )
+            B = (S**2 * e_1**2) / (f * phi * omega * m * u_1**2) * (f * Delta) ** (2 * (1 - n))
 
             # integrate this to end of burn
 
@@ -296,9 +285,7 @@ class ConstrainedRecoiless:
                     v_r = v_bar / c_a_bar
                     p_d_bar = (
                         +0.25 * gamma_1 * (gamma_1 + 1) * v_r**2
-                        + gamma_1
-                        * v_r
-                        * (1 + (0.25 * (gamma_1 + 1)) ** 2 * v_r**2) ** 0.5
+                        + gamma_1 * v_r * (1 + (0.25 * (gamma_1 + 1)) ** 2 * v_r**2) ** 0.5
                     ) * p_a_bar
                 else:
                     p_d_bar = 0
@@ -315,9 +302,7 @@ class ConstrainedRecoiless:
                     dv_bar = 0  # dv_bar/dZ
 
                 deta = C_A * S_j_bar * p_bar / tau**0.5 * dt_bar  # deta / dZ
-                dtau = (
-                    (1 - tau) * (dpsi) - 2 * v_bar * (dv_bar) - theta * tau * (deta)
-                ) / (psi - eta)
+                dtau = ((1 - tau) * (dpsi) - 2 * v_bar * (dv_bar) - theta * tau * (deta)) / (psi - eta)
 
                 return dt_bar, dl_bar, dv_bar, deta, dtau
 
@@ -347,14 +332,9 @@ class ConstrainedRecoiless:
 
             # find the last peak
             if len(record) > 2:
-                p_bars = [
-                    _f_p_bar(Z, l_bar, v_bar, eta, tau)
-                    for (Z, (t_bar, l_bar, v_bar, eta, tau)) in record
-                ]
+                p_bars = [_f_p_bar(Z, l_bar, v_bar, eta, tau) for (Z, (t_bar, l_bar, v_bar, eta, tau)) in record]
 
-                for i, (l, c, r) in enumerate(
-                    zip(p_bars[:-2], p_bars[1:-1], p_bars[2:])
-                ):
+                for i, (l, c, r) in enumerate(zip(p_bars[:-2], p_bars[1:-1], p_bars[2:])):
                     if l < c and c > r:
                         peak = i + 1
 
@@ -477,26 +457,15 @@ class ConstrainedRecoiless:
 
         if v_bar_i > v_bar_d:
             if suppress:
-                logger.warning(
-                    "velocity target point occured before peak pressure point."
-                )
-                logger.warning(
-                    "this is currently being suppressed due to program control."
-                )
+                logger.warning("velocity target point occured before peak pressure point.")
+                logger.warning("this is currently being suppressed due to program control.")
             else:
-                raise ValueError(
-                    f"Design velocity exceeded before peak pressure point (V = {v_bar_i * v_j:.4g} m/s)."
-                )
+                raise ValueError(f"Design velocity exceeded before peak pressure point (V = {v_bar_i * v_j:.4g} m/s).")
 
         # TODO: find some way of making this cross constraint less troublesome.
-        B = (
-            S**2
-            * e_1**2
-            / (f * phi * omega * m * u_1**2)
-            * (f * Delta) ** (2 * (1 - n))
-        )
+        B = S**2 * e_1**2 / (f * phi * omega * m * u_1**2) * (f * Delta) ** (2 * (1 - n))
 
-        def _ode_v(v_bar, t_bar, Z, l_bar, eta, tau, _):
+        def _ode_v(v_bar, _, Z, l_bar, eta, tau, __):
             psi = f_psi_Z(Z)
             dpsi = f_sigma_Z(Z)  # dpsi/dZ
 
@@ -523,15 +492,14 @@ class ConstrainedRecoiless:
 
             deta = C_A * S_j_bar * p_bar / tau**0.5 * dt_bar  # deta / dv_bar
             dtau = (
-                (1 - tau) * (dpsi * dZ)  # dZ/dt_bar
-                - 2 * v_bar  # dv_bar/dt_bar
-                - theta * tau * (deta)  # deta/dt_bar
+                (1 - tau) * (dpsi * dZ) - 2 * v_bar - theta * tau * (deta)  # dZ/dt_bar  # dv_bar/dt_bar  # deta/dt_bar
             ) / (
                 psi - eta
             )  # dtau/dt_bar
 
             return (dt_bar, dZ, dl_bar, deta, dtau)
 
+        # noinspection PyUnusedLocal
         def abort_v(x, ys, record):
             # v_bar = x
             t_bar, _, l_bar, _, _ = ys
@@ -637,9 +605,7 @@ class ConstrainedRecoiless:
             )
             return e_1, (l_g + l_0), l_g
 
-        logger.info(
-            f"attempting to find valid load fraction with {MAX_GUESSES} guesses."
-        )
+        logger.info(f"attempting to find valid load fraction with {MAX_GUESSES} guesses.")
 
         records = []
         for i in range(MAX_GUESSES):
@@ -653,8 +619,7 @@ class ConstrainedRecoiless:
                     progressQueue.put(round(i / MAX_GUESSES * 33))
         else:
             raise ValueError(
-                "Unable to find any valid load"
-                + " fraction with {:d} random samples.".format(MAX_GUESSES)
+                "Unable to find any valid load" + " fraction with {:d} random samples.".format(MAX_GUESSES)
             )
 
         if progressQueue is not None:
@@ -722,8 +687,8 @@ class ConstrainedRecoiless:
 
         # delta = high - low
 
-        # Edge values are some times only semi-stable, i.e. when calling
-        # f() with the same value will spuriously raise value errors. Therefore
+        # Edge values are sometimes only semi-stable, i.e. when calling
+        # f() with the same value will spuriously raise value errors. Therefore,
         # we conservatively shrink the range by tolerance to avoid this issue.
 
         # low += delta * tol
@@ -767,7 +732,7 @@ if __name__ == "__main__":
     S22S = Propellant(S22, SimpleGeometry.TUBE, 1, 2.5)
     M8S = Propellant(M8, SimpleGeometry.TUBE, 1, 2.5)
     M17P = Propellant(M1, MultPerfGeometry.SEVEN_PERF_CYLINDER, 1.0, 2.50)
-    test = ConstrainedRecoiless(
+    test = ConstrainedRecoilless(
         caliber=93e-3,
         shotMass=4,
         propellant=M17P,

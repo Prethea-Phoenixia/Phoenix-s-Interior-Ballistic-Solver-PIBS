@@ -1,7 +1,5 @@
-from tkinter import StringVar, Toplevel, Label, LEFT, SOLID
 import tkinter.font as tkFont
-
-# import textwrap
+from tkinter import LEFT, SOLID, Label, StringVar, Toplevel
 
 
 class ToolTip(object):
@@ -40,10 +38,7 @@ class ToolTip(object):
         # rx, ry, crx, cry = root.bbox()
         # bouding box coordinate is in regard to origin of widget/window
 
-        if (
-            x + self.widget.winfo_rootx()
-            > root.winfo_rootx() + 0.5 * root.winfo_width()
-        ):
+        if x + self.widget.winfo_rootx() > root.winfo_rootx() + 0.5 * root.winfo_width():
             x = x + self.widget.winfo_rootx() - width * columnWidth
             y = y + self.widget.winfo_rooty()
         else:
@@ -57,9 +52,7 @@ class ToolTip(object):
             text=self.text,
             justify=LEFT,
             background="#ffffe0",
-            width=columnWidth - 2,
-            # height=0,
-            wraplength=(columnWidth - 2) * width,
+            wraplength=(columnWidth - 2) * width,  # 2 to account for the padding.
             relief=SOLID,
             borderwidth=0,
             font=t_Font,

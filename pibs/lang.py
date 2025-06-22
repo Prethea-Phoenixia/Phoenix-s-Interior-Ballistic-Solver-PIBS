@@ -80,10 +80,10 @@ ENGLISH = {
     "stepLabel": "step",
     "calcLabel": "CALCULATE ↩",
     "CONVENTIONAL": "Conventional Gun",
-    "RECOILESS": "Recoiless Gun",
+    "RECOILLESS": "Recoilless Gun",
     "HIGHLOW": "High-Low Launcher",
     "DOMAIN_TIME": "Time",
-    "DOMAIN_LENG": "Length",
+    "DOMAIN_LEN": "Length",
     "SOL_LAGRANGE": "Lagrange ∂ρ/∂x = 0",
     "SOL_PIDDUCK": "Pidduck  ∂S/∂x = 0",
     "SOL_MAMONTOV": "Mamontov ∂T/∂x = 0",
@@ -300,9 +300,7 @@ ENGLISH = {
         )
     ),
     "cylLRText": " ".join(("Specify length to diameter ratio of the grain.",)),
-    "rodRText": " ".join(
-        ("Specify the length to width ratio of propellant rod or flake.",)
-    ),
+    "rodRText": " ".join(("Specify the length to width ratio of propellant rod or flake.",)),
     "widthText": " ".join(
         (
             "Specify the width of propellant rod or flake.\n",
@@ -311,9 +309,7 @@ ENGLISH = {
             "to be the smallest dimension.",
         )
     ),
-    "heightRText": " ".join(
-        ("Specify the height to width ratio of propellant rod or flake.",)
-    ),
+    "heightRText": " ".join(("Specify the height to width ratio of propellant rod or flake.",)),
     "tolText": " ".join(
         (
             "The maximum tolerated error, ε, for each component of the",
@@ -389,7 +385,7 @@ ENGLISH = {
             "For conventional gun, the chambrage effect is corrected",
             "by averaging the influence of chambrage over the length of",
             "barrel and increasing the secondary work factor by a",
-            "corresponding amount. For recoiless gun, due to the slow",
+            "corresponding amount. For recoilless gun, due to the slow",
             "velocity of shot and low pressure, currently the chambrage",
             "effect is not corrected for.",
         )
@@ -474,9 +470,9 @@ ENGLISH = {
     ),
     "nozzExpText": " ".join(
         (
-            "Area expansion ratio of the recoiless gun's rear nozzle, or the",
+            "Area expansion ratio of the recoilless gun's rear nozzle, or the",
             "cross section of the nozzle end over that of the throat. This is",
-            "used to size the throat to achieve recoiless condiiton while",
+            "used to size the throat to achieve recoilless condiiton while",
             "the projectile is still in bore.\n",
             "Usually taken to be 2-4. Higher expansion ratios are only",
             "marginally more efficient while incurring additional penalty to",
@@ -485,9 +481,9 @@ ENGLISH = {
     ),
     "nozzEffText": " ".join(
         (
-            "Efficiency of nozzle for recoiless gun. From rocket theory,",
+            "Efficiency of nozzle for recoilless gun. From rocket theory,",
             "it is possible to construct nozzle of decent efficiency",
-            "(as high as 95%) using simple gemometries, for example",
+            "(as high as 95%) using simple geometries, for example",
             "a straight walled truncated cone with a 15 deg half angle.",
             "Covolume correction is probably unnecessary due to the low",
             "pressure involved in its internal ballistics, which is on",
@@ -495,9 +491,9 @@ ENGLISH = {
             "Nozzle Efficiency is introduced to account for geometrical",
             "inefficiencies, wear as would be expected from a service",
             "weapon, and finally to average out the effect of thrust factor",
-            "(for muzzle) inreacsing as the projectile leaves the tube.\n",
+            "(for muzzle) increasing as the projectile leaves the tube.\n",
             "Typically taken to be around 92%, this implies that an actual",
-            "recoiless gun will tend to slightly recoil forward while",
+            "recoilless gun will tend to slightly recoil forward while",
             "projectile is in bore, and backward after it has left.",
         )
     ),
@@ -514,7 +510,7 @@ ENGLISH = {
             "Shot Pres.",
             "Avg. Temp.",
         ],
-        "RECOILESS": [
+        "RECOILLESS": [
             "Event",
             "Time",
             "Travel",
@@ -555,7 +551,7 @@ ENGLISH = {
     "CYLINDER": "Cylinder",
     "TUBE": "Tube",
     "figTimeDomain": "Time - ms",
-    "figLengDomain": "Travel - m",
+    "figLenDomain": "Travel - m",
     "figShotVel": "Shot Velocity\nm/s",
     "figBreech": "Breech Face\nPressure\nMPa",
     "figStagnation": "Stagnation\nPoint Pressure\nMPa",
@@ -625,8 +621,7 @@ ENGLISH = {
             "type, after the work of Akselʹ Vilʹgelʹmovich Gadolin,",
             "with the screw radius optimized for minimum stress. The",
             "breech block is constrained to be as long as it is wide for",
-            "ease of operation."
-            "In practice, the breech block is usually a separate piece, onto",
+            "ease of operation." "In practice, the breech block is usually a separate piece, onto",
             "which the barrel is screwed to, complicating the real stress",
             "distribution. The breech can also be made in the style of sliding",
             "block as well. Therefore the value calculated is notional and is"
@@ -736,10 +731,10 @@ CHINESE = {
     "stepLabel": "采样点",
     "calcLabel": "计算 ↵",
     "CONVENTIONAL": "常规火炮",
-    "RECOILESS": "无后坐炮",
+    "RECOILLESS": "无后坐炮",
     "HIGHLOW": "高低压发射器",
     "DOMAIN_TIME": "时间",
-    "DOMAIN_LENG": "空间",
+    "DOMAIN_LEN": "空间",
     "SOL_LAGRANGE": "拉格朗日解 ∂ρ/∂x = 0",
     "SOL_PIDDUCK": "毕杜克解   ∂S/∂x = 0",
     "SOL_MAMONTOV": "马蒙托夫解 ∂T/∂x = 0",
@@ -982,7 +977,7 @@ CHINESE = {
             "弹药弹底压强",
             "平均燃气温度",
         ],
-        "RECOILESS": [
+        "RECOILLESS": [
             "特征点",
             "历时",
             "行程",
@@ -1030,7 +1025,7 @@ CHINESE = {
     "pRatioDesc": "　           （压强比50）",
     "brDesc": "燃速",
     "figTimeDomain": "时间 / ms",
-    "figLengDomain": "行程 / m",
+    "figLenDomain": "行程 / m",
     "figShotVel": "弹速\nm/s",
     "figBreech": "膛底\nMPa",
     "figStagnation": "滞止点压强\nMPa",

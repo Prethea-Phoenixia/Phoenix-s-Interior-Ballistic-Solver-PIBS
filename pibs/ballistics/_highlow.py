@@ -1,9 +1,14 @@
-from math import pi
-from .num import gss, RKF78, cubic, dekker
-from .gun import Gun
-from .gun import DOMAIN_TIME, DOMAIN_LENG
+from __future__ import annotations
+
+import logging
+import sys
+import traceback
 from dataclasses import dataclass
+from math import pi
 from typing import List
+
+from .gun import GenericEntry, GenericResult
+from .gun import Gun
 from .gun import (
     POINT_START,
     POINT_PEAK_AVG,
@@ -12,16 +17,15 @@ from .gun import (
     POINT_BURNOUT,
     POINT_EXIT,
 )
-from .gun import GenericEntry, GenericResult
-from .gun import PressureTraceEntry, PressureProbePoint, OutlineEntry
-import traceback, sys, logging
+from .gun import PressureTraceEntry, PressureProbePoint, OutlineEntry, Domains
+from .num import gss, RKF78, cubic, dekker
 
 logger = logging.getLogger("highlow")
 
 POINT_PEAK_HIGH = "PEAK_HIGH_P"
 POINT_PEAK_BLEED = "PEAK_BLEED_P"
 
-HIGHLOW_PEAKS = [POINT_PEAK_HIGH, POINT_PEAK_BLEED, POINT_PEAK_AVG, POINT_PEAK_SHOT]
+HIGHLOW_PEAKS = (POINT_PEAK_HIGH, POINT_PEAK_BLEED, POINT_PEAK_AVG, POINT_PEAK_SHOT)
 
 
 @dataclass
@@ -43,22 +47,22 @@ class HighlowTableEntry(GenericEntry):
 @dataclass
 class HighlowErrorEntry(GenericEntry):
     tag: str
-    time: float = None
-    travel: float = None
-    burnup: float = None
-    velocity: float = None
-    highPressure: float = None
-    breechPressure: float = None
-    avgPressure: float = None
-    shotPressure: float = None
-    highTemperature: float = None
-    lowTemperature: float = None
-    outflowFraction: float = None
+    time: float | None = None
+    travel: float | None = None
+    burnup: float | None = None
+    velocity: float | None = None
+    highPressure: float | None = None
+    breechPressure: float | None = None
+    avgPressure: float | None = None
+    shotPressure: float | None = None
+    highTemperature: float | None = None
+    lowTemperature: float | None = None
+    outflowFraction: float | None = None
 
 
 @dataclass
 class HighlowResult(GenericResult):
-    gun: "Highlow"
+    gun: Highlow
     tableData: List[HighlowTableEntry]
     errorData: List[HighlowErrorEntry]
 
@@ -144,10 +148,7 @@ class Highlow:
             self.psi_0 = (
                 self.p_0_e
                 * (self.V_0 - self.omega / self.rho_p)
-                / (
-                    self.f * self.omega
-                    - self.p_0_e * (self.omega / self.rho_p - self.alpha * self.omega)
-                )
+                / (self.f * self.omega - self.p_0_e * (self.omega / self.rho_p - self.alpha * self.omega))
             )
             if self.psi_0 <= 0:
                 raise ValueError(
@@ -187,26 +188,17 @@ class Highlow:
         logger.info("highlow object successfully initialized.")
 
     def __getattr__(self, attrName):
-        if "propellant" in vars(self) and not (
-            attrName.startswith("__") and attrName.endswith("__")
-        ):
+        if "propellant" in vars(self) and not (attrName.startswith("__") and attrName.endswith("__")):
             try:
                 return getattr(self.propellant, attrName)
             except AttributeError:
-                AttributeError(
-                    "%r object has no attribute %r"
-                    % (self.__class__.__name__, attrName)
-                )
+                AttributeError("%r object has no attribute %r" % (self.__class__.__name__, attrName))
         else:
             raise AttributeError
 
     def _f_p_1(self, Z, eta, tau_1, psi=None):
         psi = psi if psi else self.f_psi_Z(Z)
-        V_psi = (
-            self.V_0
-            - self.omega / self.rho_p * (1 - psi)
-            - self.alpha * self.omega * (psi - eta)
-        )
+        V_psi = self.V_0 - self.omega / self.rho_p * (1 - psi) - self.alpha * self.omega * (psi - eta)
 
         return self.f * self.omega * tau_1 / V_psi * (psi - eta)
 
@@ -227,19 +219,13 @@ class Highlow:
 
         pr = p_2 / p_1
         if pr <= self.cfpr:
-            deta = (self.phi_2 * self.K_0 * p_1 * self.S_j) / (
-                (self.f * tau_1) ** 0.5 * self.omega
-            )
+            deta = (self.phi_2 * self.K_0 * p_1 * self.S_j) / ((self.f * tau_1) ** 0.5 * self.omega)
         else:
             gamma = self.theta + 1
             deta = (
                 (self.phi_2 * p_1 * self.S_j)
                 / ((self.f * tau_1) ** 0.5 * self.omega)
-                * (
-                    (2 * gamma / self.theta)
-                    * (pr ** (2 / gamma) - pr ** ((gamma + 1) / (gamma)))
-                )
-                ** 0.5
+                * ((2 * gamma / self.theta) * (pr ** (2 / gamma) - pr ** ((gamma + 1) / (gamma)))) ** 0.5
             )
 
         dpsi = self.f_sigma_Z(Z) * dZ
@@ -248,10 +234,7 @@ class Highlow:
         if self.c_a != 0 and v > 0:
             k = self.k_1  # gamma
             v_r = v / self.c_a
-            p_d = (
-                0.25 * k * (k + 1) * v_r**2
-                + k * v_r * (1 + (0.25 * (k + 1)) ** 2 * v_r**2) ** 0.5
-            ) * self.p_a
+            p_d = (0.25 * k * (k + 1) * v_r**2 + k * v_r * (1 + (0.25 * (k + 1)) ** 2 * v_r**2) ** 0.5) * self.p_a
         else:
             p_d = 0
 
@@ -278,19 +261,13 @@ class Highlow:
 
         pr = p_2 / p_1
         if pr <= self.cfpr:
-            deta = (self.phi_2 * self.K_0 * p_1 * self.S_j) / (
-                (self.f * tau_1) ** 0.5 * self.omega
-            )
+            deta = (self.phi_2 * self.K_0 * p_1 * self.S_j) / ((self.f * tau_1) ** 0.5 * self.omega)
         else:
             gamma = self.theta + 1
             deta = (
                 (self.phi_2 * p_1 * self.S_j)
                 / ((self.f * tau_1) ** 0.5 * self.omega)
-                * (
-                    (2 * gamma / self.theta)
-                    * (pr ** (2 / gamma) - pr ** ((gamma + 1) / (gamma)))
-                )
-                ** 0.5
+                * ((2 * gamma / self.theta) * (pr ** (2 / gamma) - pr ** ((gamma + 1) / (gamma)))) ** 0.5
             )
 
         dpsi = self.f_sigma_Z(Z) * dZ
@@ -320,20 +297,13 @@ class Highlow:
 
         pr = p_2 / p_1
         if pr <= self.cfpr:
-            deta = (
-                (self.phi_2 * self.K_0 * p_1 * self.S_j)
-                / ((self.f * tau_1) ** 0.5 * self.omega)
-            ) * dt  # deta / dl
+            deta = ((self.phi_2 * self.K_0 * p_1 * self.S_j) / ((self.f * tau_1) ** 0.5 * self.omega)) * dt  # deta / dl
         else:
             gamma = self.theta + 1
             deta = (
                 (self.phi_2 * p_1 * self.S_j)
                 / ((self.f * tau_1) ** 0.5 * self.omega)
-                * (
-                    (2 * gamma / self.theta)
-                    * (pr ** (2 / gamma) - pr ** ((gamma + 1) / (gamma)))
-                )
-                ** 0.5
+                * ((2 * gamma / self.theta) * (pr ** (2 / gamma) - pr ** ((gamma + 1) / (gamma)))) ** 0.5
             ) * dt  # deta / dl
 
         dpsi = self.f_sigma_Z(Z) * dZ  # dpsi / dl
@@ -342,10 +312,7 @@ class Highlow:
         if self.c_a != 0 and v > 0:
             k = self.k_1  # gamma
             v_r = v / self.c_a
-            p_d = (
-                0.25 * k * (k + 1) * v_r**2
-                + k * v_r * (1 + (0.25 * (k + 1)) ** 2 * v_r**2) ** 0.5
-            ) * self.p_a
+            p_d = (0.25 * k * (k + 1) * v_r**2 + k * v_r * (1 + (0.25 * (k + 1)) ** 2 * v_r**2) ** 0.5) * self.p_a
         else:
             p_d = 0
 
@@ -368,20 +335,13 @@ class Highlow:
 
         pr = p_2 / p_1
         if pr <= self.cfpr:
-            deta = (
-                (self.phi_2 * self.K_0 * p_1 * self.S_j)
-                / ((self.f * tau_1) ** 0.5 * self.omega)
-            ) * dt
+            deta = ((self.phi_2 * self.K_0 * p_1 * self.S_j) / ((self.f * tau_1) ** 0.5 * self.omega)) * dt
         else:
             gamma = self.theta + 1
             deta = (
                 (self.phi_2 * p_1 * self.S_j)
                 / ((self.f * tau_1) ** 0.5 * self.omega)
-                * (
-                    (2 * gamma / self.theta)
-                    * (pr ** (2 / gamma) - pr ** ((gamma + 1) / (gamma)))
-                )
-                ** 0.5
+                * ((2 * gamma / self.theta) * (pr ** (2 / gamma) - pr ** ((gamma + 1) / (gamma)))) ** 0.5
             ) * dt
 
         dpsi = self.f_sigma_Z(Z)  # dpsi / dZ
@@ -390,10 +350,7 @@ class Highlow:
         if self.c_a != 0 and v > 0:
             k = self.k_1  # gamma
             v_r = v / self.c_a
-            p_d = (
-                0.25 * k * (k + 1) * v_r**2
-                + k * v_r * (1 + (0.25 * (k + 1)) ** 2 * v_r**2) ** 0.5
-            ) * self.p_a
+            p_d = (0.25 * k * (k + 1) * v_r**2 + k * v_r * (1 + (0.25 * (k + 1)) ** 2 * v_r**2) ** 0.5) * self.p_a
         else:
             p_d = 0
 
@@ -414,23 +371,13 @@ class Highlow:
         p_2 = self._f_p_2(0, eta, tau_2)
         pr = p_2 / p_1
         if pr <= self.cfpr:
-            deta = (
-                self.phi_2
-                * self.K_0
-                * p_1
-                * self.S_j
-                / ((self.f * tau_1) ** 0.5 * self.omega)
-            ) * dt
+            deta = (self.phi_2 * self.K_0 * p_1 * self.S_j / ((self.f * tau_1) ** 0.5 * self.omega)) * dt
         else:
             gamma = self.theta + 1
             deta = (
                 (self.phi_2 * p_1 * self.S_j)
                 / ((self.f * tau_1) ** 0.5 * self.omega)
-                * (
-                    (2 * gamma / self.theta)
-                    * (pr ** (2 / gamma) - pr ** ((gamma + 1) / (gamma)))
-                )
-                ** 0.5
+                * ((2 * gamma / self.theta) * (pr ** (2 / gamma) - pr ** ((gamma + 1) / (gamma)))) ** 0.5
             ) * dt
 
         dpsi = self.f_sigma_Z(Z)  # dpsi / dZ
@@ -449,7 +396,7 @@ class Highlow:
         self,
         step=10,
         tol=1e-5,
-        dom=DOMAIN_TIME,
+        dom: Domains = Domains.DOMAIN_TIME,
         ambientRho=1.204,
         ambientP=101.325e3,
         ambientGamma=1.4,
@@ -577,9 +524,7 @@ class Highlow:
                     + "not enough to start the shot."
                 )
 
-        Z_1, _ = dekker(
-            lambda x: f(x)[0] - self.p_0_s, Z_0, Z, y_abs_tol=self.p_0_s * tol
-        )
+        Z_1, _ = dekker(lambda x: f(x)[0] - self.p_0_s, Z_0, Z, y_abs_tol=self.p_0_s * tol)
 
         # p_2_sm, (t, eta, tau_1, tau_2) = f(Z_1)
         # p_1_sm = self._f_p_1(Z_1, eta, tau_1)
@@ -645,9 +590,7 @@ class Highlow:
         while Z_i < Z_b:  # terminates if burnout is achieved
             ztlvett_record_i = []
             if Z_j == Z_i:
-                raise ValueError(
-                    "Numerical accuracy exhausted in search of exit/burnout point."
-                )
+                raise ValueError("Numerical accuracy exhausted in search of exit/burnout point.")
             try:
                 if Z_j > Z_b:
                     Z_j = Z_b
@@ -842,9 +785,7 @@ class Highlow:
                 tau_1_err=tau_1_err, tau_2_err=tau_2_err,
             )
             # fmt: on
-            logger.info(
-                "integrated and determined conditions at propellant frature point."
-            )
+            logger.info("integrated and determined conditions at propellant frature point.")
 
         t_b = None
         if isBurnOutContained:
@@ -872,9 +813,7 @@ class Highlow:
                 v_err=v_err, eta_err=eta_err, tau_1_err=tau_1_err, tau_2_err=tau_2_err
             )
             # fmt: on
-            logger.info(
-                "integrated and determined conditions at propellant burnout point."
-            )
+            logger.info("integrated and determined conditions at propellant burnout point.")
 
         if progressQueue is not None:
             progressQueue.put(30)
@@ -983,7 +922,7 @@ class Highlow:
 
         logger.info(f"sampling for {step} points.")
 
-        if dom == DOMAIN_TIME:
+        if dom == Domains.DOMAIN_TIME:
             # fmt: off
             (
                 t_j, Z_j, eta_j, tau_1_j, tau_2_j
@@ -1046,7 +985,7 @@ class Highlow:
                 )
                 # fmt: on
 
-        elif dom == DOMAIN_LENG:
+        elif dom == Domains.DOMAIN_LEN:
             """
             Due to two issues, i.e. 1.the length domain ODE
             cannot be integrated from the origin point, and 2.the
@@ -1098,7 +1037,7 @@ class Highlow:
         else:
             raise ValueError("Unknown domain")
 
-        if progressQueue is not None:
+        if progressQueue:
             progressQueue.put(100)
         logger.info("sampling completed.")
 
@@ -1143,9 +1082,7 @@ class Highlow:
                 )
             )
 
-            data.append(
-                HighlowTableEntry(dtag, t, l, psi, v, p_1, p_b, p_2, p_s, T_1, T_2, eta)
-            )
+            data.append(HighlowTableEntry(dtag, t, l, psi, v, p_1, p_b, p_2, p_s, T_1, T_2, eta))
             # fmt: off
             error.append(
                 HighlowErrorEntry(
@@ -1208,9 +1145,7 @@ class Highlow:
         highlowResult = HighlowResult(self, data, error, p_trace_low + p_trace_high)
 
         if self.material is None:
-            logger.warning(
-                "material is not specified, skipping structural calculation."
-            )
+            logger.warning("material is not specified, skipping structural calculation.")
         else:
             try:
                 self._getStructural(highlowResult, step, tol)
@@ -1218,11 +1153,7 @@ class Highlow:
             except Exception:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 logger.error("exception occured during structural calculation:")
-                logger.error(
-                    "".join(
-                        traceback.format_exception(exc_type, exc_value, exc_traceback)
-                    )
-                )
+                logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
                 logger.info("structural calculation skipped.")
 
         logger.info("integration concluded.")
@@ -1260,11 +1191,7 @@ class Highlow:
         if x < l_h:
             p_x = p_h
         else:
-            r = (
-                self.chi_k * (x - l_h)
-                if x < (l_l + l_h)
-                else (x - l_l - l_h) + self.l_1
-            )
+            r = self.chi_k * (x - l_h) if x < (l_l + l_h) else (x - l_l - l_h) + self.l_1
             k = (r / (self.l_1 + l)) ** 2
 
             p_x = p_s * k + p_b * (1 - k)
@@ -1323,9 +1250,7 @@ class Highlow:
             x_b, p_b = x_probes[j:], p_probes[j:]
 
             V_l, rho_l = Gun._Vrho_k(x_l, p_l, [S_b for _ in x_l], sigma, tol)
-            V_h, rho_h = Gun._Vrho_k(
-                x_h, p_h, [S_b for _ in x_h], sigma, tol, k_min=rho_l[0]
-            )
+            V_h, rho_h = Gun._Vrho_k(x_h, p_h, [S_b for _ in x_h], sigma, tol, k_min=rho_l[0])
 
             V_b, rho_b = Gun._Vrho_k(
                 x_b,
@@ -1345,8 +1270,7 @@ class Highlow:
 
                 if y > 3**-0.5:
                     raise ValueError(
-                        f"Limit to conventional construction ({sigma * 3*1e-6:.3f} MPa)"
-                        + " exceeded in section."
+                        f"Limit to conventional construction ({sigma * 3*1e-6:.3f} MPa)" + " exceeded in section."
                     )
                 rho = ((1 + y * (4 - 3 * y**2) ** 0.5) / (1 - 3 * y**2)) ** 0.5
                 rho_probes.append(rho)
@@ -1372,27 +1296,19 @@ class Highlow:
         R1__R2 = max((1 - 1 / R2__rb * (P__sigma) ** 0.5) ** 0.5, R2__rb**-1)
         R1__rb = R1__R2 * R2__rb
         R1 = R1__rb * r_b
-        L__rb = 0.5 * (
-            P__sigma**0.5 * (R1__rb**2 / P__sigma - R1__R2**2 / (1 - R1__R2**2)) ** -0.5
-        )
+        L__rb = 0.5 * (P__sigma**0.5 * (R1__rb**2 / P__sigma - R1__R2**2 / (1 - R1__R2**2)) ** -0.5)
         L_rear = max(L__rb * r_b, 2 * R1)  # the "rear", or the actual breech
 
         logger.info("structural calculation of rear breech complete.")
 
         R0__R2 = 1 / R2__rb
         R0__rb = 1
-        Lf__rb = 0.5 * (
-            P__sigma**0.5 * (R0__rb**2 / P__sigma - R0__R2**2 / (1 - R0__R2**2)) ** -0.5
-        )
-        L_front = (
-            Lf__rb * r_b
-        )  # the "forward breech", or the plate between high and low
+        Lf__rb = 0.5 * (P__sigma**0.5 * (R0__rb**2 / P__sigma - R0__R2**2 / (1 - R0__R2**2)) ** -0.5)
+        L_front = Lf__rb * r_b  # the "forward breech", or the plate between high and low
 
         logger.info("structural calculation of front breech complete.")
 
-        tube_mass = (
-            V + (R2__rb**2 - R1__rb**2) * S_b * L_rear + S_b * L_front
-        ) * self.material.rho
+        tube_mass = (V + (R2__rb**2 - R1__rb**2) * S_b * L_rear + S_b * L_front) * self.material.rho
         breech_mass = R1__rb**2 * S_b * L_rear * self.material.rho
 
         hull = []

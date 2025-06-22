@@ -1,5 +1,5 @@
-from math import exp
 from bisect import bisect
+from math import exp
 
 """
 USA Standard Atmospere 1976, from left to right:
@@ -112,8 +112,8 @@ def atmosphere(h):
 
 
 if __name__ == "__main__":
-    from matplotlib import pyplot as plt
     import numpy as np
+    from matplotlib import pyplot as plt
 
     ax = plt.subplot()
 

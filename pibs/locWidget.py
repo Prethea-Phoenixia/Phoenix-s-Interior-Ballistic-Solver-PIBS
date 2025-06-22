@@ -1,5 +1,6 @@
-from misc import formatFloatInput
 from tkinter import IntVar, StringVar, ttk
+
+from misc import formatFloatInput
 from tip import CreateToolTip
 
 
@@ -25,22 +26,10 @@ class Loc12Disp:
         e.default = default
         e.set(default)
         parent.rowconfigure(row, weight=0)
-        en = ttk.Entry(
-            parent, textvariable=e, width=entryWidth, state="disabled", justify=justify
-        )
-        en.grid(
-            row=row + 1,
-            column=col + (1 if reverse else 0),
-            sticky="nsew",
-            padx=2,
-            pady=2,
-        )
+        en = ttk.Entry(parent, textvariable=e, width=entryWidth, state="disabled", justify=justify)
+        en.grid(row=row + 1, column=col + (1 if reverse else 0), sticky="nsew", padx=2, pady=2)
         ttk.Label(parent, text=unitText).grid(
-            row=row + 1,
-            column=col + (0 if reverse else 1),
-            sticky="nsew",
-            padx=2,
-            pady=2,
+            row=row + 1, column=col + (0 if reverse else 1), sticky="nsew", padx=2, pady=2
         )
         if tooltipLocKey is not None:
             self.locTooltipVar = StringVar(value=locFunc(tooltipLocKey))
@@ -110,26 +99,10 @@ class Loc122Disp(Loc12Disp):
         e2.default = default_dn
         e2.set(default_dn)
         parent.rowconfigure(row, weight=0)
-        en2 = ttk.Entry(
-            parent,
-            textvariable=e2,
-            width=entryWidth,
-            state="disabled",
-            justify=justify_dn,
-        )
-        en2.grid(
-            row=row + 2,
-            column=col + (1 if reverse else 0),
-            sticky="nsew",
-            padx=2,
-            pady=2,
-        )
+        en2 = ttk.Entry(parent, textvariable=e2, width=entryWidth, state="disabled", justify=justify_dn)
+        en2.grid(row=row + 2, column=col + (1 if reverse else 0), sticky="nsew", padx=2, pady=2)
         ttk.Label(parent, text=unitText_dn).grid(
-            row=row + 2,
-            column=col + (0 if reverse else 1),
-            sticky="nsew",
-            padx=2,
-            pady=2,
+            row=row + 2, column=col + (0 if reverse else 1), sticky="nsew", padx=2, pady=2
         )
 
         self.auxEntryVar = e2
@@ -163,9 +136,7 @@ class Loc2Input:
         locFunc=None,
         allInputs=None,
     ):
-        lb = ttk.Label(
-            parent, text=locFunc(labelLocKey), width=labelWidth, anchor=anchor
-        )
+        lb = ttk.Label(parent, text=locFunc(labelLocKey), width=labelWidth, anchor=anchor)
 
         lb.grid(
             row=row,
@@ -369,9 +340,7 @@ class LocDropdown:
         Given an unlocalized string / localization key, set the drop down menu
         to the correct position.
         """
-        self.widget.set(
-            self.widget["values"][list(self.strObjDict.keys()).index(string)]
-        )
+        self.widget.set(self.widget["values"][list(self.strObjDict.keys()).index(string)])
 
     def setByObj(self, obj):
         index = list(self.strObjDict.values()).index(obj)
@@ -414,9 +383,7 @@ class LocDropdown:
 
 
 class LocLabelFrame(ttk.LabelFrame):
-    def __init__(
-        self, *args, locKey="", tooltipLocKey=None, locFunc=None, allLLF=None, **kwargs
-    ):
+    def __init__(self, *args, locKey="", tooltipLocKey=None, locFunc=None, allLLF=None, **kwargs):
         self.locKey = locKey
         self.locFunc = locFunc
         super().__init__(*args, text=locFunc(locKey), **kwargs)
@@ -520,7 +487,4 @@ class LocLabelCheck:
         self.checkWidget.config(state=self.nominalState)
 
     def getDescriptive(self):
-        return self.locFunc(
-            self.labelLocKey if self.descLabelKey is None else self.descLabelKey,
-            forceDefault=True,
-        )
+        return self.locFunc(self.labelLocKey if self.descLabelKey is None else self.descLabelKey, forceDefault=True)

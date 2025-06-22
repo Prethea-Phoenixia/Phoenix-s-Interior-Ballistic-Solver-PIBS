@@ -5,8 +5,8 @@ GEOMETRIES:
 
 """
 
-from enum import Enum
 import csv
+from enum import Enum
 from math import pi
 
 
@@ -25,54 +25,14 @@ class MultPerfGeometry(Enum):
     def __str__(self):
         return self.desc
 
-    SEVEN_PERF_CYLINDER = (
-        "SEVEN_PERF_CYLINDER",
-        1,
-        7,
-        0,
-        0.2956,
-        7,
-    )
-    SEVEN_PERF_ROSETTE = (
-        "SEVEN_PERF_ROSETTE",
-        2,
-        8,
-        12 * 3**0.5 / pi,
-        0.1547,
-        7,
-    )
-    FOURTEEN_PERF_ROSETTE = (
-        "FOURTEEN_PERF_ROSETTE",
-        8 / 3,
-        47 / 3,
-        26 * 3**0.5 / pi,
-        0.1547,
-        14,
-    )
-    NINETEEN_PERF_ROSETTE = (
-        "NINETEEN_PERF_ROSETTE",  # rosette prism
-        3,
-        21,
-        36 * 3**0.5 / pi,
-        0.1547,
-        19,
-    )
-    NINETEEN_PERF_CYLINDER = (
-        "NINETEEN_PERF_CYLINDER",
-        1,
-        19,
-        0,
-        0.3559,
-        19,
-    )
-    NINETEEN_PERF_HEXAGON = (
-        "NINETEEN_PERF_HEXAGON",  # hexagonal prism
-        18 / pi,
-        19,
-        18 * (3 * 3**0.5 - 1) / pi,
-        0.1864,
-        19,
-    )
+    SEVEN_PERF_CYLINDER = ("SEVEN_PERF_CYLINDER", 1, 7, 0, 0.2956, 7)
+
+    SEVEN_PERF_ROSETTE = ("SEVEN_PERF_ROSETTE", 2, 8, 12 * 3**0.5 / pi, 0.1547, 7)
+    FOURTEEN_PERF_ROSETTE = ("FOURTEEN_PERF_ROSETTE", 8 / 3, 47 / 3, 26 * 3**0.5 / pi, 0.1547, 14)
+    NINETEEN_PERF_ROSETTE = ("NINETEEN_PERF_ROSETTE", 3, 21, 36 * 3**0.5 / pi, 0.1547, 19)  # rosette prism
+    NINETEEN_PERF_CYLINDER = ("NINETEEN_PERF_CYLINDER", 1, 19, 0, 0.3559, 19)
+    NINETEEN_PERF_HEXAGON = ("NINETEEN_PERF_HEXAGON", 18 / pi, 19, 18 * (3 * 3**0.5 - 1) / pi, 0.1864, 19)
+
     NINETEEN_PERF_ROUNDED_HEXAGON = (
         "NINETEEN_PERF_ROUNDED_HEXAGON",
         3**0.5 + 12 / pi,
@@ -215,12 +175,7 @@ class GrainComp:
             return (2 * self.f / self.theta) ** 0.5
         else:
             # pressure ratio is interpreted as chamber/exit
-            return (
-                2
-                * self.f
-                / self.theta
-                * (1 - pRatio ** (-self.theta / (self.theta + 1)))
-            ) ** 0.5
+            return (2 * self.f / self.theta * (1 - pRatio ** (-self.theta / (self.theta + 1)))) ** 0.5
 
     @classmethod
     def check(cls):
@@ -247,7 +202,7 @@ class GrainComp:
                     comp.theta + 1,
                     round(comp.alpha * 27680, 2),
                     comp.rho_p,
-                    round(comp.u_1 * (1e6) ** comp.n * 1e3, 3),
+                    round(comp.u_1 * 1e6**comp.n * 1e3, 3),
                     comp.n,
                 ]
             )
@@ -416,9 +371,7 @@ class Propellant:
 
             elif self.geometry == SimpleGeometry.ROD:
                 self.maxLF = 1
-                beta, alpha = sorted(
-                    (1 / R1, 1 / R2)
-                )  # ensure that alpha > beta, ascending order
+                beta, alpha = sorted((1 / R1, 1 / R2))  # ensure that alpha > beta, ascending order
 
                 self.chi = 1 + alpha + beta
                 self.labda = -(alpha + beta + alpha * beta) / self.chi
@@ -428,19 +381,14 @@ class Propellant:
             raise ValueError("unhandled propellant geometry {}".format(propGeom))
 
     def __getattr__(self, attrName):
-        if "composition" in vars(self) and not (
-            attrName.startswith("__") and attrName.endswith("__")
-        ):
+        if "composition" in vars(self) and not (attrName.startswith("__") and attrName.endswith("__")):
             try:
                 if attrName == "u_1":
                     return getattr(self.composition, attrName) * (1 + self.fudge)
                 else:
                     return getattr(self.composition, attrName)
             except AttributeError:
-                raise AttributeError(
-                    "%r object has no attribute %r"
-                    % (self.__class__.__name__, attrName)
-                )
+                raise AttributeError("%r object has no attribute %r" % (self.__class__.__name__, attrName))
         else:
             raise AttributeError
 

@@ -1,92 +1,89 @@
-from tkinter import Frame, Menu, Text, filedialog, messagebox, StringVar, IntVar
-from tkinter import Tk, ttk, END
-import tkinter.font as tkFont
-
-from ballistics import DOMAIN_TIME, DOMAIN_LENG
-from ballistics import POINT_START, POINT_BURNOUT, POINT_FRACTURE, POINT_EXIT
-from ballistics import (
-    POINT_PEAK_AVG,
-    POINT_PEAK_SHOT,
-    POINT_PEAK_BREECH,
-    POINT_PEAK_STAG,
-    POINT_PEAK_HIGH,
-    POINT_PEAK_BLEED,
-)
-from ballistics import SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV
-from ballistics import Gun, Recoiless, Highlow
-from ballistics import Propellant, GrainComp, GEOMETRIES, SimpleGeometry
-from ballistics import Constrained, ConstrainedRecoiless, ConstrainedHighlow
-
-
-from tip import CreateToolTip
-from lang import STRING
-
-from misc import validateNN, validatePI, validateFLT
-from misc import roundSig, formatMass, dot_aligned, toSI
-from misc import formatIntInput
-from misc import loadfont, resolvepath
-
-from math import ceil, pi, log10
-
-from matplotlib import font_manager
-import matplotlib as mpl
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from labellines import labelLines
-
-import multiprocessing
-from multiprocessing import Process, Queue
-from queue import Empty
-
 import csv
 import json
-import platform
-import traceback
-import sys
-
-from ctypes import windll
-
-from locWidget import Loc12Disp, Loc122Disp
-from locWidget import Loc2Input, Loc3Input
-from locWidget import LocLabelFrame, LocLabelCheck, LocDropdown
-
-from ballistics import MATERIALS
-
 import locale
-
 import logging
+import multiprocessing
+import platform
+import sys
+import tkinter.font as tkFont
+import traceback
+from ctypes import windll
 from logging.handlers import QueueHandler, QueueListener
+from math import ceil, log10, pi
+from multiprocessing import Process, Queue
+from queue import Empty
+from tkinter import (
+    END,
+    Frame,
+    IntVar,
+    Menu,
+    StringVar,
+    Text,
+    Tk,
+    filedialog,
+    messagebox,
+    ttk,
+)
 
-RECOILESS = "RECOILESS"
-CONVENTIONAL = "CONVENTIONAL"
-HIGHLOW = "HIGHLOW"
+import matplotlib as mpl
+from labellines import labelLines
+from matplotlib import font_manager
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 
-TYPES = {CONVENTIONAL: CONVENTIONAL, RECOILESS: RECOILESS, HIGHLOW: HIGHLOW}
+from ballistics import (
+    DOMAIN_LEN,
+    DOMAIN_TIME,
+    GEOMETRIES,
+    MATERIALS,
+    POINT_BURNOUT,
+    POINT_EXIT,
+    POINT_FRACTURE,
+    POINT_PEAK_AVG,
+    POINT_PEAK_BREECH,
+    POINT_PEAK_SHOT,
+    POINT_PEAK_STAG,
+    POINT_START,
+    RECOILLESS,
+    Constrained,
+    ConstrainedRecoilless,
+    GrainComp,
+    Gun,
+    Propellant,
+    Recoilless,
+    SimpleGeometry,
+)
+from lang import STRING
+from locWidget import (
+    Loc2Input,
+    Loc3Input,
+    Loc12Disp,
+    Loc122Disp,
+    LocDropdown,
+    LocLabelCheck,
+    LocLabelFrame,
+)
+from misc import (
+    dot_aligned,
+    formatIntInput,
+    formatMass,
+    loadfont,
+    resolvepath,
+    roundSig,
+    toSI,
+    validateFLT,
+    validateNN,
+    validatePI,
+)
+from pibs.ballistics import CONVENTIONAL, SOL_LAGRANGE, SOL_PIDDUCK
+from tip import CreateToolTip
 
 CARTRIDGE = "CARTRIDGE"
 TELESCOPED = "TELESCOPED"
 
-AMMUNITIONS = {CARTRIDGE: CARTRIDGE, TELESCOPED: TELESCOPED}
-
-SOLUTIONS = {
-    SOL_LAGRANGE: SOL_LAGRANGE,
-    SOL_PIDDUCK: SOL_PIDDUCK,
-    SOL_MAMONTOV: SOL_MAMONTOV,
-}
-DOMAINS = {
-    DOMAIN_TIME: DOMAIN_TIME,
-    DOMAIN_LENG: DOMAIN_LENG,
-}
-
-CONTROLS = {
-    POINT_PEAK_AVG: POINT_PEAK_AVG,
-    POINT_PEAK_BREECH: POINT_PEAK_BREECH,
-    POINT_PEAK_SHOT: POINT_PEAK_SHOT,
-}
 
 USE_LF = "USE_LF"
 USE_CV = "USE_CV"
-USE = {USE_LF: USE_LF, USE_CV: USE_CV}
 
 FONTNAME = "Sarasa Fixed SC"
 FONTSIZE = 8
@@ -102,7 +99,7 @@ GEOM_CONTEXT = {
     "lines.markersize": FONTSIZE / 4,
     "axes.axisbelow": True,
     "font.family": "Sarasa Fixed SC",
-}
+}  # this customizes matplotlib for the sigma-Z figure
 
 FIG_CONTEXT = {
     "font.size": FONTSIZE,
@@ -119,7 +116,7 @@ FIG_CONTEXT = {
     "axes.labelweight": "bold",
     "yaxis.labellocation": "top",
     "font.family": "Sarasa Fixed SC",
-}
+}  # this customizes matplotlib for the main figure.
 
 
 class TextHandler(logging.Handler):
@@ -129,9 +126,7 @@ class TextHandler(logging.Handler):
     def __init__(self, text):
         # run the regular Handler __init__
         logging.Handler.__init__(self)
-        self.setFormatter(
-            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        )
+        self.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
         self.setLevel(logging.INFO)
         # Store a reference to the Text it will log to
         self.text = text
@@ -150,20 +145,19 @@ class TextHandler(logging.Handler):
             self.text.yview(END)
 
         # This is necessary because we can't modify the Text from other threads
-        self.text.after(0, append)
+        self.text.after_idle(append)
 
 
+# noinspection PyAttributeOutsideInit
 class InteriorBallisticsFrame(Frame):
 
     def __init__(self, parent, menubar, dpi, defaultLang=None):
         super().__init__(parent)
+
         self.grid(row=0, column=0, sticky="nsew")
         parent.rowconfigure(0, weight=1)
         parent.columnconfigure(0, weight=1)
-        # self.pack(fill="both", expand=True)
-        self.LANG = StringVar(
-            value=list(STRING.keys())[0] if defaultLang is None else defaultLang
-        )
+        self.LANG = StringVar(value=list(STRING.keys())[0] if defaultLang is None else defaultLang)
 
         self.locs = []
 
@@ -183,17 +177,11 @@ class InteriorBallisticsFrame(Frame):
         self.menubar = menubar
 
         fileMenu = Menu(menubar)
-        menubar.add_cascade(
-            label=self.getLocStr("fileLabel"), menu=fileMenu, underline=0
-        )
+        menubar.add_cascade(label=self.getLocStr("fileLabel"), menu=fileMenu, underline=0)
         themeMenu = Menu(menubar)
-        menubar.add_cascade(
-            label=self.getLocStr("themeLabel"), menu=themeMenu, underline=0
-        )
+        menubar.add_cascade(label=self.getLocStr("themeLabel"), menu=themeMenu, underline=0)
         debugMenu = Menu(menubar)
-        menubar.add_cascade(
-            label=self.getLocStr("debugLabel"), menu=debugMenu, underline=0
-        )
+        menubar.add_cascade(label=self.getLocStr("debugLabel"), menu=debugMenu, underline=0)
         langMenu = Menu(menubar)
         menubar.add_cascade(label="Lang 语言", menu=langMenu, underline=0)
 
@@ -205,12 +193,8 @@ class InteriorBallisticsFrame(Frame):
 
         self.DEBUG = IntVar(value=0)
 
-        fileMenu.add_command(
-            label=self.getLocStr("saveLabel"), command=self.save, underline=0
-        )
-        fileMenu.add_command(
-            label=self.getLocStr("loadLabel"), command=self.load, underline=0
-        )
+        fileMenu.add_command(label=self.getLocStr("saveLabel"), command=self.save, underline=0)
+        fileMenu.add_command(label=self.getLocStr("loadLabel"), command=self.load, underline=0)
         fileMenu.add_command(
             label=self.getLocStr("exportLabel"),
             command=self.export,
@@ -283,7 +267,6 @@ class InteriorBallisticsFrame(Frame):
         parent.protocol("WM_DELETE_WINDOW", self.quit)
 
         self.useTheme()
-
         self.tLid = None
 
         textHandler = TextHandler(self.errorText)
@@ -308,23 +291,21 @@ class InteriorBallisticsFrame(Frame):
 
     def timedLoop(self):
         # polling function for the calculation subprocess
-        if self.process is not None:
+        if self.process:
             self.getValue()
 
-        self.tLid = self.after(25, self.timedLoop)
+        # noinspection PyTypeChecker
+        self.tLid = self.after(100, self.timedLoop)
 
     def quit(self):
-
-        if self.process is not None:
+        if self.process:
             self.process.terminate()
             self.process.kill()
         self.listener.stop()
 
-        # root = self.parent
         if self.tLid is not None:
             self.after_cancel(self.tLid)
-            # root.after_cancel(self.tLid)
-        # root.quit()
+
         super().quit()
 
     def getDescriptive(self):
@@ -335,16 +316,11 @@ class InteriorBallisticsFrame(Frame):
             typ = kwargs["typ"]
             cal = kwargs["caliber"]
             blr = kwargs["lengthGun"] / cal
-            car_len = kwargs["chamberVolume"] / (
-                pi * (0.5 * cal) ** 2 * kwargs["chambrage"]
-            )
+            car_len = kwargs["chamberVolume"] / (pi * (0.5 * cal) ** 2 * kwargs["chambrage"])
             w = kwargs["shotMass"]
             return (
                 "{:} {:.3g}x{:.4g}mm L{:.0f} ".format(
-                    "{:.4g} g".format(w * 1e3) if w < 1 else "{:.4g} kg".format(w),
-                    cal * 1e3,
-                    car_len * 1e3,
-                    blr,
+                    "{:.4g} g".format(w * 1e3) if w < 1 else "{:.4g} kg".format(w), cal * 1e3, car_len * 1e3, blr
                 )
                 + typ
             )
@@ -370,21 +346,13 @@ class InteriorBallisticsFrame(Frame):
             with open(fileName, "r", encoding="utf-8") as file:
                 comment = json.load(file)["Comment"]
         except Exception:
-            comment = None  # either file DNE or some exception occured during reading.
+            comment = None  # either file DNE or some exception occurred during reading.
 
         try:
-            locValDict = {
-                loc.getDescriptive(): str(loc.get())
-                for loc in self.locs
-                if hasattr(loc, "getDescriptive")
-            }
+            locValDict = {loc.getDescriptive(): str(loc.get()) for loc in self.locs if hasattr(loc, "getDescriptive")}
 
             if comment is None:
-                locValDict.update(
-                    {
-                        "Comment": "Comment written here will be preserved even if file is overwritten!"
-                    }
-                )
+                locValDict.update({"Comment": "Comment written here will be preserved even if file is overwritten!"})
 
             else:
                 locValDict.update({"Comment": comment})
@@ -412,11 +380,7 @@ class InteriorBallisticsFrame(Frame):
             return
 
         try:
-            locDict = {
-                loc.getDescriptive(): loc
-                for loc in self.locs
-                if hasattr(loc, "getDescriptive")
-            }
+            locDict = {loc.getDescriptive(): loc for loc in self.locs if hasattr(loc, "getDescriptive")}
 
             with open(fileName, "r", encoding="utf-8") as file:
                 fileDict = json.load(file)
@@ -431,9 +395,7 @@ class InteriorBallisticsFrame(Frame):
             exc_type, exc_value, exc_traceback = sys.exc_info()
 
             if self.DEBUG.get() == 1:
-                errMsg = "".join(
-                    traceback.format_exception(exc_type, exc_value, exc_traceback)
-                )
+                errMsg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
             else:
                 errMsg = str(e)
             messagebox.showinfo(self.getLocStr("excTitle"), errMsg)
@@ -458,9 +420,7 @@ class InteriorBallisticsFrame(Frame):
             return
         try:
             with open(fileName, "w", encoding="utf-8", newline="") as csvFile:
-                csvWriter = csv.writer(
-                    csvFile, delimiter=",", quoting=csv.QUOTE_MINIMAL
-                )
+                csvWriter = csv.writer(csvFile, delimiter=",", quoting=csv.QUOTE_MINIMAL)
 
                 csvWriter.writerow(columnList)
 
@@ -508,10 +468,8 @@ class InteriorBallisticsFrame(Frame):
         self.updateFigPlot()
         self.updateAuxPlot()
 
-    def getLocStr(self, name, forceDefault=None):
+    def getLocStr(self, name):
         try:
-            if forceDefault:
-                raise KeyError
             return STRING[self.LANG.get()][name]
         except KeyError:
             try:
@@ -520,9 +478,7 @@ class InteriorBallisticsFrame(Frame):
                 return name
 
     def addNamePlate(self):
-        nameFrm = LocLabelFrame(
-            self, locKey="nameFrm", locFunc=self.getLocStr, allLLF=self.locs
-        )
+        nameFrm = LocLabelFrame(self, locKey="nameFrm", locFunc=self.getLocStr, allLLF=self.locs)
         nameFrm.grid(row=0, column=0, sticky="nsew", columnspan=2)
 
         nameFrm.columnconfigure(0, weight=1)
@@ -592,6 +548,7 @@ class InteriorBallisticsFrame(Frame):
             allDisps=self.locs,
         )
         i += 2
+        # noinspection SpellCheckingInspection
         self.be = Loc12Disp(
             parent=parFrm,
             row=i,
@@ -601,6 +558,7 @@ class InteriorBallisticsFrame(Frame):
             allDisps=self.locs,
         )
         i += 2
+        # noinspection SpellCheckingInspection
         self.pe = Loc12Disp(
             parent=parFrm,
             row=i,
@@ -684,9 +642,7 @@ class InteriorBallisticsFrame(Frame):
             dropdowns=self.locs,
             descLabelKey="matFrmTempLabel",
         )
-        self.dropMatTemp.grid(
-            row=1, column=0, columnspan=2, sticky="nsew", padx=2, pady=2
-        )
+        self.dropMatTemp.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
 
         self.dropMat.trace_add(
             "write",
@@ -721,10 +677,10 @@ class InteriorBallisticsFrame(Frame):
         )
         solFrm.grid(row=2, column=0, sticky="nsew")
         solFrm.columnconfigure(0, weight=1)
-
+        # noinspection SpellCheckingInspection
         self.dropSoln = LocDropdown(
             parent=solFrm,
-            strObjDict=SOLUTIONS,
+            strObjDict={soln: soln for soln in (SOL_LAGRANGE, SOL_PIDDUCK, SOL_PIDDUCK)},
             locFunc=self.getLocStr,
             dropdowns=self.locs,
             descLabelKey="solFrmLabel",
@@ -910,7 +866,7 @@ class InteriorBallisticsFrame(Frame):
         j += 1
         self.pControl = LocDropdown(
             parent=consFrm,
-            strObjDict=CONTROLS,
+            strObjDict={" ": " "},
             locFunc=self.getLocStr,
             dropdowns=self.locs,
             descLabelKey="Pressure Constraint",
@@ -932,6 +888,7 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         j += 1
+        # noinspection SpellCheckingInspection
         self.lgmax = Loc3Input(
             parent=consFrm,
             row=j,
@@ -960,16 +917,14 @@ class InteriorBallisticsFrame(Frame):
 
         self.dropDomain = LocDropdown(
             parent=sampleFrm,
-            strObjDict=DOMAINS,
+            strObjDict={domain: domain for domain in (DOMAIN_TIME, DOMAIN_LEN)},
             locFunc=self.getLocStr,
             dropdowns=self.locs,
             descLabelKey="sampleFrmLabel",
         )
 
         j = 0
-        self.dropDomain.grid(
-            row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2
-        )
+        self.dropDomain.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
 
         j += 1
         self.step = Loc2Input(
@@ -1012,9 +967,7 @@ class InteriorBallisticsFrame(Frame):
             text=self.getLocStr("calcLabel"),
             command=self.onCalculate,
         )
-        self.calcButton.grid(
-            row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2
-        )
+        self.calcButton.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
         opFrm.rowconfigure(i, weight=1)
         self.calcButtonTip = StringVar(value=self.getLocStr("calcButtonText"))
@@ -1046,12 +999,7 @@ class InteriorBallisticsFrame(Frame):
             if self.useCv.getObj() == USE_CV:
                 chamberVolume = float(self.cvL.get()) * 1e-3
             else:
-                chamberVolume = (
-                    float(self.chgkg.get())
-                    / self.prop.rho_p
-                    / float(self.ldf.get())
-                    * 100
-                )
+                chamberVolume = float(self.chgkg.get()) / self.prop.rho_p / float(self.ldf.get()) * 100
 
             chambrage = float(self.clr.get())
             chargeMass = float(self.chgkg.get())
@@ -1062,7 +1010,7 @@ class InteriorBallisticsFrame(Frame):
             gunLength = float(self.tblmm.get()) * 1e-3
             loadFraction = float(self.ldf.get()) * 1e-2
 
-            if telescoped:  # converting to equivalent cartridged gun.
+            if telescoped:  # converting to equivalent cartridge gun.
                 maxInset = float(self.insetmm.get()) * 1e-3
                 exactlyTelescopedV = breechS * maxInset
 
@@ -1078,7 +1026,6 @@ class InteriorBallisticsFrame(Frame):
             else:
                 maxInset = 0
 
-            # fmt: off
             self.kwargs = {
                 "opt": optimize,
                 "con": constrain,
@@ -1088,9 +1035,7 @@ class InteriorBallisticsFrame(Frame):
                 "dom": self.dropDomain.getObj(),
                 "sol": self.dropSoln.getObj(),
                 "control": self.pControl.getObj(),
-                "structuralMaterial": self.dropMat.getObj().createMaterialAtTemp(
-                    self.dropMatTemp.getObj()
-                ),
+                "structuralMaterial": self.dropMat.getObj().createMaterialAtTemp(self.dropMatTemp.getObj()),
                 "structuralSafetyFactor": float(self.ssf.get()),
                 "caliber": caliber,
                 "shotMass": float(self.shtkg.get()),
@@ -1119,9 +1064,9 @@ class InteriorBallisticsFrame(Frame):
                 "step": int(self.step.get()),
                 "maxInset": maxInset,
                 "autofrettage": autofrettage,
-                "knownBore": lock
+                "knownBore": lock,
             }
-            # fmt: on
+
             if atmosphere:
                 self.kwargs.update(
                     {
@@ -1145,9 +1090,7 @@ class InteriorBallisticsFrame(Frame):
             exc_type, exc_value, exc_traceback = sys.exc_info()
 
             logging.error("exception when dispatching calculation:")
-            logging.error(
-                "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-            )
+            logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
             self.updateTable()
             self.updateFigPlot()
@@ -1175,7 +1118,7 @@ class InteriorBallisticsFrame(Frame):
             pass
 
         try:
-            (self.kwargs, self.gun, self.gunResult) = jobQueue.get_nowait()
+            self.kwargs, self.gun, self.gunResult = jobQueue.get_nowait()
 
         except Empty:
             return
@@ -1194,6 +1137,7 @@ class InteriorBallisticsFrame(Frame):
 
         boreS = pi * 0.25 * caliber**2
         breechS = boreS * chambrage
+        # noinspection SpellCheckingInspection
         exactlyTelescopedVreal = (breechS - boreS) * maxInset
 
         sigfig = int(-log10(kwargs["tol"])) + 1
@@ -1207,15 +1151,12 @@ class InteriorBallisticsFrame(Frame):
 
         insetV = boreS * inset
 
-        kwargs["loadFraction"] /= (
-            1 + insetV / kwargs["chamberVolume"]
-        )  # convert the "true load fraction" to "apparent"
-        kwargs[
-            "chamberVolume"
-        ] += insetV  # convert the "real volume" returned to "apparent volume"
+        kwargs["loadFraction"] /= 1 + insetV / kwargs["chamberVolume"]  # convert the "true load fraction" to "apparent"
+        kwargs["chamberVolume"] += insetV  # convert the "real volume" returned to "apparent volume"
 
-        if gun is not None:
+        if gun:
             if constrain:
+                # noinspection SpellCheckingInspection
                 webmm = roundSig(kwargs["grainSize"] * 1e3, n=sigfig)
                 self.arcmm.set(webmm)
 
@@ -1223,6 +1164,7 @@ class InteriorBallisticsFrame(Frame):
                 self.evL.set(evL)
 
                 if not lock:
+                    # noinspection SpellCheckingInspection
                     lgmm = roundSig(kwargs["lengthGun"] * 1e3, n=sigfig)
                     self.tblmm.set(lgmm)
 
@@ -1230,9 +1172,7 @@ class InteriorBallisticsFrame(Frame):
                     if self.useCv.getObj() == USE_CV:
                         self.cvL.set(roundSig(kwargs["chamberVolume"] * 1e3, n=sigfig))
                     else:
-                        self.ldf.set(
-                            roundSig(kwargs["loadFraction"] * 100, n=sigfig)
-                        )  # corrected "bulk" load fraction
+                        self.ldf.set(roundSig(kwargs["loadFraction"] * 100, n=sigfig))  # corrected "bulk" load fraction
 
             self.ld.set(toSI(trueLF * self.prop.rho_p, useSN=False).strip() + " kg/m³")
             # true load density
@@ -1247,22 +1187,17 @@ class InteriorBallisticsFrame(Frame):
 
             self.va.set(toSI(gun.v_j, unit="m/s"))
 
-            cartridge_len = (
-                kwargs["chamberVolume"] / breechS
-            )  # is equivalent to chamber length
+            cartridge_len = kwargs["chamberVolume"] / breechS  # is equivalent to chamber length
 
             self.lx.set(
                 toSI(kwargs["lengthGun"] / caliber, unit="Cal"),
                 toSI(
-                    (kwargs["lengthGun"] + cartridge_len / kwargs["chambrage"])
-                    / kwargs["caliber"],
+                    (kwargs["lengthGun"] + cartridge_len / kwargs["chambrage"]) / kwargs["caliber"],
                     unit="Cal",
                 ),
             )
 
-            self.ammo.set(
-                "{:.3g} x {:.4g} mm".format(caliber * 1e3, cartridge_len * 1e3)
-            )
+            self.ammo.set("{:.3g} x {:.4g} mm".format(caliber * 1e3, cartridge_len * 1e3))
 
             self.pa.set(toSI(ps * gun.S / gun.m, unit="m/s²"))
             self.name.set(self.getDescriptive())
@@ -1305,10 +1240,10 @@ class InteriorBallisticsFrame(Frame):
         validationFLT = self.register(validateFLT)
 
         i = 0
-
+        # noinspection SpellCheckingInspection
         self.typeOptn = LocDropdown(
             parent=specFrm,
-            strObjDict=TYPES,
+            strObjDict={gun_type: gun_type for gun_type in (CONVENTIONAL, RECOILLESS)},
             locFunc=self.getLocStr,
             dropdowns=self.locs,
             descLabelKey="typeLabel",
@@ -1316,7 +1251,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.typeOptn.grid(row=i, column=0, sticky="nsew", padx=2, pady=2, columnspan=3)
         i += 1
-
+        # noinspection SpellCheckingInspection
         self.calmm = Loc3Input(
             parent=specFrm,
             row=i,
@@ -1328,6 +1263,7 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         i += 1
+        # noinspection SpellCheckingInspection
         self.tblmm = Loc3Input(
             parent=specFrm,
             row=i,
@@ -1339,6 +1275,7 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         i += 1
+        # noinspection SpellCheckingInspection
         self.shtkg = Loc3Input(
             parent=specFrm,
             row=i,
@@ -1350,10 +1287,10 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         i += 1
-
+        # noinspection SpellCheckingInspection
         self.ammoOptn = LocDropdown(
             parent=specFrm,
-            strObjDict=AMMUNITIONS,
+            strObjDict={CARTRIDGE: CARTRIDGE, TELESCOPED: TELESCOPED},
             locFunc=self.getLocStr,
             dropdowns=self.locs,
             descLabelKey="ammoLabel",
@@ -1361,7 +1298,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.ammoOptn.grid(row=i, column=0, sticky="nsew", padx=2, pady=2, columnspan=3)
         i += 1
-
+        # noinspection SpellCheckingInspection
         self.insetmm = Loc3Input(
             parent=specFrm,
             row=i,
@@ -1373,7 +1310,7 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         i += 1
-
+        # noinspection SpellCheckingInspection
         self.chgkg = Loc3Input(
             parent=specFrm,
             row=i,
@@ -1477,6 +1414,7 @@ class InteriorBallisticsFrame(Frame):
         j += 1
         self.dropGeom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         j += 1
+        # noinspection SpellCheckingInspection
         self.arcmm = Loc3Input(
             parent=grainFrm,
             row=j,
@@ -1530,9 +1468,10 @@ class InteriorBallisticsFrame(Frame):
         )
 
         i += 1
+        # noinspection SpellCheckingInspection
         self.useCv = LocDropdown(
             parent=specFrm,
-            strObjDict=USE,
+            strObjDict={USE_LF: USE_LF, USE_CV: USE_CV},
             locFunc=self.getLocStr,
             dropdowns=self.locs,
             descLabelKey="cvlfLabel",
@@ -1576,10 +1515,10 @@ class InteriorBallisticsFrame(Frame):
         )
 
         self.useCv.trace_add("write", self.cvlfCallback)
-        self.cvL.trace_add("write", self.cvlfConsisCallback)
-        self.ldf.trace_add("write", self.cvlfConsisCallback)
-        self.chgkg.trace_add("write", self.cvlfConsisCallback)
-        self.accExp.trace_add("write", self.cvlfConsisCallback)
+        self.cvL.trace_add("write", self.cvlfConsistencyCallback)
+        self.ldf.trace_add("write", self.cvlfConsistencyCallback)
+        self.chgkg.trace_add("write", self.cvlfConsistencyCallback)
+        self.accExp.trace_add("write", self.cvlfConsistencyCallback)
 
         i += 1
         self.clr = Loc3Input(
@@ -1642,6 +1581,7 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         i += 1
+        # noinspection SpellCheckingInspection
         self.nozzExp = Loc3Input(
             parent=specFrm,
             row=i,
@@ -1688,15 +1628,8 @@ class InteriorBallisticsFrame(Frame):
             self.geomAx = fig.add_subplot(111)
 
             self.geomCanvas = FigureCanvasTkAgg(fig, master=geomPlotFrm)
-            self.geomCanvas.draw()
-            # self.geomCanvas.get_tk_widget().grid(
-            #     row=0, column=0,  sticky="nsew"
-            # )
+            self.geomCanvas.draw_idle()
             self.geomCanvas.get_tk_widget().place(relheight=1, relwidth=1)
-            # self.geomCanvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=False)
-            # fig.set_layout_engine(None)
-
-        # geomPlotFrm.grid_propagate(True)
 
     def addCenterFrm(self):
         self.tabParent = ttk.Notebook(self, padding=0)
@@ -1758,10 +1691,10 @@ class InteriorBallisticsFrame(Frame):
         )
         self.errorText.grid(row=0, column=0, sticky="nsew")
 
-        # self.text.tag_configure(logging.DEBUG, foreground="tan")
-        self.errorText.tag_configure(logging.WARNING, foreground="orange")
-        self.errorText.tag_configure(logging.ERROR, foreground="orangered")
-        self.errorText.tag_configure(logging.CRITICAL, foreground="red")
+        self.errorText.tag_configure(str(logging.DEBUG), foreground="tan")
+        self.errorText.tag_configure(str(logging.WARNING), foreground="orange")
+        self.errorText.tag_configure(str(logging.ERROR), foreground="orangered")
+        self.errorText.tag_configure(str(logging.CRITICAL), foreground="red")
 
         errScroll.config(command=self.errorText.yview)
 
@@ -1784,6 +1717,7 @@ class InteriorBallisticsFrame(Frame):
 
         j = 1
         k = 0
+
         self.plotAvgP = LocLabelCheck(
             parent=plotFrm,
             row=j,
@@ -1859,15 +1793,6 @@ class InteriorBallisticsFrame(Frame):
             locFunc=self.getLocStr,
             allLC=checks,
         )
-        # k += 1
-        # self.plotRecoil = LocLabelCheck(
-        #     parent=plotFrm,
-        #     row=j,
-        #     col=k,
-        #     labelLocKey="plotRecoil",
-        #     locFunc=self.getLocStr,
-        #     allLC=checks,
-        # )
 
         for check in checks:
             check.trace_add("write", self.updateFigPlot)
@@ -1895,6 +1820,7 @@ class InteriorBallisticsFrame(Frame):
             axv.yaxis.tick_left()
 
             ax.set_xlabel(" ")
+            # noinspection PyTypeChecker
             axP.spines.right.set_position(("data", 0.5))
             axP.yaxis.set_ticks(axP.get_yticks()[1:-1:])
 
@@ -1906,8 +1832,6 @@ class InteriorBallisticsFrame(Frame):
             self.pltCanvas = FigureCanvasTkAgg(fig, master=plotPlaceFrm)
             self.pltCanvas.draw_idle()
             self.pltCanvas.get_tk_widget().place(relheight=1, relwidth=1)
-
-            # self.pltCanvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=True)
 
     def addAuxFrm(self):
         auxFrm = LocLabelFrame(
@@ -1974,9 +1898,9 @@ class InteriorBallisticsFrame(Frame):
             self.auxCanvas.draw_idle()
             self.auxCanvas.get_tk_widget().place(relwidth=1, relheight=1)
 
+    # noinspection PyUnusedLocal
     def updateFigPlot(self, *args):
-        gun = self.gun
-        if gun is None:
+        if self.gun is None:
             with mpl.rc_context(FIG_CONTEXT):
                 self.ax.cla()
                 self.axP.cla()
@@ -2004,12 +1928,12 @@ class InteriorBallisticsFrame(Frame):
                     if tag == POINT_PEAK_AVG:
                         if dom == DOMAIN_TIME:
                             xPeak = t * 1e3
-                        elif dom == DOMAIN_LENG:
+                        elif dom == DOMAIN_LEN:
                             xPeak = l
 
                     if dom == DOMAIN_TIME:
                         xs.append(t * 1000)
-                    elif dom == DOMAIN_LENG:
+                    elif dom == DOMAIN_LEN:
                         xs.append(l)
 
                     vs.append(v)
@@ -2018,7 +1942,7 @@ class InteriorBallisticsFrame(Frame):
                     Pbs.append(Pb / 1e6)
                     psis.append(psi)
 
-            elif gunType == RECOILESS:
+            elif gunType == RECOILLESS:
                 # fmt: off
                 for (
                     tag, t, l, psi, v, vx, Px, P0, P, Ps, T, eta
@@ -2027,12 +1951,12 @@ class InteriorBallisticsFrame(Frame):
                     if tag == POINT_PEAK_AVG:
                         if dom == DOMAIN_TIME:
                             xPeak = t * 1e3
-                        elif dom == DOMAIN_LENG:
+                        elif dom == DOMAIN_LEN:
                             xPeak = l
 
                     if dom == DOMAIN_TIME:
                         xs.append(t * 1000)
-                    elif dom == DOMAIN_LENG:
+                    elif dom == DOMAIN_LEN:
                         xs.append(l)
 
                     # Fr = P * gun.S * (1 - gun.C_f * gun.S_j_bar)
@@ -2046,32 +1970,32 @@ class InteriorBallisticsFrame(Frame):
                     psis.append(psi)
                     etas.append(eta)
 
-            elif gunType == HIGHLOW:
-                # fmt: off
-                for (tag, t, l, psi, v, Ph, Pb, P, Ps, Th, Tl, eta) in self.gunResult.getRawTableData():
-                    # fmt: on
-                    if tag == POINT_PEAK_AVG:
-                        if dom == DOMAIN_TIME:
-                            xPeak = t * 1e3
-                        elif dom == DOMAIN_LENG:
-                            xPeak = l
+            # elif gunType == HIGHLOW:
+            #     for tag, t, l, psi, v, Ph, Pb, P, Ps, Th, Tl, eta in self.gunResult.getRawTableData():
+            #
+            #         if tag == POINT_PEAK_AVG:
+            #             if dom == Domains.DOMAIN_TIME:
+            #                 xPeak = t * 1e3
+            #             elif dom == Domains.DOMAIN_LEN:
+            #                 xPeak = l
+            #
+            #         if dom == Domains.DOMAIN_TIME:
+            #             xs.append(t * 1000)
+            #         elif dom == Domains.DOMAIN_LEN:
+            #             xs.append(l)
+            #
+            #         # Fr = P * gun.S
+            #
+            #         vs.append(v)
+            #         Pas.append(P / 1e6)
+            #         Pss.append(Ps / 1e6)
+            #         Pbs.append(Pb / 1e6)
+            #         P0s.append(Ph / 1e6)
+            #         # Frs.append(Fr / 1e6)
+            #         psis.append(psi)
+            #         etas.append(eta)
 
-                    if dom == DOMAIN_TIME:
-                        xs.append(t * 1000)
-                    elif dom == DOMAIN_LENG:
-                        xs.append(l)
-
-                    # Fr = P * gun.S
-
-                    vs.append(v)
-                    Pas.append(P / 1e6)
-                    Pss.append(Ps / 1e6)
-                    Pbs.append(Pb / 1e6)
-                    P0s.append(Ph / 1e6)
-                    # Frs.append(Fr / 1e6)
-                    psis.append(psi)
-                    etas.append(eta)
-
+            # noinspection PyTypeChecker,PyUnreachableCode
             self.axP.spines.left.set_position(("data", xPeak))
 
             if self.plotBreechP.get():
@@ -2082,15 +2006,11 @@ class InteriorBallisticsFrame(Frame):
                     label=(
                         self.getLocStr("figBreech")
                         if gunType == CONVENTIONAL
-                        else (
-                            self.getLocStr("figNozzleP")
-                            if gunType == RECOILESS
-                            else self.getLocStr("figBleedP")
-                        )
+                        else (self.getLocStr("figNozzleP") if gunType == RECOILLESS else self.getLocStr("figBleedP"))
                     ),
                 )
 
-            if gunType == RECOILESS:
+            if gunType == RECOILLESS:
                 if self.plotStagP.get():
                     self.axP.plot(
                         xs,
@@ -2100,66 +2020,55 @@ class InteriorBallisticsFrame(Frame):
                     )
 
                 if self.plotNozzleV.get():
-                    self.axv.plot(
-                        xs, vxs, "royalblue", label=self.getLocStr("figNozzleV")
-                    )
+                    self.axv.plot(xs, vxs, "royalblue", label=self.getLocStr("figNozzleV"))
 
                 if self.plotEta.get():
-                    self.ax.plot(
-                        xs, etas, "crimson", label=self.getLocStr("figOutflow")
-                    )
+                    self.ax.plot(xs, etas, "crimson", label=self.getLocStr("figOutflow"))
 
-            elif gunType == HIGHLOW:
-                if self.plotStagP.get():
-                    self.axP.plot(
-                        xs,
-                        P0s,
-                        "seagreen",
-                        label=self.getLocStr("figHighChamber"),
-                    )
-
-                if self.plotEta.get():
-                    self.ax.plot(xs, etas, "crimson", label=self.getLocStr("figBleed"))
+            # elif gunType == HIGHLOW:
+            #     if self.plotStagP.get():
+            #         self.axP.plot(
+            #             xs,
+            #             P0s,
+            #             "seagreen",
+            #             label=self.getLocStr("figHighChamber"),
+            #         )
+            #
+            #     if self.plotEta.get():
+            #         self.ax.plot(xs, etas, "crimson", label=self.getLocStr("figBleed"))
 
             if self.plotAvgP.get():
                 self.axP.plot(
                     xs,
                     Pas,
                     "tab:green",
-                    label=(
-                        self.getLocStr("figLowAvgP")
-                        if gunType == HIGHLOW
-                        else self.getLocStr("figAvgP")
-                    ),
+                    # label=(self.getLocStr("figLowAvgP") if gunType == HIGHLOW else self.getLocStr("figAvgP")),
+                    label=self.getLocStr("figAvgP"),
                 )
 
             if self.plotBaseP.get():
-                self.axP.plot(
-                    xs, Pss, "yellowgreen", label=self.getLocStr("figShotBase")
-                )
+                self.axP.plot(xs, Pss, "yellowgreen", label=self.getLocStr("figShotBase"))
 
-            # TODO: add case for HL here.
-
-            if gunType == CONVENTIONAL or gunType == RECOILESS:
+            if gunType == CONVENTIONAL or gunType == RECOILLESS:
                 self.axP.axhline(
                     float(self.pTgt.get()),
                     c="tab:green",
                     linestyle=":",
                     label=self.getLocStr("figTgtP"),
                 )
-            elif gunType == HIGHLOW:
-                self.axP.axhline(
-                    float(self.pHTgt.get()),
-                    c="seagreen",
-                    linestyle=":",
-                    label=self.getLocStr("figHTgtP"),
-                )
-                self.axP.axhline(
-                    float(self.pLTgt.get()),
-                    c="tab:green",
-                    linestyle=":",
-                    label=self.getLocStr("figLTgtP"),
-                )
+            # elif gunType == HIGHLOW:
+            #     self.axP.axhline(
+            #         float(self.pHTgt.get()),
+            #         c="seagreen",
+            #         linestyle=":",
+            #         label=self.getLocStr("figHTgtP"),
+            #     )
+            #     self.axP.axhline(
+            #         float(self.pLTgt.get()),
+            #         c="tab:green",
+            #         linestyle=":",
+            #         label=self.getLocStr("figLTgtP"),
+            #     )
 
             if self.plotVel.get():
                 self.axv.plot(
@@ -2192,14 +2101,13 @@ class InteriorBallisticsFrame(Frame):
                 linesLabeled.append(lines)
 
             self.ax.set_xlim(left=0, right=xs[-1])
+            # noinspection SpellCheckingInspection
             pmax = max(Pas + Pbs + Pss + P0s)
             self.axP.set(ylim=(0, pmax * 1.1))
             self.axv.set(ylim=(0, max(vs + vxs) * 1.15))
             self.ax.set_ylim(bottom=0, top=1.05)
 
-            self.axP.yaxis.set_ticks(
-                [v for v in self.axP.get_yticks() if v <= pmax][1:]
-            )
+            self.axP.yaxis.set_ticks([v for v in self.axP.get_yticks() if v <= pmax][1:])
 
             self.ax.yaxis.tick_right()
             self.axP.yaxis.tick_left()
@@ -2214,8 +2122,8 @@ class InteriorBallisticsFrame(Frame):
 
             if dom == DOMAIN_TIME:
                 self.ax.set_xlabel(self.getLocStr("figTimeDomain"))
-            elif dom == DOMAIN_LENG:
-                self.ax.set_xlabel(self.getLocStr("figLengDomain"))
+            elif dom == DOMAIN_LEN:
+                self.ax.set_xlabel(self.getLocStr("figLenDomain"))
 
             self.axP.set_ylabel("MPa")
             self.axP.yaxis.label.set_color("tab:green")
@@ -2224,6 +2132,7 @@ class InteriorBallisticsFrame(Frame):
             self.axv.yaxis.label.set_color("tab:blue")
             self.pltCanvas.draw_idle()
 
+    # noinspection PyUnusedLocal
     def updateAuxPlot(self, *args):
         gun = self.gun
         if gun is None:
@@ -2240,6 +2149,7 @@ class InteriorBallisticsFrame(Frame):
             # gunType = self.kwargs["typ"]
 
             pTrace = self.gunResult.pressureTrace
+            # noinspection SpellCheckingInspection
             cmap = mpl.colormaps["afmhot"]
 
             x_max = 0
@@ -2329,9 +2239,10 @@ class InteriorBallisticsFrame(Frame):
 
         tblPlaceFrm = Frame(tblFrm)
         tblPlaceFrm.grid(row=0, column=0, sticky="nsew")
-
+        # noinspection SpellCheckingInspection
         vertscroll = ttk.Scrollbar(tblFrm, orient="vertical")  # create a scrollbar
         vertscroll.grid(row=0, rowspan=2, column=1, sticky="nsew")
+        # noinspection SpellCheckingInspection
         horzscroll = ttk.Scrollbar(tblFrm, orient="horizontal")
         horzscroll.grid(row=1, column=0, sticky="nsew")
 
@@ -2346,12 +2257,14 @@ class InteriorBallisticsFrame(Frame):
         vertscroll.configure(command=self.tv.yview)  # make it vertical
         horzscroll.configure(command=self.tv.xview)
 
+    # noinspection PyUnusedLocal
     def updateSpec(self, *args):
         self.specs.config(state="normal")
         compo = self.dropProp.getObj()
         self.specs.delete("1.0", END)
         t_Font = tkFont.Font(font=self.specs.cget("font"))
         width = self.specs.winfo_width() // t_Font.measure("m")
+        # noinspection SpellCheckingInspection
         self.specs.insert(
             END,
             "{:}: {:>4.0f} K {:}\n".format(
@@ -2368,9 +2281,7 @@ class InteriorBallisticsFrame(Frame):
         isp = compo.getIsp()
         self.specs.insert(
             END,
-            "{:}: {:>4.0f} m/s {:>3.0f} s\n".format(
-                self.getLocStr("vacISPDesc"), isp, isp / 9.805
-            ),
+            "{:}: {:>4.0f} m/s {:>3.0f} s\n".format(self.getLocStr("vacISPDesc"), isp, isp / 9.805),
         )
         isp = compo.getIsp(50)
         self.specs.insert(
@@ -2397,8 +2308,9 @@ class InteriorBallisticsFrame(Frame):
         # this updates the specification description
 
         self.callback()
-        self.cvlfConsisCallback()  # update the chamber volume / load fraction with current data
+        self.cvlfConsistencyCallback()  # update the chamber volume / load fraction with current data
 
+    # noinspection PyUnusedLocal
     def updateGeom(self, *args):
         geom = self.dropGeom.getObj()
         if geom == SimpleGeometry.SPHERE:
@@ -2431,6 +2343,7 @@ class InteriorBallisticsFrame(Frame):
         else:
             self.arcmm.reLocalize("athLabel", "arcText")
             self.grlR.reLocalize("ltdLabel", "perfLRText")
+            # noinspection SpellCheckingInspection
             self.grdR.reLocalize("pdtalLabel", "pDiaRText")
 
         self.callback()
@@ -2459,13 +2372,9 @@ class InteriorBallisticsFrame(Frame):
                 self.geomAx.grid(which="major", color="grey", linestyle="dotted")
                 self.geomAx.minorticks_on()
                 self.geomAx.set_xlim(left=0, right=min(prop.Z_b, 2))
-                self.geomAx.xaxis.set_ticks(
-                    [i * 0.5 for i in range(ceil(min(prop.Z_b, 2) / 0.5) + 1)]
-                )
+                self.geomAx.xaxis.set_ticks([i * 0.5 for i in range(ceil(min(prop.Z_b, 2) / 0.5) + 1)])
                 self.geomAx.set_ylim(bottom=0, top=max(ys))
-                self.geomAx.yaxis.set_ticks(
-                    [i * 0.5 for i in range(ceil(max(ys) / 0.5) + 1)]
-                )
+                self.geomAx.yaxis.set_ticks([i * 0.5 for i in range(ceil(max(ys) / 0.5) + 1)])
 
             self.geomCanvas.draw_idle()
 
@@ -2490,32 +2399,25 @@ class InteriorBallisticsFrame(Frame):
             locTableData.append((self.getLocStr(line[0]), *line[1:]))
 
         if gunType == CONVENTIONAL:
-            # fmt: off
-            useSN = (
-                False, False, False, True, False, False, False, False, True
-            )
-            # fmt: on
+
+            useSN = (False, False, False, True, False, False, False, False, True)
 
             units = (None, "s", "m", None, "m/s", "Pa", "Pa", "Pa", "K")
 
-        elif gunType == RECOILESS:
-            # fmt: off
-            useSN = (
-                False, False, False, True, False, False, False, False, False,
-                False, True, True
-            )
-            units = (
-                None, "s", "m", None, "m/s", "m/s", "Pa", "Pa", "Pa", "Pa", "K", None
-            )
-            # fmt: on
+        elif gunType == RECOILLESS:
 
-        elif gunType == HIGHLOW:
-            # fmt: off
-            useSN = (
-                False, False, False, True, False, False, False, False, False, True, True, True
-            )
-            units = (None, "s", "m", None, "m/s", "Pa", "Pa", "Pa", "Pa", "K", "K", None)
-            # fmt: on
+            useSN = (False, False, False, True, False, False, False, False, False, False, True, True)
+            units = (None, "s", "m", None, "m/s", "m/s", "Pa", "Pa", "Pa", "Pa", "K", None)
+
+        # elif gunType == HIGHLOW:
+        #     # fmt: off
+        #     useSN = (
+        #         False, False, False, True, False, False, False, False, False, True, True, True
+        #     )
+        #     units = (None, "s", "m", None, "m/s", "Pa", "Pa", "Pa", "Pa", "K", "K", None)
+        #     # fmt: on
+        else:
+            raise ValueError("unknown gun types")
 
         locTableData = dot_aligned(locTableData, units=units, useSN=useSN)
         errorData = dot_aligned(errorData, units=units, useSN=useSN)
@@ -2525,14 +2427,12 @@ class InteriorBallisticsFrame(Frame):
         self.tv["show"] = "headings"
 
         self.tv.tag_configure(self.getLocStr(POINT_PEAK_STAG), foreground="#2e8b57")
-        self.tv.tag_configure(self.getLocStr(POINT_PEAK_HIGH), foreground="#2e8b57")
+        # self.tv.tag_configure(self.getLocStr(POINT_PEAK_HIGH), foreground="#2e8b57")
 
         self.tv.tag_configure(self.getLocStr(POINT_PEAK_AVG), foreground="#2ca02c")
         self.tv.tag_configure(self.getLocStr(POINT_PEAK_BREECH), foreground="orange")
-        self.tv.tag_configure(self.getLocStr(POINT_PEAK_BLEED), foreground="orange")
-        self.tv.tag_configure(
-            self.getLocStr(POINT_PEAK_SHOT), foreground="yellow green"
-        )
+        # self.tv.tag_configure(self.getLocStr(POINT_PEAK_BLEED), foreground="orange")
+        self.tv.tag_configure(self.getLocStr(POINT_PEAK_SHOT), foreground="yellow green")
         self.tv.tag_configure(self.getLocStr(POINT_BURNOUT), foreground="red")
         self.tv.tag_configure(self.getLocStr(POINT_FRACTURE), foreground="brown")
         self.tv.tag_configure(self.getLocStr(POINT_EXIT), foreground="steel blue")
@@ -2551,9 +2451,7 @@ class InteriorBallisticsFrame(Frame):
         width = winWidth // len(self.tv["columns"])
 
         for i, column in enumerate(columnList):  # foreach column
-            self.tv.heading(
-                i, text=column, anchor="e"
-            )  # let the column heading = column name
+            self.tv.heading(i, text=column, anchor="e")  # let the column heading = column name
             self.tv.column(
                 column,
                 stretch=True,  # will adjust to window resizing
@@ -2561,23 +2459,16 @@ class InteriorBallisticsFrame(Frame):
                 minwidth=fontWidth * 14,
                 anchor="e",
             )
-        for i, (row, erow) in enumerate(zip(locTableData, errorData)):
-            self.tv.insert(
-                "",
-                END,
-                str(i + 1),
-                values=row,
-                tags=(row[0].strip(), "monospace"),
-            )
-            self.tv.insert(
-                str(i + 1),
-                END,
-                str(-i - 1),
-                values=tuple("±" + e if "." in e else e for e in erow),
-                tags="error",
-            )
-            self.tv.move(str(-i - 1), str(i + 1), END)
 
+        # noinspection SpellCheckingInspection
+        for i, (row, erow) in enumerate(zip(locTableData, errorData)):
+            self.tv.insert("", "end", str(i + 1), values=row, tags=(row[0].strip(), "monospace"))
+            self.tv.insert(
+                str(i + 1), "end", str(-i - 1), values=tuple("±" + e if "." in e else e for e in erow), tags="error"
+            )
+            self.tv.move(str(-i - 1), str(i + 1), -1)
+
+    # noinspection PyUnusedLocal
     def callback(self, *args):
         """
         updates the propellant object on write to the ratio entry fields
@@ -2601,10 +2492,9 @@ class InteriorBallisticsFrame(Frame):
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.prop = None
             logging.error("exception in propellant callback:")
-            logging.error(
-                "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-            )
+            logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
+    # noinspection PyUnusedLocal
     def typeCallback(self, *args):
         gunType = self.typeOptn.getObj()
 
@@ -2614,7 +2504,7 @@ class InteriorBallisticsFrame(Frame):
             self.dropSoln.setByObj(SOL_LAGRANGE)
             self.dropSoln.disable()
 
-        if gunType == RECOILESS:
+        if gunType == RECOILLESS:
             self.bm.reLocalize("nmLabel", "")
             self.nozzExp.restore()
             self.nozzEff.restore()
@@ -2625,65 +2515,57 @@ class InteriorBallisticsFrame(Frame):
             self.nozzEff.remove()
             self.plotNozzleV.remove()
 
-        if gunType == HIGHLOW:
-            self.evL.restore()
-            self.bstMPa.restore()
-            self.perf.restore()
-            self.plotAvgP.reLocalize("plotLowAvgP")
-            self.pTgt.remove()
-            self.pHTgt.restore()
-            self.pLTgt.restore()
-            self.ammoOptn.setByObj(CARTRIDGE)
-            self.ammoOptn.disable()
-        else:
-            self.evL.remove()
-            self.bstMPa.remove()
-            self.perf.remove()
-            self.plotAvgP.reLocalize("plotAvgP")
-            self.pTgt.restore()
-            self.pHTgt.remove()
-            self.pLTgt.remove()
-            self.ammoOptn.enable()
+        # if gunType == HIGHLOW:
+        #     self.evL.restore()
+        #     self.bstMPa.restore()
+        #     self.perf.restore()
+        #     self.plotAvgP.reLocalize("plotLowAvgP")
+        #     self.pTgt.remove()
+        #     self.pHTgt.restore()
+        #     self.pLTgt.restore()
+        #     self.ammoOptn.setByObj(CARTRIDGE)
+        #     self.ammoOptn.disable()
+        # else:
+        #     self.evL.remove()
+        #     self.bstMPa.remove()
+        #     self.perf.remove()
+        #     self.plotAvgP.reLocalize("plotAvgP")
+        #     self.pTgt.restore()
+        #     self.pHTgt.remove()
+        #     self.pLTgt.remove()
+        #     self.ammoOptn.enable()
 
         if gunType == CONVENTIONAL:
             self.plotBreechP.reLocalize("plotBreechP")
             self.plotStagP.remove()
             self.plotEta.remove()
-            self.pControl.reset(
-                {
-                    POINT_PEAK_SHOT: POINT_PEAK_SHOT,
-                    POINT_PEAK_AVG: POINT_PEAK_AVG,
-                    POINT_PEAK_BREECH: POINT_PEAK_BREECH,
-                }
-            )
-        elif gunType == RECOILESS:
+            self.pControl.reset({point: point for point in (POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)})
+        elif gunType == RECOILLESS:
             self.plotBreechP.reLocalize("plotNozzleP")
             self.plotStagP.restore()
             self.plotStagP.reLocalize("plotStagP")
             self.plotEta.restore()
             self.plotEta.reLocalize("plotEtaEsc")
             self.pControl.reset(
-                {
-                    POINT_PEAK_SHOT: POINT_PEAK_SHOT,
-                    POINT_PEAK_STAG: POINT_PEAK_STAG,
-                    POINT_PEAK_AVG: POINT_PEAK_AVG,
-                    POINT_PEAK_BREECH: POINT_PEAK_BREECH,
-                }
+                {point: point for point in (POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_AVG, POINT_PEAK_BREECH)}
             )
-        elif gunType == HIGHLOW:
-            self.plotBreechP.reLocalize("plotLowBldP")
-            self.plotStagP.restore()
-            self.plotStagP.reLocalize("plotHighP")
-            self.plotEta.restore()
-            self.plotEta.reLocalize("plotEtaBld")
-            self.pControl.reset(
-                {
-                    POINT_PEAK_SHOT: POINT_PEAK_SHOT,
-                    POINT_PEAK_AVG: POINT_PEAK_AVG,
-                    POINT_PEAK_BLEED: POINT_PEAK_BLEED,
-                }
-            )
+        else:
+            raise ValueError("unknown gun type")
+        # elif gunType == HIGHLOW:
+        #     self.plotBreechP.reLocalize("plotLowBldP")
+        #     self.plotStagP.restore()
+        #     self.plotStagP.reLocalize("plotHighP")
+        #     self.plotEta.restore()
+        #     self.plotEta.reLocalize("plotEtaBld")
+        #     self.pControl.reset(
+        #         {
+        #             POINT_PEAK_SHOT: POINT_PEAK_SHOT,
+        #             POINT_PEAK_AVG: POINT_PEAK_AVG,
+        #             POINT_PEAK_BLEED: POINT_PEAK_BLEED,
+        #         }
+        #     )
 
+    # noinspection PyUnusedLocal
     def ctrlCallback(self, *args):
         if self.solve_W_Lg.get() == 0:
             self.vTgt.disable()
@@ -2719,7 +2601,8 @@ class InteriorBallisticsFrame(Frame):
             self.lgmax.enable()
             self.pControl.enable()
 
-    def cvlfConsisCallback(self, *args):
+    # noinspection PyUnusedLocal, SpellCheckingInspection
+    def cvlfConsistencyCallback(self, *args):
         try:
             sigfig = int(self.accExp.get()) + 1
             if self.useCv.getObj() == USE_CV:  # use Cv
@@ -2737,17 +2620,20 @@ class InteriorBallisticsFrame(Frame):
         except (ZeroDivisionError, ValueError):
             return
 
+    # noinspection PyUnusedLocal
     def ambCallback(self, *args):
         self.ambP.enable() if self.inAtmos.get() else self.ambP.disable()
         self.ambRho.enable() if self.inAtmos.get() else self.ambRho.disable()
         self.ambGam.enable() if self.inAtmos.get() else self.ambGam.disable()
 
+    # noinspection PyUnusedLocal, SpellCheckingInspection
     def cvlfCallback(self, *args):
         useCv = self.useCv.getObj() == USE_CV
 
         self.ldf.disable() if useCv else self.ldf.enable()
         self.cvL.enable() if useCv else self.cvL.disable()
 
+    # noinspection PyUnusedLocal
     def insetCallback(self, *args):
         isCartridge = self.ammoOptn.getObj() == CARTRIDGE
         self.insetmm.remove() if isCartridge else self.insetmm.restore()
@@ -2760,36 +2646,30 @@ class InteriorBallisticsFrame(Frame):
         elif choice == 1:
             style.theme_use("awlight")
 
-        self.setTheme()
-
-    def setTheme(self):
-        dpi = self.dpi
-
         style = ttk.Style(self)
         # ensure that the treeview rows are roughly the same height
         # regardless of dpi. on Windows, default is Segoe UI at 9 points
         # so the default row height should be around 12
 
-        style.configure("Treeview", rowheight=round(12 * (FONTSIZE / 8) * dpi / 72.0))
+        style.configure("Treeview", rowheight=round(12 * (FONTSIZE / 8) * self.dpi / 72.0))
         style.configure("Treeview.Heading", font=(FONTNAME, FONTSIZE))
         style.configure("TButton", font=(FONTNAME, FONTSIZE + 2, "bold"))
         style.configure("TLabelframe.Label", font=(FONTNAME, FONTSIZE + 2, "bold"))
-        style.configure(
-            "SubLabelFrame.TLabelframe.Label", font=(FONTNAME, FONTSIZE + 2)
-        )
+        style.configure("SubLabelFrame.TLabelframe.Label", font=(FONTNAME, FONTSIZE + 2))
         style.configure("TCheckbutton", font=(FONTNAME, FONTSIZE))
         style.configure("TNotebook.Tab", font=(FONTNAME, FONTSIZE + 1, "bold"))
 
         bgc = str(style.lookup("TFrame", "background"))
         fgc = str(style.lookup("TFrame", "foreground"))
-        ebgc = str(style.lookup("TCombobox", "fieldbackground"))
+        # noinspection SpellCheckingInspection
+        fbgc = str(style.lookup("TCombobox", "fieldbackground"))
 
         GEOM_CONTEXT.update(
             {
                 "xtick.color": fgc,
                 "ytick.color": fgc,
                 "axes.edgecolor": fgc,
-                "axes.facecolor": ebgc,
+                "axes.facecolor": fbgc,
                 "figure.facecolor": bgc,
                 "figure.edgecolor": fgc,
             }
@@ -2800,7 +2680,7 @@ class InteriorBallisticsFrame(Frame):
                 "figure.facecolor": bgc,
                 "figure.edgecolor": fgc,
                 "axes.edgecolor": fgc,
-                "axes.facecolor": ebgc,
+                "axes.facecolor": fbgc,
                 "axes.labelcolor": fgc,
                 "text.color": fgc,
                 "xtick.color": fgc,
@@ -2808,11 +2688,7 @@ class InteriorBallisticsFrame(Frame):
             }
         )
 
-        grays = (
-            [f"gray{i}" for i in [90, 80, 70]]
-            if self.themeRadio.get()
-            else [f"gray{i}" for i in [16, 23, 30]]
-        )
+        grays = [f"gray{i}" for i in [90, 80, 70]] if self.themeRadio.get() else [f"gray{i}" for i in [16, 23, 30]]
 
         self.errorText.tag_configure("integrate", background=grays[0])
         self.errorText.tag_configure("structure", background=grays[0])
@@ -2821,28 +2697,21 @@ class InteriorBallisticsFrame(Frame):
 
         # some widgets also needs to be manually updated
         for w in self.forceUpdOnThemeWidget:
-            w.config(background=ebgc, foreground=fgc)
+            w.config(background=fbgc, foreground=fgc)
 
         try:
             self.fig.set_facecolor(bgc)
             self.geomFig.set_facecolor(bgc)
             self.auxFig.set_facecolor(bgc)
 
-            # this is necessary because twinned axis does not necessarily
-            # follow the rcParams
-            for ax in (
-                self.ax,
-                self.axv,
-                self.axP,
-                self.geomAx,
-                self.auxAx,
-                self.auxAxH,
-            ):
-                ax.set_facecolor(ebgc)
+            for ax in (self.ax, self.axv, self.axP, self.geomAx, self.auxAx, self.auxAxH):
+                ax.set_facecolor(fbgc)
                 ax.spines["top"].set_color(fgc)
                 ax.spines["bottom"].set_color(fgc)
                 ax.spines["left"].set_color(fgc)
                 ax.spines["right"].set_color(fgc)
+                ax.tick_params(axis="x", colors=fgc)
+                ax.tick_params(axis="y", colors=fgc)
 
             self.updateGeomPlot()
             self.updateFigPlot()
@@ -2869,39 +2738,38 @@ def calculate(jobQueue, progressQueue, logQueue, kwargs):
     debug = kwargs["deb"]
 
     try:
+        gun = None
+        gunResult = None
         if constrain:
             if gunType == CONVENTIONAL:
                 constrained = Constrained(**kwargs)
-            elif gunType == RECOILESS:
-                constrained = ConstrainedRecoiless(**kwargs)
-            elif gunType == HIGHLOW:
-                constrained = ConstrainedHighlow(**kwargs)
+            elif gunType == RECOILLESS:
+                constrained = ConstrainedRecoilless(**kwargs)
+            else:
+                raise ValueError("unknown gun type")
+            # elif gunType == HIGHLOW:
+            #     constrained = ConstrainedHighlow(**kwargs)
 
             if optimize:
-                if gunType == CONVENTIONAL or gunType == RECOILESS:
-                    l_f, e_1, l_g = constrained.findMinV(
-                        **kwargs, progressQueue=progressQueue
-                    )
-                elif gunType == HIGHLOW:
-                    l_f, e_1, V_1, l_g = constrained.findMinV(
-                        **kwargs, progressQueue=progressQueue
-                    )
-                    kwargs.update({"expansionVolume": V_1})
+                if gunType == CONVENTIONAL or gunType == RECOILLESS:
+                    l_f, e_1, l_g = constrained.findMinV(**kwargs, progressQueue=progressQueue)
+                # elif gunType == HIGHLOW:
+                #     l_f, e_1, V_1, l_g = constrained.findMinV(**kwargs, progressQueue=progressQueue)
+                #     kwargs.update({"expansionVolume": V_1})
+                else:
+                    raise ValueError("unknown gun type")
+
                 kwargs.update({"loadFraction": l_f})
-                chamberVolume = (
-                    kwargs["chargeMass"]
-                    / kwargs["propellant"].rho_p
-                    / kwargs["loadFraction"]
-                )
+                chamberVolume = kwargs["chargeMass"] / kwargs["propellant"].rho_p / kwargs["loadFraction"]
                 kwargs.update({"chamberVolume": chamberVolume})
             else:
-                if gunType == CONVENTIONAL or gunType == RECOILESS:
+                if gunType == CONVENTIONAL or gunType == RECOILLESS:
                     e_1, l_g = constrained.solve(**kwargs, progressQueue=progressQueue)
-                elif gunType == HIGHLOW:
-                    e_1, V_1, l_g = constrained.solve(
-                        **kwargs, progressQueue=progressQueue
-                    )
-                    kwargs.update({"expansionVolume": V_1})
+                # elif gunType == HIGHLOW:
+                #     e_1, V_1, l_g = constrained.solve(**kwargs, progressQueue=progressQueue)
+                #     kwargs.update({"expansionVolume": V_1})
+                else:
+                    raise ValueError("unknown gun type")
 
             kwargs.update({"grainSize": 2 * e_1})
 
@@ -2910,10 +2778,12 @@ def calculate(jobQueue, progressQueue, logQueue, kwargs):
 
         if gunType == CONVENTIONAL:
             gun = Gun(**kwargs)
-        elif gunType == RECOILESS:
-            gun = Recoiless(**kwargs)
-        elif gunType == HIGHLOW:
-            gun = Highlow(**kwargs)
+        elif gunType == RECOILLESS:
+            gun = Recoilless(**kwargs)
+        # elif gunType == HIGHLOW:
+        #     gun = Highlow(**kwargs)
+        else:
+            raise ValueError("unknown gun type")
 
         gunResult = gun.integrate(**kwargs, progressQueue=progressQueue)
         logging.info("calculation concluded successfully.")
@@ -2924,10 +2794,9 @@ def calculate(jobQueue, progressQueue, logQueue, kwargs):
 
         exc_type, exc_value, exc_traceback = sys.exc_info()
         logging.error("exception while calculating:")
-        logging.error(
-            "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-        )
+        logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
     finally:
+        # noinspection PyUnboundLocalVariable
         jobQueue.put((kwargs, gun, gunResult))
 
 
@@ -2967,9 +2836,7 @@ def main():
     loc = locale.windows_locale[windll.kernel32.GetUserDefaultUILanguage()]
 
     # this allows us to set our own taskbar icon
-    # "mycompany.myproduct.subproduct.version"
-    myappid = "Phoenix.Interior.Ballistics.Solver"  # arbitrary string
-    windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    windll.shell32.SetCurrentProcessExplicitAppUserModelID("Phoenix.Interior.Ballistics.Solver")
 
     loadfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"), False, True)
     font_manager.fontManager.addfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"))
@@ -2997,15 +2864,15 @@ def main():
     # root.resizable(False, False)
     # root.iconify()
 
-    InteriorBallisticsFrame(
-        root, menubar, dpi, defaultLang="English" if loc != "zh_CN" else "中文"
-    )
-    # root.minsize(root.winfo_width(), root.winfo_height())  # set minimum size
-    # root.geometry("1600x1200")
-    # root.minsize(1600, 1200)  # set minimum size
-    root.state("zoomed")
     root.bind("<Escape>", lambda event: root.state("normal"))
     root.bind("<F11>", lambda event: root.state("zoomed"))
+    InteriorBallisticsFrame(root, menubar, dpi, defaultLang="English" if loc != "zh_CN" else "中文")
+    root.minsize(root.winfo_width(), root.winfo_height())  # set minimum size
+    root.state("zoomed")
+
+    # root.geometry("1600x1200")
+    # root.minsize(1600, 1200)  # set minimum size
+
     # root.resizable(True, True)
 
     root.mainloop()

@@ -18,13 +18,13 @@ Original BASIC listings is distributed with the notice:
 # The program given in this paper can be freely reproduced if
 # used in strictly non-commercial applications.
 
-The drag curves herein contains significant original work by Simon Fowler, whom 
+The drag curves herein contains significant original work by Simon Fowler, whom
 ported Jurens work into Python with additional data, and developed a GUI/CLI
 interface for the same. Fowler's work is at:
 https://github.com/sjjf/master_exterior_ballistics
 Distributed under the GNU General Public License, Version 3 or later.
 Given the JS version is ported from the Python distribution, this author assumes
-similar permissions would apply to the Javascript version. 
+similar permissions would apply to the Javascript version.
 
 Since PhoenixYard is distributed under the Unlicensed license, to respect the
 GNU GPL v3 license's stronger provisions, code herein are written de-noveau
@@ -533,10 +533,11 @@ PARIS_GUN_Drag = [0.072600, 0.072600, 0.072600, 0.072600, 0.072600, 0.072600,
 0.023758, 0.023267, 0.022777, 0.022286, 0.021795, 0.021304, 0.020813, 0.020322,
 0.019831, 0.019340, 0.018850, 0.018359, 0.017868, 0.017377, 0.016886]
 
+import csv
+
 # fmt: on
 from bisect import bisect
 from enum import Enum
-import csv
 
 with open("ballistics/resource/ffvhl.csv", "r", newline="") as csvFile:
     reader = csv.reader(csvFile, delimiter=",", quoting=csv.QUOTE_NONNUMERIC)
@@ -558,11 +559,7 @@ class KdCurve(Enum):
         drag = self.drag
         n = len(mach)
         if M < mach[0] or M > mach[n - 1]:
-            raise ValueError(
-                "Mach value {:} is out of range for {:}-{:}".format(
-                    M, mach[0], mach[n - 1]
-                )
-            )
+            raise ValueError("Mach value {:} is out of range for {:}-{:}".format(M, mach[0], mach[n - 1]))
 
         """
         Use the Python built in library (optimized C code) to find an insertion
@@ -621,9 +618,9 @@ class KdCurve(Enum):
 KDCURVES = {c.desc: c for c in KdCurve}
 
 if __name__ == "__main__":
-    from matplotlib import pyplot as plt
-    from labellines import labelLines
     import numpy as np
+    from labellines import labelLines
+    from matplotlib import pyplot as plt
 
     ax = plt.subplot()
 

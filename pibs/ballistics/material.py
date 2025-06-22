@@ -3,11 +3,7 @@ from enum import Enum
 
 def _30SIMN2MOVA_Y(T):
     return (
-        -0.047 * (T / 293) ** 4
-        + 0.201 * (T / 293) ** 3
-        - 0.15 * (T / 293) ** 2
-        - 0.376 * (T / 293)
-        + 1.375
+        -0.047 * (T / 293) ** 4 + 0.201 * (T / 293) ** 3 - 0.15 * (T / 293) ** 2 - 0.376 * (T / 293) + 1.375
     ) * 900e6  # Circumferential Yield Strength in Pa
 
 
@@ -30,7 +26,7 @@ class Material(Enum):
     def __str__(self):
         return self.desc
 
-    _30SIMN2MOVA = (
+    material_30SIMN2MOVA = (
         "30SiMn2MoVA",
         "Cao et al., (2017); Gu et al., (2018); Rp0.2",
         7801,
@@ -38,7 +34,7 @@ class Material(Enum):
         [293 + i * 100 for i in range(7)],
     )
 
-    _38644Ti = (
+    material_38644Ti = (
         "38644Ti",
         "ADA196329; 0.1%",
         4820,
@@ -46,7 +42,7 @@ class Material(Enum):
         [294, 273 + 316],
     )
 
-    _A723 = (
+    material_A723 = (
         "ASTM A723 Grade 2",
         "ADA196329; 0.1%",
         7850,  # generic value
@@ -79,4 +75,4 @@ MATERIALS = {i.desc: i for i in Material}
 
 
 if __name__ == "__main__":
-    print(Material._30SIMN2MOVA.getTdict())
+    print(Material.material_30SIMN2MOVA.getTdict())
