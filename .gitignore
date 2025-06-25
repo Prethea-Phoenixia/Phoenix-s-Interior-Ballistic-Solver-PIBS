@@ -153,5 +153,4 @@ cython_debug/
 *.pstats
 *.png
 
-# not finsihed
-/archive
+/output/*
