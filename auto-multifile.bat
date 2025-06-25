@@ -1,1 +1,0 @@
-auto-py-to-exe -c "multifile.json" -o "%~dp0%build"
