@@ -1,8 +1,8 @@
+import json
 import os
 import sys
-from ctypes import windll, byref, create_unicode_buffer, create_string_buffer
-from math import log, floor, log10
-
+from ctypes import byref, create_string_buffer, create_unicode_buffer, windll
+from math import floor, log, log10
 
 _prefix = {
     "y": 1e-24,  # yocto
@@ -35,7 +35,7 @@ def resolvepath(path):
         resolved_path = os.path.abspath(os.path.join(sys._MEIPASS, path))
     else:
         # Normal development mode. Use os.getcwd() or __file__ as appropriate in your case...
-        resolved_path = os.path.abspath(os.path.join(os.getcwd(), path))
+        resolved_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), path))
 
     return resolved_path
 
@@ -96,11 +96,7 @@ def toSI(v, dec=4, unit=None, useSN=False):
                 + vstr
                 + " " * (dec + 1 - len(vstr) + vstr.find("."))
                 + (
-                    (
-                        "E{:<+3d}".format(round(log(magnitude, 10)))
-                        if magnitude != 1
-                        else "    "  # 4 SPACES!
-                    )
+                    ("E{:<+3d}".format(round(log(magnitude, 10))) if magnitude != 1 else "    ")  # 4 SPACES!
                     if useSN
                     else prefix
                 )
@@ -138,9 +134,7 @@ def validateNN(inp):
         inp == ""
         or inp == "."
         or (inp.count("e") == 1 and inp[-1] == "e")  # scientific input
-        or (
-            inp.count("e") == 1 and inp[-2:] == "e-"
-        )  # scientific input with negative exponent
+        or (inp.count("e") == 1 and inp[-2:] == "e-")  # scientific input with negative exponent
     ):
         return True
     try:
@@ -167,9 +161,7 @@ def validateFLT(inp):  # validate an input such that the result is a float.
         or inp == "."
         or inp == "-"
         or (inp.count("e") == 1 and inp[-1] == "e")  # scientific input
-        or (
-            inp.count("e") == 1 and inp[-2:] == "e-"
-        )  # scientific input with negative exponent
+        or (inp.count("e") == 1 and inp[-2:] == "e-")  # scientific input with negative exponent
     ):
         return True
     try:
@@ -222,20 +214,25 @@ def roundSig(x, n=4):
 
 
 def formatMass(m, n=4):
-    if m is None:
-        return "N/A"
-    if m < 1e-3:
-        return "{:.{:}g} mg".format(m * 1e6, n)
-    elif m < 1:
-        return "{:.{:}g} g".format(m * 1e3, n)
-    elif m < 1000:
-        return "{:.{:}g} kg".format(m, n)
-    elif m < 1e6:
-        return "{:.{:}g} t".format(m * 1e-3, n)
-    elif m < 1e9:
-        return "{:.{:}g} kt".format(m * 1e-6, n)
-    elif m < 1e12:
-        return "{:.{:}g} Mt".format(m * 1e-9, n)
+    if m:
+        if m < 1e-3:
+            return "{:.{:}g} mg".format(m * 1e6, n)
+        elif m < 1:
+            return "{:.{:}g} g".format(m * 1e3, n)
+        elif m < 1000:
+            return "{:.{:}g} kg".format(m, n)
+        elif m < 1e6:
+            return "{:.{:}g} t".format(m * 1e-3, n)
+        elif m < 1e9:
+            return "{:.{:}g} kt".format(m * 1e-6, n)
+        elif m < 1e12:
+            return "{:.{:}g} Mt".format(m * 1e-9, n)
+
+    return "N/A"
+
+
+with open(resolvepath("ui/localization.json")) as file:
+    STRING = json.load(file)
 
 
 if __name__ == "__main__":

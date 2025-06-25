@@ -2,3 +2,18 @@
 profile = "black"
 [tool.black]
 line-length = 120
+
+[tool.setuptools.dynamic]
+version = { attr = "pibs.__version__" }
+
+[project]
+name = "pibs"
+dynamic = ["version"]
+dependencies = [
+    "matplotlib",
+    "matplotlib-label-lines",
+    "tabulate"
+]
+
+[project.optional-dependencies]
+dev = ["black", "isort", "auto-py-to-exe"]

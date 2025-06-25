@@ -41,7 +41,6 @@ class ConstrainedRecoilless:
     ):
         # constants for constrained designs
 
-        logger = logging.getLogger("opt.recoiless")
         logger.info("initializing constrained recoiless gun object.")
 
         if any(
@@ -112,7 +111,6 @@ class ConstrainedRecoilless:
         progressQueue=None,
         **_,
     ):
-        logger = logging.getLogger("opt.recoiless.solve")
         logger.info("solving constraint at specified load fraction")
         if any((chargeMassRatio <= 0, loadFraction <= 0, loadFraction > 1)):
             raise ValueError("Invalid parameters to solve constrained design problem")
@@ -162,7 +160,7 @@ class ConstrainedRecoilless:
 
         phi = phi_1 + omega / (3 * m)
 
-        S_j_bar = 1 / (Recoilless._getCf(gamma, A_bar, tol) * chi_0)
+        S_j_bar = 1 / (Recoilless.getCf(gamma, A_bar, tol) * chi_0)
         if S_j_bar > chi_k:
             raise ValueError(
                 "Achieving recoiless condition necessitates"
@@ -573,7 +571,6 @@ class ConstrainedRecoilless:
         """
         find the minimum volume solution.
         """
-        logger = logging.getLogger("opt.recoiless.minimize")
         if progressQueue is not None:
             progressQueue.put(1)
 

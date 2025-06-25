@@ -1,7 +1,7 @@
 from tkinter import IntVar, StringVar, ttk
 
-from misc import formatFloatInput
-from tip import CreateToolTip
+from .misc import formatFloatInput
+from .tip import CreateToolTip
 
 
 class Loc12Disp:
@@ -111,7 +111,8 @@ class Loc122Disp(Loc12Disp):
         if allDisps is not None:
             allDisps.append(self)
 
-    def set(self, val_1, val_2):
+    def set(self, val):
+        val_1, val_2 = val
         self.entryVar.set(val_1)
         self.auxEntryVar.set(val_2)
 
@@ -126,7 +127,7 @@ class Loc2Input:
         descLabelKey=None,
         default="",
         validation=None,
-        labelWidth=0,
+        labelWidth=20,
         entryWidth=10,
         formatter=formatFloatInput,
         color=None,
@@ -136,6 +137,7 @@ class Loc2Input:
         locFunc=None,
         allInputs=None,
     ):
+        # noinspection PyTypeChecker
         lb = ttk.Label(parent, text=locFunc(labelLocKey), width=labelWidth, anchor=anchor)
 
         lb.grid(
@@ -245,7 +247,7 @@ class Loc3Input(Loc2Input):
         unitText="",
         default="",
         validation=None,
-        labelWidth=0,
+        labelWidth=20,
         entryWidth=10,
         formatter=formatFloatInput,
         color=None,
@@ -337,7 +339,7 @@ class LocDropdown:
 
     def setByStr(self, string):
         """
-        Given an unlocalized string / localization key, set the drop down menu
+        Given an unlocalized string / localization key, set the drop-down menu
         to the correct position.
         """
         self.widget.set(self.widget["values"][list(self.strObjDict.keys()).index(string)])

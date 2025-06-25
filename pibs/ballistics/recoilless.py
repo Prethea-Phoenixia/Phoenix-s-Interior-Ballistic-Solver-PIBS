@@ -19,15 +19,10 @@ from pibs.ballistics import (
     POINT_PEAK_STAG,
     POINT_START,
     Domains,
+    COMPUTE,
+    SAMPLE,
 )
-from .gun import (
-    GenericEntry,
-    GenericResult,
-    Gun,
-    OutlineEntry,
-    PressureProbePoint,
-    PressureTraceEntry,
-)
+from .gun import GenericEntry, GenericResult, Gun, OutlineEntry, PressureProbePoint, PressureTraceEntry
 from .num import RKF78, cubic, dekker, gss
 from .prop import GrainComp, Propellant
 
@@ -216,7 +211,7 @@ class Recoilless:
         else:
             raise AttributeError
 
-    def _f_p_bar(self, Z, l_bar, eta, tau, psi=None):
+    def f_p_bar(self, Z, l_bar, eta, tau, psi=None):
         psi = psi if psi else self.f_psi_Z(Z)
         l_psi_bar = 1 - self.Delta * ((1 - psi) / self.rho_p + self.alpha * (psi - eta))
 
@@ -224,10 +219,10 @@ class Recoilless:
 
         return p_bar
 
-    def _ode_t(self, _, Z, l_bar, v_bar, eta, tau, __):
+    def ode_t(self, _, Z, l_bar, v_bar, eta, tau, __):
         psi = self.f_psi_Z(Z)
         dpsi = self.f_sigma_Z(Z)  # dpsi/dZ
-        p_bar = self._f_p_bar(Z, l_bar, eta, tau, psi)
+        p_bar = self.f_p_bar(Z, l_bar, eta, tau, psi)
 
         if self.c_a_bar != 0 and v_bar > 0:
             k = self.k_1  # gamma
@@ -251,7 +246,7 @@ class Recoilless:
 
         return dZ, dl_bar, dv_bar, deta, dtau
 
-    def _ode_l(self, l_bar, _, Z, v_bar, eta, tau, __):
+    def ode_l(self, l_bar, _, Z, v_bar, eta, tau, __):
         """length domain ode of internal ballistics
         the 1/v_bar pose a starting problem that prevent us from using it from
         initial condition.
@@ -262,7 +257,7 @@ class Recoilless:
 
         psi = self.f_psi_Z(Z)
         dpsi = self.f_sigma_Z(Z)  # dpsi/dZ
-        p_bar = self._f_p_bar(Z, l_bar, eta, tau, psi)
+        p_bar = self.f_p_bar(Z, l_bar, eta, tau, psi)
 
         if self.c_a_bar != 0 and v_bar > 0:
             k = self.k_1  # gamma
@@ -284,10 +279,10 @@ class Recoilless:
 
         return dt_bar, dZ, dv_bar, deta, dtau
 
-    def _ode_Z(self, Z, _, l_bar, v_bar, eta, tau, __):
+    def ode_Z(self, Z, _, l_bar, v_bar, eta, tau, __):
         psi = self.f_psi_Z(Z)
         dpsi = self.f_sigma_Z(Z)  # dpsi/dZ
-        p_bar = self._f_p_bar(Z, l_bar, eta, tau, psi)
+        p_bar = self.f_p_bar(Z, l_bar, eta, tau, psi)
 
         if self.c_a_bar != 0 and v_bar > 0:
             k = self.k_1  # gamma
@@ -346,15 +341,15 @@ class Recoilless:
 
         gamma = self.theta + 1
         """
-        self.S_j_bar = self._getCf(gamma, 1, tol) / (
-            self._getCf(gamma, self.A_bar, tol) * self.chi_0
+        self.S_j_bar = self.getCf(gamma, 1, tol) / (
+            self.getCf(gamma, self.A_bar, tol) * self.chi_0
         )  # = S_j/S
         """
-        self.C_f = self._getCf(gamma, self.A_bar, tol)
+        self.C_f = self.getCf(gamma, self.A_bar, tol)
         self.S_j_bar = 1 / (self.C_f * self.chi_0)
         if self.S_j_bar > self.chi_k:
             raise ValueError(
-                "Achieving recoiless condition necessitates"
+                "Achieving recoilless condition necessitates"
                 + " a larger throat area than could be fit into"
                 + " breech face."
             )
@@ -381,7 +376,7 @@ class Recoilless:
         bar_err = []
 
         def updBarData(tag, t_bar, l_bar, Z, v_bar, eta, tau, t_bar_err, l_bar_err, Z_err, v_bar_err, eta_err, tau_err):
-            p_bar = self._f_p_bar(Z, l_bar, eta, tau)
+            p_bar = self.f_p_bar(Z, l_bar, eta, tau)
             p_bar_err = "N/A"
             bar_data.append((tag, t_bar, l_bar, Z, v_bar, p_bar, eta, tau))
             """
@@ -433,7 +428,7 @@ class Recoilless:
         # noinspection PyUnusedLocal
         def abort(x, ys, record):
             Z, (_, l_bar, v_bar, eta, tau) = x, ys
-            p_bar = self._f_p_bar(Z, l_bar, eta, tau)
+            p_bar = self.f_p_bar(Z, l_bar, eta, tau)
 
             return any((l_bar > l_g_bar, p_bar > p_bar_max, v_bar <= 0, p_bar < 0))
 
@@ -446,7 +441,7 @@ class Recoilless:
                     Z_j = Z_b
 
                 Z, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j), _ = RKF78(
-                    self._ode_Z,
+                    self.ode_Z,
                     (t_bar_i, l_bar_i, v_bar_i, eta_i, tau_i),
                     Z_i,
                     Z_j,
@@ -456,13 +451,13 @@ class Recoilless:
                     record=ztlvet_record_i,
                 )
 
-                p_bar_j = self._f_p_bar(Z_j, l_bar_j, eta_j, tau_j)
+                p_bar_j = self.f_p_bar(Z_j, l_bar_j, eta_j, tau_j)
 
             except ValueError as e:
                 ztlvet_record.extend(ztlvet_record_i)
                 Z, (t_bar, l_bar, v_bar, eta, tau) = ztlvet_record[-1]
-                dt_bar, dl_bar, dv_bar, deta, dtau = self._ode_Z(Z, t_bar, l_bar, v_bar, eta, tau, _)
-                # p_bar = self._f_p_bar(Z, l_bar, eta, tau)
+                dt_bar, dl_bar, dv_bar, deta, dtau = self.ode_Z(Z, t_bar, l_bar, v_bar, eta, tau, _)
+                # p_bar = self.f_p_bar(Z, l_bar, eta, tau)
 
                 if all((dt_bar > 0, dl_bar > 0, dv_bar < 0)):
                     raise ValueError(
@@ -540,7 +535,7 @@ class Recoilless:
             Z_i = Z_b + tol
 
         record.extend(
-            (t_bar, (l_bar, self.f_psi_Z(Z), v_bar, self._f_p_bar(Z, l_bar, eta, tau), eta, tau))
+            (t_bar, (l_bar, self.f_psi_Z(Z), v_bar, self.f_p_bar(Z, l_bar, eta, tau), eta, tau))
             for (Z, (t_bar, l_bar, v_bar, eta, tau)) in ztlvet_record
         )
 
@@ -562,7 +557,7 @@ class Recoilless:
 
         ltzvet_record = []
         (_, (t_bar_e, Z_e, v_bar_e, eta_e, tau_e), (t_bar_err, Z_err, v_bar_err, eta_err, tau_err)) = RKF78(
-            self._ode_l,
+            self.ode_l,
             (t_bar_i, Z_i, v_bar_i, eta_i, tau_i),
             l_bar_i,
             l_g_bar,
@@ -572,7 +567,7 @@ class Recoilless:
         )
 
         record.extend(
-            (t_bar, (l_bar, self.f_psi_Z(Z), v_bar, self._f_p_bar(Z, l_bar, eta, tau), eta, tau))
+            (t_bar, (l_bar, self.f_psi_Z(Z), v_bar, self.f_p_bar(Z, l_bar, eta, tau), eta, tau))
             for (l_bar, (t_bar, Z, v_bar, eta, tau)) in ltzvet_record
         )
 
@@ -608,7 +603,7 @@ class Recoilless:
                 _,
                 (t_bar_f, l_bar_f, v_bar_f, eta_f, tau_f),
                 (t_bar_err_f, l_bar_err_f, v_bar_err_f, eta_err_f, tau_err_f),
-            ) = RKF78(self._ode_Z, (0, 0, 0, 0, 1), Z_0, 1, relTol=tol, absTol=tol**2)
+            ) = RKF78(self.ode_Z, (0, 0, 0, 0, 1), Z_0, 1, relTol=tol, absTol=tol**2)
 
             updBarData(
                 tag=POINT_FRACTURE,
@@ -640,7 +635,7 @@ class Recoilless:
                 _,
                 (t_bar_b, l_bar_b, v_bar_b, eta_b, tau_b),
                 (t_bar_err_b, l_bar_err_b, v_bar_err_b, eta_err_b, tau_err_b),
-            ) = RKF78(self._ode_Z, (0, 0, 0, 0, 1), Z_0, Z_b, relTol=tol, absTol=tol**2)
+            ) = RKF78(self.ode_Z, (0, 0, 0, 0, 1), Z_0, Z_b, relTol=tol, absTol=tol**2)
 
             updBarData(
                 tag=POINT_BURNOUT,
@@ -672,13 +667,13 @@ class Recoilless:
         """
 
         def g(t, tag):
-            Z, l_bar, v_bar, eta, tau = RKF78(self._ode_t, (Z_0, 0, 0, 0, 1), 0, t, relTol=tol, absTol=tol**2)[1]
-            p_bar = self._f_p_bar(Z, l_bar, eta, tau)
+            Z, l_bar, v_bar, eta, tau = RKF78(self.ode_t, (Z_0, 0, 0, 0, 1), 0, t, relTol=tol, absTol=tol**2)[1]
+            p_bar = self.f_p_bar(Z, l_bar, eta, tau)
 
             if tag == POINT_PEAK_AVG:
                 return p_bar
 
-            Ps, P0, Pb, Vb = self._toPsP0PbVb(l_bar * self.l_0, v_bar * self.v_j, p_bar * pScale, tau * self.T_v, eta)
+            Ps, P0, Pb, Vb = self.toPsP0PbVb(l_bar * self.l_0, v_bar * self.v_j, p_bar * pScale, tau * self.T_v, eta)
 
             if tag == POINT_PEAK_BREECH:
                 return Pb / pScale
@@ -699,18 +694,12 @@ class Recoilless:
 
             t_bar_tol = tol * min(t for t in (t_bar_e, t_bar_b, t_bar_f) if t is not None)
 
-            t_bar_1, t_bar_2 = gss(
-                g,
-                0,
-                t_bar_e if t_bar_b is None else t_bar_b,
-                x_tol=t_bar_tol,
-                findMin=False,
-            )
+            t_bar_1, t_bar_2 = gss(g, 0, t_bar_e if t_bar_b is None else t_bar_b, x_tol=t_bar_tol, findMin=False)
 
             t_bar = 0.5 * (t_bar_1 + t_bar_2)
 
             (_, (Z, l_bar, v_bar, eta, tau), (Z_err, l_bar_err, v_bar_err, eta_err, tau_err)) = RKF78(
-                self._ode_t, (Z_0, 0, 0, 0, 1), 0, t_bar, relTol=tol, absTol=tol**2
+                self.ode_t, (Z_0, 0, 0, 0, 1), 0, t_bar, relTol=tol, absTol=tol**2
             )
             t_bar_err = 0.5 * t_bar_tol
 
@@ -749,12 +738,12 @@ class Recoilless:
             for j in range(step):
                 t_bar_k = t_bar_e / (step + 1) * (j + 1)
                 (_, (Z_j, l_bar_j, v_bar_j, eta_j, tau_j), (Z_err, l_bar_err, v_bar_err, eta_err, tau_err)) = RKF78(
-                    self._ode_t, (Z_j, l_bar_j, v_bar_j, eta_j, tau_j), t_bar_j, t_bar_k, relTol=tol, absTol=tol**2
+                    self.ode_t, (Z_j, l_bar_j, v_bar_j, eta_j, tau_j), t_bar_j, t_bar_k, relTol=tol, absTol=tol**2
                 )
                 t_bar_j = t_bar_k
 
                 updBarData(
-                    tag="",
+                    tag=COMPUTE,
                     t_bar=t_bar_j,
                     l_bar=l_bar_j,
                     Z=Z_j,
@@ -783,25 +772,20 @@ class Recoilless:
             """
             t_bar_j = 0.5 * t_bar_i
             Z_j, l_bar_j, v_bar_j, eta_j, tau_j = RKF78(
-                self._ode_t,
-                (Z_0, 0, 0, 0, 1),
-                0,
-                t_bar_j,
-                relTol=tol,
-                absTol=tol**2,
+                self.ode_t, (Z_0, 0, 0, 0, 1), 0, t_bar_j, relTol=tol, absTol=tol**2
             )[1]
 
             for j in range(step):
                 l_bar_k = l_g_bar / (step + 1) * (j + 1)
 
                 (_, (t_bar_j, Z_j, v_bar_j, eta_j, tau_j), (t_bar_err, Z_err, v_bar_err, eta_err, tau_err)) = RKF78(
-                    self._ode_l, (t_bar_j, Z_j, v_bar_j, eta_j, tau_j), l_bar_j, l_bar_k, relTol=tol, absTol=tol**2
+                    self.ode_l, (t_bar_j, Z_j, v_bar_j, eta_j, tau_j), l_bar_j, l_bar_k, relTol=tol, absTol=tol**2
                 )
 
                 l_bar_j = l_bar_k
 
                 updBarData(
-                    tag="",
+                    tag=COMPUTE,
                     t_bar=t_bar_j,
                     l_bar=l_bar_j,
                     Z=Z_j,
@@ -844,12 +828,12 @@ class Recoilless:
             T = tau * self.T_v
             T_err = tau_err * self.T_v
 
-            ps, p0, pb, vb = self._toPsP0PbVb(l, v, p, T, eta)
+            ps, p0, pb, vb = self.toPsP0PbVb(l, v, p, T, eta)
 
             p_line = []
             for i in range(step):  # 0....step -1
                 x = i / step * (l + l_c)
-                px = self._toPx(l, v, vb, ps, T, eta, x)
+                px = self.toPx(l, v, vb, ps, T, eta, x)
 
                 p_line.append(PressureProbePoint(x, px))
 
@@ -867,19 +851,19 @@ class Recoilless:
                 continue
             l, v, p, T = (l_bar * self.l_0, v_bar * self.v_j, p_bar * pScale, tau * self.T_v)
 
-            ps, p0, pb, vb = self._toPsP0PbVb(l, v, p, T, eta)
+            ps, p0, pb, vb = self.toPsP0PbVb(l, v, p, T, eta)
 
             p_line = []
             for i in range(step):  # 0....step -1
                 x = i / step * (l + l_c)
-                px = self._toPx(l, v, vb, ps, T, eta, x)
+                px = self.toPx(l, v, vb, ps, T, eta, x)
                 pp = PressureProbePoint(x, px)
                 p_line.append(pp)
 
             p_line.append(PressureProbePoint(l + l_c, ps))
-            p_trace.append(PressureTraceEntry("*", T, p_line))
+            p_trace.append(PressureTraceEntry(SAMPLE, T, p_line))
 
-            data.append(RecoillessTableEntry("*", t, l, psi, v, vb, pb, p0, p, ps, T, eta))
+            data.append(RecoillessTableEntry(SAMPLE, t, l, psi, v, vb, pb, p0, p, ps, T, eta))
             error.append(RecoillessErrorEntry("L"))
 
         data, error, p_trace = zip(
@@ -888,14 +872,14 @@ class Recoilless:
 
         logger.info("scaled intermediate results to SI.")
 
-        recoilessResult = RecoillessResult(self, data, error, p_trace)
+        recoillessResult = RecoillessResult(self, data, error, p_trace)
 
         if self.material is None:
             logger.warning("material is not specified, skipping structural calculation.")
 
         else:
             try:
-                self._getStructural(recoilessResult, step, tol)
+                self.getStructural(recoillessResult, step, tol)
             except Exception:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 logger.error("exception occured during structural calculation:")
@@ -904,9 +888,9 @@ class Recoilless:
 
         logger.info("integration concluded.")
 
-        return recoilessResult
+        return recoillessResult
 
-    def _toPsP0PbVb(self, l, v, p, T, eta):
+    def toPsP0PbVb(self, l, v, p, T, eta):
         """
         Diagramatic explanation of the calculated values:
             ----\___     __________________
@@ -945,7 +929,7 @@ class Recoilless:
         # l0 = H / (1 + H) * l  # location of the stagnation point
         return ps, p0, pb, vb
 
-    def _toPx(self, l, v, vb, ps, T, eta, x):
+    def toPx(self, l, v, vb, ps, T, eta, x):
         m = self.m
         omega = self.omega
         phi_1 = self.phi_1
@@ -975,7 +959,7 @@ class Recoilless:
         return px
 
     @staticmethod
-    def _getCf(gamma, Sr, tol=1e-5):
+    def getCf(gamma, Sr, tol=1e-5):
         """
         takes the adiabatic index and area ration between constriction throat
         and the exit, calculate the thrust factor Cf
@@ -993,8 +977,7 @@ class Recoilless:
 
         return Cf
 
-    def _getStructural(self, recoillessResult: RecoillessResult, step: int, tol: float):
-        logger = logging.getLogger("recoiless.structure")
+    def getStructural(self, recoillessResult: RecoillessResult, step: int, tol: float):
         logger.info("commencing structural calculation")
         l_c = self.l_c
         l_g = self.l_g
@@ -1028,7 +1011,7 @@ class Recoilless:
 
             for i, x in enumerate(x_probes):
                 if (x - l_c) <= l:
-                    p_x = self._toPx(l, v, vb, ps, T, eta, x)
+                    p_x = self.toPx(l, v, vb, ps, T, eta, x)
                     p_probes[i] = max(p_probes[i], p_x)
                 else:
                     break
@@ -1067,12 +1050,12 @@ class Recoilless:
             if x < -l_b:
                 k = (x + l_b + l_a) / l_a
                 r = k * r_t + (1 - k) * r_n
-                p = Recoilless._getPr(gamma, (r / r_t) ** 2, tol)[1] * p_entry
+                p = Recoilless.getPr(gamma, (r / r_t) ** 2, tol)[1] * p_entry
 
             else:
                 k = (x + l_b) / l_b
                 r = k * r_b + (1 - k) * r_t
-                p = Recoilless._getPr(gamma, (r / r_t) ** 2, tol)[0] * p_entry
+                p = Recoilless.getPr(gamma, (r / r_t) ** 2, tol)[0] * p_entry
 
             if p > 3**-0.5 * sigma:
                 raise ValueError(
@@ -1084,7 +1067,7 @@ class Recoilless:
             neg_S_probes.append(pi * r**2)
 
         if self.is_af:
-            V_n, rho_n = Gun._Vrho_k(neg_x_probes, neg_p_probes, neg_S_probes, sigma, tol)
+            V_n, rho_n = Gun.Vrho_k(neg_x_probes, neg_p_probes, neg_S_probes, sigma, tol)
 
         else:
             V_n, rho_n = 0, []
@@ -1117,24 +1100,16 @@ class Recoilless:
             m : r_n / r_i
             k : r_o / r_i
             n : p_vM_max / sigma
-
             1 < m < k
-
             The point of optimum autofrettage, or the minimum autofrettage
             necessary to contain the working pressure, is
             """
             i = step + 1
             x_c, p_c = x_probes[:i], p_probes[:i]  # c for chamber
             x_b, p_b = x_probes[i:], p_probes[i:]  # b for barrel
-            V_c, rho_c = Gun._Vrho_k(x_c, p_c, [S * chi_k for _ in x_c], sigma, tol, k_min=rho_n[-1])  # c for chamber
-            V_b, rho_b = Gun._Vrho_k(
-                x_b,
-                p_b,
-                [S for _ in x_b],
-                sigma,
-                tol,
-                k_max=rho_c[-1] * chi_k**0.5,
-                p_ref=max(p_c),
+            V_c, rho_c = Gun.Vrho_k(x_c, p_c, [S * chi_k for _ in x_c], sigma, tol, k_min=rho_n[-1])  # c for chamber
+            V_b, rho_b = Gun.Vrho_k(
+                x_b, p_b, [S for _ in x_b], sigma, tol, k_max=rho_c[-1] * chi_k**0.5, p_ref=max(p_c)
             )  # b for bore
             V = V_c + V_b
             rho_probes = rho_c + rho_b
@@ -1145,8 +1120,7 @@ class Recoilless:
             theory (von Mises) as it is generally accepted to be the most
             applicable for this application.
 
-            The limiting stress points circumferentially along the circum-
-            ference of the barrel.
+            The limiting stress points circumferentially along the circumference of the barrel.
 
             P_4 = sigma_e * (rho^2-1)/ (3*rho**4 + 1) ** 0.5
             lim (x->inf) (x^2-1)/sqrt(3*x**4+1) = 1/sqrt(3)
@@ -1192,13 +1166,12 @@ class Recoilless:
                 hull.append(OutlineEntry(x, r_s, rho * r_s))
 
         recoillessResult.outline = hull
-        recoillessResult.tubeMass = tube_mass
-        recoillessResult.breechMass = nozzle_mass
+        recoillessResult.tubeMass = tube_mass + nozzle_mass
 
         logger.info("structural calculation results attached.")
 
     @staticmethod
-    def _getAr(gamma, Pr):
+    def getAr(gamma, Pr):
         if Pr == 0 or Pr == 1:
             return inf
         return (
@@ -1208,7 +1181,7 @@ class Recoilless:
         ) ** -1
 
     @staticmethod
-    def _getPr(gamma, Ar, tol):
+    def getPr(gamma, Ar, tol):
         """
         Given an area ratio Ar, calculate the pressure ratio Pr for a
         converging-diverging nozzle. One area ratio corresponds to two
@@ -1231,9 +1204,8 @@ class Recoilless:
         if Ar == 1:
             return Pr_c, Pr_c
         else:
-            Pr_sup, _ = dekker(lambda Pr: Recoilless._getAr(gamma, Pr), 0, Pr_c, y=Ar, y_rel_tol=tol)
-
-            Pr_sub, _ = dekker(lambda Pr: Recoilless._getAr(gamma, Pr), Pr_c, 1, y=Ar, y_rel_tol=tol)
+            Pr_sup, _ = dekker(lambda Pr: Recoilless.getAr(gamma, Pr), 0, Pr_c, y=Ar, y_rel_tol=tol)
+            Pr_sub, _ = dekker(lambda Pr: Recoilless.getAr(gamma, Pr), Pr_c, 1, y=Ar, y_rel_tol=tol)
 
             return Pr_sub, Pr_sup
 
