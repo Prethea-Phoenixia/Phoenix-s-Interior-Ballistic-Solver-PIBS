@@ -892,7 +892,7 @@ class Recoilless:
 
     def toPsP0PbVb(self, l, v, p, T, eta):
         """
-        Diagramatic explanation of the calculated values:
+        Diagrammatic explanation of the calculated values:
             ----\___     __________________
                     |---|                  |_________________________________
                        ==                                       |        \
@@ -1240,21 +1240,18 @@ if __name__ == "__main__":
         chambrage=1.0,
     )
     record = []
-    # fmt: off
+
     print("\nnumerical: time")
     print(
         tabulate(
             test.integrate(10, 1e-3, dom=DOMAIN_TIME).getRawTableData(),
-            headers=("tag", "t", "l", "psi", "v", "vb", "pb", "p0", "p", "ps",
-                     "T", "eta")
+            headers=("tag", "t", "l", "psi", "v", "vb", "pb", "p0", "p", "ps", "T", "eta"),
         )
     )
     print("\nnumerical: length")
     print(
         tabulate(
             test.integrate(10, 1e-3, dom=DOMAIN_LEN).getRawTableData(),
-            headers=("tag", "t", "l", "psi", "v", "vb", "pb", "p0", "p", "ps",
-                     "T", "eta")
+            headers=("tag", "t", "l", "psi", "v", "vb", "pb", "p0", "p", "ps", "T", "eta"),
         )
     )
-    # fmt:on

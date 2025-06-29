@@ -432,16 +432,16 @@ class Gun:
 
     def integrate(
         self,
-        step=10,
-        tol=1e-5,
+        step: int = 10,
+        tol: float = 1e-5,
         dom: Domains = DOMAIN_TIME,
         sol: Solutions = SOL_PIDDUCK,
-        ambientRho=1.204,
-        ambientP=101.325e3,
-        ambientGamma=1.4,
+        ambientRho: float = 1.204,
+        ambientP: float = 101.325e3,
+        ambientGamma: float = 1.4,
         progressQueue=None,
         **_,
-    ):
+    ) -> GunResult:
         """
         Runs a full numerical solution for the gun in the specified domain
         sampled evenly at specified number of step, using a scaled numerical

@@ -2,13 +2,7 @@ import logging
 from math import floor, inf, log, pi
 from random import uniform
 
-from . import (
-    POINT_PEAK_AVG,
-    POINT_PEAK_BREECH,
-    POINT_PEAK_SHOT,
-    POINT_PEAK_STAG,
-    Points,
-)
+from . import POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT, POINT_PEAK_STAG, Points
 from .num import RKF78, cubic, dekker, gss
 from .optGun import MAX_GUESSES
 from .prop import Propellant
@@ -58,13 +52,7 @@ class ConstrainedRecoilless:
         ):
             raise ValueError("Invalid parameters for constrained design")
 
-        if any(
-            (
-                designPressure <= 0,
-                # designPressure <= startPressure,
-                designVelocity <= 0,
-            )
-        ):
+        if any((designPressure <= 0, designVelocity <= 0)):
             raise ValueError("Invalid design constraint")
 
         self.S = (0.5 * caliber) ** 2 * pi
@@ -199,12 +187,7 @@ class ConstrainedRecoilless:
 
         psi_0 = (1 / Delta - 1 / rho_p) / (f / p_0 + alpha - 1 / rho_p)
 
-        Zs = cubic(
-            a=chi * mu,
-            b=chi * labda,
-            c=chi,
-            d=-psi_0,
-        )
+        Zs = cubic(a=chi * mu, b=chi * labda, c=chi, d=-psi_0)
         # pick a valid solution between 0 and 1
         Zs = tuple(
             Z for Z in Zs if not isinstance(Z, complex) and (Z > 0.0 and Z < 1.0)

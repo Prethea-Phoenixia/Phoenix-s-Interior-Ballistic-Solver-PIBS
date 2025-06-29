@@ -260,12 +260,7 @@ class Propellant:
 
         self.fudge = fudge
 
-        if any(
-            (
-                R1 < 0 if R1 is not None else False,
-                R2 < 0 if R1 is not None else False,
-            )
-        ):
+        if any((R1 < 0 if R1 is not None else False, R2 < 0 if R1 is not None else False)):
             raise ValueError("Geometry is impossible")
 
         self.composition = composition

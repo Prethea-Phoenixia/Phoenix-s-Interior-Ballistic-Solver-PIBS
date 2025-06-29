@@ -30,7 +30,7 @@ from matplotlib import font_manager
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-from pibs.ballistics import CONVENTIONAL, SOL_LAGRANGE, SOL_PIDDUCK
+from .ballistics import CONVENTIONAL, SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV
 
 from .ballistics import (
     COMPUTE,
@@ -98,6 +98,7 @@ GEOM_CONTEXT = {
     "legend.fontsize": FONTSIZE,
     "figure.titlesize": FONTSIZE + 2,
     "lines.markersize": FONTSIZE / 4,
+    "lines.linewidth": 1,
     "axes.axisbelow": True,
     "font.family": "Sarasa Fixed SC",
 }  # this customizes matplotlib for the sigma-Z figure
@@ -118,6 +119,18 @@ FIG_CONTEXT = {
     "yaxis.labellocation": "top",
     "font.family": "Sarasa Fixed SC",
 }  # this customizes matplotlib for the main figure.
+
+GUIDE_CONTEXT = {
+    "font.size": FONTSIZE,
+    "axes.titlesize": FONTSIZE,
+    "axes.labelsize": FONTSIZE,
+    "xtick.labelsize": FONTSIZE,
+    "ytick.labelsize": FONTSIZE,
+    "legend.fontsize": FONTSIZE,
+    "figure.titlesize": FONTSIZE + 2,
+    "lines.markersize": FONTSIZE / 4,
+    "lines.linewidth": 1,
+}
 
 
 def grid_configure_recursive(widget, **kwargs):
@@ -246,6 +259,7 @@ class InteriorBallisticsFrame(Frame):
         self.addRightFrm()
         self.addSpecFrm()
         self.addGeomPlot()
+        self.addGuidancePlot()
         self.ambCallback()
         self.cvlfCallback()
         self.typeCallback()
@@ -268,7 +282,6 @@ class InteriorBallisticsFrame(Frame):
         self.tLid = None
 
         textHandler = TextHandler(self.errorText)
-        logger = logging.getLogger()
         logger.addHandler(textHandler)
 
         logging.info("text handler attached to root logger.")
@@ -340,11 +353,12 @@ class InteriorBallisticsFrame(Frame):
             messagebox.showinfo(self.getLocStr("excTitle"), self.getLocStr("cancelMsg"))
             return
 
+        comment = None
         try:
             with open(fileName, "r", encoding="utf-8") as file:
                 comment = json.load(file)["Comment"]
         except Exception:
-            comment = None  # either file DNE or some exception occurred during reading.
+            pass  # either file DNE or some exception occurred during reading.
 
         try:
             locValDict = {loc.getDescriptive(): str(loc.get()) for loc in self.locs if hasattr(loc, "getDescriptive")}
@@ -449,6 +463,7 @@ class InteriorBallisticsFrame(Frame):
             locWidget.reLocalize()
 
         self.calcButton.config(text=self.getLocStr("calcLabel"))
+        self.guideButton.config(text=self.getLocStr("guideLabel"))
 
         self.tabParent.tab(self.plotTab, text=self.getLocStr("plotTab"))
         self.tabParent.tab(self.tableTab, text=self.getLocStr("tableTab"))
@@ -613,90 +628,22 @@ class InteriorBallisticsFrame(Frame):
         validationNN = self.register(validateNN)
         validationPI = self.register(validatePI)
 
-        mecFrm = LocLabelFrame(
-            rightFrm,
-            locKey="matFrmLabel",
-            locFunc=self.getLocStr,
-            allLLF=self.locs,
-        )
-        mecFrm.grid(row=1, column=0, sticky="nsew")
-        mecFrm.columnconfigure(0, weight=1)
-
-        self.dropMat = LocDropdown(
-            parent=mecFrm,
-            strObjDict=MATERIALS,
-            locFunc=self.getLocStr,
-            dropdowns=self.locs,
-            descLabelKey="matFrmLabel",
-        )
-        self.dropMat.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-
-        self.dropMatTemp = LocDropdown(
-            parent=mecFrm,
-            strObjDict=self.dropMat.getObj().getTdict(),
-            locFunc=self.getLocStr,
-            dropdowns=self.locs,
-            descLabelKey="matFrmTempLabel",
-        )
-        self.dropMatTemp.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-
-        self.dropMat.trace_add(
-            "write",
-            lambda *args: self.dropMatTemp.reset(self.dropMat.getObj().getTdict()),
-        )
-
-        self.ssf = Loc2Input(
-            parent=mecFrm,
-            row=2,
-            col=0,
-            labelLocKey="sffLabel",
-            default="1.35",
-            validation=validationNN,
-            locFunc=self.getLocStr,
-            allInputs=self.locs,
-        )
-        self.isAf = LocLabelCheck(
-            parent=mecFrm,
-            labelLocKey="afLabel",
-            row=3,
-            col=0,
-            locFunc=self.getLocStr,
-            allLC=self.locs,
-            columnspan=2,
-        )
-
-        solFrm = LocLabelFrame(
-            rightFrm,
-            locKey="solFrmLabel",
-            locFunc=self.getLocStr,
-            allLLF=self.locs,
-        )
-        solFrm.grid(row=2, column=0, sticky="nsew")
-        solFrm.columnconfigure(0, weight=1)
-        # noinspection SpellCheckingInspection
-        self.dropSoln = LocDropdown(
-            parent=solFrm,
-            strObjDict={soln: soln for soln in (SOL_LAGRANGE, SOL_PIDDUCK, SOL_PIDDUCK)},
-            locFunc=self.getLocStr,
-            dropdowns=self.locs,
-            descLabelKey="solFrmLabel",
-        )
-        self.dropSoln.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-
+        i = 1
         envFrm = LocLabelFrame(
             rightFrm,
             locKey="envFrmLabel",
             locFunc=self.getLocStr,
             allLLF=self.locs,
         )
-        envFrm.grid(row=3, column=0, sticky="nsew")
+        envFrm.grid(row=i, column=0, sticky="nsew")
         envFrm.columnconfigure(0, weight=1)
+        i += 1
 
-        i = 0
+        j = 0
         self.inAtmos = LocLabelCheck(
             parent=envFrm,
             labelLocKey="atmosLabel",
-            row=i,
+            row=j,
             col=0,
             locFunc=self.getLocStr,
             allLC=self.locs,
@@ -704,10 +651,10 @@ class InteriorBallisticsFrame(Frame):
         )
         self.inAtmos.trace_add("write", self.ambCallback)
 
-        i += 1
+        j += 1
         self.ambP = Loc3Input(
             parent=envFrm,
-            row=i,
+            row=j,
             col=0,
             labelLocKey="ambPresLabel",
             unitText="kPa",
@@ -716,10 +663,10 @@ class InteriorBallisticsFrame(Frame):
             locFunc=self.getLocStr,
             allInputs=self.locs,
         )
-        i += 1
+        j += 1
         self.ambRho = Loc3Input(
             parent=envFrm,
-            row=i,
+            row=j,
             col=0,
             labelLocKey="ambRhoLabel",
             unitText="kg/m³",
@@ -728,10 +675,11 @@ class InteriorBallisticsFrame(Frame):
             locFunc=self.getLocStr,
             allInputs=self.locs,
         )
-        i += 1
+
+        j += 1
         self.ambGam = Loc3Input(
             parent=envFrm,
-            row=i,
+            row=j,
             col=0,
             labelLocKey="ambGamLabel",
             default="1.400",
@@ -739,6 +687,26 @@ class InteriorBallisticsFrame(Frame):
             locFunc=self.getLocStr,
             allInputs=self.locs,
         )
+
+        solFrm = LocLabelFrame(
+            rightFrm,
+            locKey="solFrmLabel",
+            locFunc=self.getLocStr,
+            allLLF=self.locs,
+        )
+        solFrm.grid(row=i, column=0, sticky="nsew")
+        i += 1
+        solFrm.columnconfigure(0, weight=1)
+
+        # noinspection SpellCheckingInspection
+        self.dropSoln = LocDropdown(
+            parent=solFrm,
+            strObjDict={soln: soln for soln in (SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV)},
+            locFunc=self.getLocStr,
+            dropdowns=self.locs,
+            descLabelKey="solFrmLabel",
+        )
+        self.dropSoln.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
 
         opFrm = LocLabelFrame(
             rightFrm,
@@ -748,7 +716,6 @@ class InteriorBallisticsFrame(Frame):
         )
         opFrm.grid(row=4, column=0, sticky="nsew")
         opFrm.columnconfigure(0, weight=1)
-        i = 0
 
         consFrm = LocLabelFrame(
             opFrm,
@@ -759,6 +726,7 @@ class InteriorBallisticsFrame(Frame):
         )
         consFrm.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         consFrm.columnconfigure(0, weight=1)
+        i += 1
 
         j = 0
         self.solve_W_Lg = LocLabelCheck(
@@ -879,7 +847,6 @@ class InteriorBallisticsFrame(Frame):
         )
         sampleFrm.grid(row=i, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         sampleFrm.columnconfigure(0, weight=1)
-
         self.dropDomain = LocDropdown(
             parent=sampleFrm,
             strObjDict={domain: domain for domain in (DOMAIN_TIME, DOMAIN_LEN)},
@@ -887,7 +854,6 @@ class InteriorBallisticsFrame(Frame):
             dropdowns=self.locs,
             descLabelKey="sampleFrmLabel",
         )
-
         j = 0
         self.dropDomain.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         j += 1
@@ -896,13 +862,14 @@ class InteriorBallisticsFrame(Frame):
             row=j,
             col=0,
             labelLocKey="stepLabel",
-            default="10",
+            default="33",
             validation=validationNN,
             formatter=formatIntInput,
             locFunc=self.getLocStr,
             allInputs=self.locs,
         )
         i += 1
+
         self.accExp = Loc2Input(
             parent=opFrm,
             row=i,
@@ -917,22 +884,96 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         i += 1
+
+        self.calcButton = ttk.Button(opFrm, text=self.getLocStr("calcLabel"), command=self.onCalculate)
+        self.calcButton.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        opFrm.rowconfigure(i, weight=1)
+        i += 1
         self.progress = IntVar()
         ttk.Progressbar(opFrm, maximum=100, variable=self.progress).grid(
             row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2
         )
-        i += 1
-
-        self.calcButton = ttk.Button(
-            opFrm,
-            text=self.getLocStr("calcLabel"),
-            command=self.onCalculate,
-        )
-        self.calcButton.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-
-        opFrm.rowconfigure(i, weight=1)
         self.calcButtonTip = StringVar(value=self.getLocStr("calcButtonText"))
         CreateToolTip(self.calcButton, self.calcButtonTip)
+        i += 1
+
+        ctrlFrm = LocLabelFrame(rightFrm, locKey="guideCtrlFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
+        ctrlFrm.grid(row=i, column=0, columnspan=3, sticky="nsew")
+        ctrlFrm.columnconfigure(0, weight=1)
+        i += 1
+
+        j, k = 0, 0
+        self.guideMinLF = Loc3Input(
+            ctrlFrm,
+            labelLocKey="minLFLabel",
+            default="10",
+            unitText="%",
+            validation=validationNN,
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+            row=j,
+            col=k,
+        )
+        j += 1
+        self.guideMaxLF = Loc3Input(
+            ctrlFrm,
+            labelLocKey="maxLFLabel",
+            default="90",
+            unitText="%",
+            validation=validationNN,
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+            row=j,
+            col=k,
+        )
+        j += 1
+        self.guideStepLF = Loc3Input(
+            ctrlFrm,
+            labelLocKey="stepLFLabel",
+            default="3",
+            unitText="%",
+            validation=validationNN,
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+            row=j,
+            col=k,
+        )
+        j += 1
+        self.guideMinCMR = Loc3Input(
+            ctrlFrm,
+            labelLocKey="minCMRLabel",
+            default="0.5",
+            validation=validationNN,
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+            row=j,
+            col=k,
+        )
+        j += 1
+        self.guideMaxCMR = Loc3Input(
+            ctrlFrm,
+            labelLocKey="maxCMRLabel",
+            default="1.5",
+            validation=validationNN,
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+            row=j,
+            col=k,
+        )
+        j += 1
+        self.guideStepCMR = Loc3Input(
+            ctrlFrm,
+            labelLocKey="stepCMRLabel",
+            default="0.1",
+            validation=validationNN,
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+            row=j,
+            col=k,
+        )
+        j += 1
+        self.guideButton = ttk.Button(ctrlFrm, text=self.getLocStr("guideLabel"))
+        self.guideButton.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
     def onCalculate(self):
         if self.process is not None:
@@ -1018,8 +1059,7 @@ class InteriorBallisticsFrame(Frame):
                 self.kwargs.update({"ambientP": 0, "ambientRho": 0, "ambientGamma": 1})
 
             self.process = Process(
-                target=calculate,
-                args=(self.jobQueue, self.progressQueue, self.logQueue, self.kwargs),
+                target=calculate, args=(self.jobQueue, self.progressQueue, self.logQueue, self.kwargs)
             )
 
             self.process.start()
@@ -1040,7 +1080,7 @@ class InteriorBallisticsFrame(Frame):
                     loc.inhibit()
                 except AttributeError:
                     pass
-
+            self.guideButton.config(state="disabled")
             self.calcButton.config(state="disabled")
 
     def getValue(self):
@@ -1130,10 +1170,7 @@ class InteriorBallisticsFrame(Frame):
             peakBreechEntry = self.gunResult.readTableData(POINT_PEAK_BREECH)
 
             self.pp.set(
-                (
-                    toSI(peakAverageEntry.avgPressure, unit="Pa"),
-                    toSI(peakBreechEntry.breechPressure, unit="Pa")
-                )
+                (toSI(peakAverageEntry.avgPressure, unit="Pa"), toSI(peakBreechEntry.breechPressure, unit="Pa"))
             )
 
             muzzleEntry = self.gunResult.readTableData(POINT_EXIT)
@@ -1145,12 +1182,13 @@ class InteriorBallisticsFrame(Frame):
                 self.tabParent.select(0)  # goto the graphing pane
 
         else:  # calculation results in some error
-            self.tabParent.select(2)  # goto the error pane
+            self.tabParent.select(3)  # goto the error pane
 
         self.updateTable()
         self.updateFigPlot()
         self.updateAuxPlot()
         self.calcButton.config(state="normal")
+        self.guideButton.config(state="normal")
 
         for loc in self.locs:
             try:
@@ -1267,7 +1305,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.specs = Text(
             propFrm,
-            wrap="none",
+            wrap="word",
             height=10,
             width=30,
             yscrollcommand=specScroll.set,
@@ -1395,10 +1433,8 @@ class InteriorBallisticsFrame(Frame):
         )
 
         self.useCv.trace_add("write", self.cvlfCallback)
-        self.cvL.trace_add("write", self.cvlfConsistencyCallback)
-        self.ldf.trace_add("write", self.cvlfConsistencyCallback)
-        self.chgkg.trace_add("write", self.cvlfConsistencyCallback)
-        self.accExp.trace_add("write", self.cvlfConsistencyCallback)
+        for widget in (self.cvL, self.ldf, self.chgkg, self.accExp):
+            widget.trace_add("write", self.cvlfConsistencyCallback)
 
         i += 1
         self.clr = Loc3Input(
@@ -1475,6 +1511,62 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
 
+        mecFrm = LocLabelFrame(
+            specFrm,
+            locKey="matFrmLabel",
+            locFunc=self.getLocStr,
+            allLLF=self.locs,
+        )
+        mecFrm.grid(row=i, column=0, sticky="nsew", columnspan=3)
+        mecFrm.columnconfigure(0, weight=1)
+        i += 1
+
+        j = 0
+        self.dropMat = LocDropdown(
+            parent=mecFrm,
+            strObjDict=MATERIALS,
+            locFunc=self.getLocStr,
+            dropdowns=self.locs,
+            descLabelKey="matFrmLabel",
+        )
+        self.dropMat.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.dropMat.trace_add("write", lambda *args: self.dropMatTemp.reset(self.dropMat.getObj().getTdict()))
+        j += 1
+        self.dropMatTemp = LocDropdown(
+            parent=mecFrm,
+            strObjDict=self.dropMat.getObj().getTdict(),
+            locFunc=self.getLocStr,
+            dropdowns=self.locs,
+            descLabelKey="matFrmTempLabel",
+        )
+        self.dropMatTemp.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        j += 1
+
+        self.ssf = Loc2Input(
+            parent=mecFrm,
+            row=j,
+            col=0,
+            labelLocKey="sffLabel",
+            default="1.35",
+            validation=validationNN,
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+        )
+        j += 1
+        self.isAf = LocLabelCheck(
+            parent=mecFrm,
+            labelLocKey="afLabel",
+            row=j,
+            col=0,
+            locFunc=self.getLocStr,
+            allLC=self.locs,
+            columnspan=2,
+        )
+        j += 1
+
+        i += 1
+        specFrm.rowconfigure(i, weight=1)
+
         self.dropProp.trace_add("write", self.updateSpec)
         self.dropGeom.trace_add("write", self.updateGeom)
 
@@ -1485,14 +1577,24 @@ class InteriorBallisticsFrame(Frame):
         self.typeOptn.trace_add("write", self.typeCallback)
 
     def addGeomPlot(self):
-        geomPlotFrm = self.geomPlotFrm
-
         with mpl.rc_context(GEOM_CONTEXT):
             fig = Figure(dpi=96, layout="constrained")
             self.geomFig = fig
             self.geomAx = fig.add_subplot(111)
 
-            self.geomCanvas = FigureCanvasTkAgg(fig, master=geomPlotFrm)
+            self.geomCanvas = FigureCanvasTkAgg(fig, master=self.geomPlotFrm)
+            self.geomCanvas.draw_idle()
+            self.geomCanvas.get_tk_widget().place(relheight=1, relwidth=1)
+
+    def addGuidancePlot(self):
+        plotFrm = LocLabelFrame(self.guidanceTab, locKey="guideFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
+        plotFrm.grid(row=0, column=0, sticky="nsew")
+
+        with mpl.rc_context(GUIDE_CONTEXT):
+            fig = Figure(dpi=96, layout="constrained")
+            self.guideFig = fig
+            self.guideAx = fig.add_subplot(111)
+            self.guideCanvas = FigureCanvasTkAgg(fig, master=plotFrm)
             self.geomCanvas.draw_idle()
             self.geomCanvas.get_tk_widget().place(relheight=1, relwidth=1)
 
@@ -1502,6 +1604,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.tabParent.columnconfigure(0, weight=1)
         self.tabParent.rowconfigure(0, weight=1)
+
         self.plotTab = Frame(self.tabParent)
         self.plotTab.grid(row=0, column=0, stick="nsew")
         self.plotTab.rowconfigure(0, weight=2)
@@ -1513,6 +1616,11 @@ class InteriorBallisticsFrame(Frame):
         self.tableTab.rowconfigure(0, weight=1)
         self.tableTab.columnconfigure(0, weight=1)
 
+        self.guidanceTab = Frame(self.tabParent)
+        self.guidanceTab.grid(row=0, column=0, sticky="nsew")
+        self.guidanceTab.rowconfigure(0, weight=1)
+        self.guidanceTab.columnconfigure(0, weight=1)
+
         self.errorTab = Frame(self.tabParent)
         self.errorTab.grid(row=0, column=0, sticky="nsew")
         self.errorTab.rowconfigure(0, weight=1)
@@ -1520,17 +1628,15 @@ class InteriorBallisticsFrame(Frame):
 
         self.tabParent.add(self.plotTab, text=self.getLocStr("plotTab"))
         self.tabParent.add(self.tableTab, text=self.getLocStr("tableTab"))
+        self.tabParent.add(self.guidanceTab, text=self.getLocStr("guideTab"))
         self.tabParent.add(self.errorTab, text=self.getLocStr("errorTab"))
 
         self.tabParent.enable_traversal()
 
-        self.addPlotFrm()
-        self.addAuxFrm()
         self.addTblFrm()
         self.addErrFrm()
 
         self.addFigPlot()
-        self.addAuxPlot()
 
     def addErrFrm(self):
         errorFrm = LocLabelFrame(
@@ -1563,7 +1669,7 @@ class InteriorBallisticsFrame(Frame):
 
         errScroll.config(command=self.errorText.yview)
 
-    def addPlotFrm(self):
+    def addFigPlot(self):
         plotFrm = LocLabelFrame(
             self.plotTab,
             locKey="plotFrmLabel",
@@ -1573,8 +1679,6 @@ class InteriorBallisticsFrame(Frame):
         )
         plotFrm.grid(row=0, column=0, sticky="nsew")
 
-        self.plotFrm = plotFrm
-
         for i in range(5):
             plotFrm.columnconfigure(i, weight=1)
 
@@ -1582,90 +1686,29 @@ class InteriorBallisticsFrame(Frame):
 
         j = 1
         k = 0
-
-        self.plotAvgP = LocLabelCheck(
-            parent=plotFrm,
-            row=j,
-            col=k,
-            labelLocKey="plotAvgP",
-            locFunc=self.getLocStr,
-            allLC=checks,
-        )
+        self.plotAvgP = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
         k += 1
-        self.plotBaseP = LocLabelCheck(
-            parent=plotFrm,
-            row=j,
-            col=k,
-            labelLocKey="plotBaseP",
-            locFunc=self.getLocStr,
-            allLC=checks,
-        )
-
+        self.plotBaseP = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
         k += 1
-        self.plotBreechP = LocLabelCheck(
-            parent=plotFrm,
-            row=j,
-            col=k,
-            descLabelKey="Breech/Nozzle/Bleed Pressure",
-            locFunc=self.getLocStr,
-            allLC=checks,
-        )
+        self.plotBreechP = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
         k += 1
-        self.plotStagP = LocLabelCheck(
-            parent=plotFrm,
-            row=j,
-            col=k,
-            descLabelKey="Stagnation/High Chamber Pressure",
-            locFunc=self.getLocStr,
-            allLC=checks,
-        )
+        self.plotStagP = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
 
         j += 1
         k = 0
-
-        self.plotVel = LocLabelCheck(
-            parent=plotFrm,
-            row=j,
-            col=k,
-            labelLocKey="plotVel",
-            locFunc=self.getLocStr,
-            allLC=checks,
-        )
+        self.plotVel = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
         k += 1
-        self.plotNozzleV = LocLabelCheck(
-            parent=plotFrm,
-            row=j,
-            col=k,
-            labelLocKey="plotNozzleV",
-            locFunc=self.getLocStr,
-            allLC=checks,
-        )
+        self.plotNozzleV = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
         k += 1
-        self.plotBurnup = LocLabelCheck(
-            parent=plotFrm,
-            row=j,
-            col=k,
-            labelLocKey="plotBurnup",
-            locFunc=self.getLocStr,
-            allLC=checks,
-        )
+        self.plotBurnup = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
         k += 1
-        self.plotEta = LocLabelCheck(
-            parent=plotFrm,
-            row=j,
-            col=k,
-            descLabelKey="Outflow/Bleed Fraction",
-            locFunc=self.getLocStr,
-            allLC=checks,
-        )
+        self.plotEta = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
 
         for check in checks:
             check.trace_add("write", self.updateFigPlot)
 
         self.locs.extend(checks)
 
-    def addFigPlot(self):
-        plotFrm = self.plotFrm
         plotFrm.columnconfigure(0, weight=1)
         plotFrm.rowconfigure(0, weight=1)
 
@@ -1688,21 +1731,16 @@ class InteriorBallisticsFrame(Frame):
             axP.spines.right.set_position(("data", 0.5))
             axP.yaxis.set_ticks(axP.get_yticks()[1:-1:])
 
-            self.ax = ax
-            self.axP = axP
-            self.axv = axv
-            self.fig = fig
+            self.ax, self.axP, self.axv, self.fig = ax, axP, axv, fig
 
             self.pltCanvas = FigureCanvasTkAgg(fig, master=plotPlaceFrm)
             self.pltCanvas.draw_idle()
             self.pltCanvas.get_tk_widget().place(relheight=1, relwidth=1)
 
-    def addAuxFrm(self):
         auxFrm = LocLabelFrame(
             self.plotTab, locKey="auxFrmLabel", locFunc=self.getLocStr, tooltipLocKey="auxText", allLLF=self.locs
         )
         auxFrm.grid(row=1, column=0, sticky="nsew")
-        self.auxFrm = auxFrm
 
         for i in range(2):
             auxFrm.columnconfigure(i, weight=1)
@@ -1729,8 +1767,6 @@ class InteriorBallisticsFrame(Frame):
 
         self.locs.extend(auxChecks)
 
-    def addAuxPlot(self):
-        auxFrm = self.auxFrm
         auxFrm.columnconfigure(0, weight=1)
         auxFrm.rowconfigure(0, weight=1)
 
@@ -1933,7 +1969,7 @@ class InteriorBallisticsFrame(Frame):
 
             for pressureTraceEntry in pTrace[::-1]:
 
-                tag, T, trace = (pressureTraceEntry.tag, pressureTraceEntry.T, pressureTraceEntry.pressureTrace)
+                tag, T, trace = pressureTraceEntry.tag, pressureTraceEntry.T, pressureTraceEntry.pressureTrace
 
                 if tag != SAMPLE:
                     color = "black" if self.themeRadio.get() else "white"
@@ -1995,12 +2031,7 @@ class InteriorBallisticsFrame(Frame):
             self.auxCanvas.draw_idle()
 
     def addTblFrm(self):
-        tblFrm = LocLabelFrame(
-            self.tableTab,
-            locKey="tblFrmLabel",
-            locFunc=self.getLocStr,
-            allLLF=self.locs,
-        )
+        tblFrm = LocLabelFrame(self.tableTab, locKey="tblFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
         tblFrm.grid(row=0, column=0, sticky="nsew")
 
         tblFrm.columnconfigure(0, weight=1)
@@ -2174,7 +2205,6 @@ class InteriorBallisticsFrame(Frame):
         self.tv.tag_configure(self.getLocStr(POINT_PEAK_STAG), foreground="#2e8b57")
         self.tv.tag_configure(self.getLocStr(POINT_PEAK_AVG), foreground="#2ca02c")
         self.tv.tag_configure(self.getLocStr(POINT_PEAK_BREECH), foreground="orange")
-        # self.tv.tag_configure(self.getLocStr(POINT_PEAK_BLEED), foreground="orange")
         self.tv.tag_configure(self.getLocStr(POINT_PEAK_SHOT), foreground="yellow green")
         self.tv.tag_configure(self.getLocStr(POINT_BURNOUT), foreground="red")
         self.tv.tag_configure(self.getLocStr(POINT_FRACTURE), foreground="brown")
@@ -2249,7 +2279,7 @@ class InteriorBallisticsFrame(Frame):
             self.plotBreechP.reLocalize("plotBreechP")
             self.plotStagP.remove()
             self.plotEta.remove()
-            self.pControl.reset({point: point for point in (POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)})
+            self.pControl.reset({point: point for point in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH)})
         elif gunType == RECOILLESS:
             self.plotBreechP.reLocalize("plotNozzleP")
             self.plotStagP.restore()
@@ -2257,7 +2287,7 @@ class InteriorBallisticsFrame(Frame):
             self.plotEta.restore()
             self.plotEta.reLocalize("plotEtaEsc")
             self.pControl.reset(
-                {point: point for point in (POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_AVG, POINT_PEAK_BREECH)}
+                {point: point for point in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)}
             )
         else:
             raise ValueError("unknown gun type")
@@ -2338,7 +2368,7 @@ class InteriorBallisticsFrame(Frame):
             style.theme_use("awlight")
             pass
 
-        style = ttk.Style(self)
+        #
         # ensure that the treeview rows are roughly the same height
         # regardless of dpi. on Windows, default is Segoe UI at 9 points
         # so the default row height should be around 12
@@ -2351,10 +2381,22 @@ class InteriorBallisticsFrame(Frame):
         style.configure("TCheckbutton", font=(FONTNAME, FONTSIZE))
         style.configure("TNotebook.Tab", font=(FONTNAME, FONTSIZE + 1, "bold"))
 
+        grays = [f"gray{i}" for i in [90, 80, 70]] if self.themeRadio.get() else [f"gray{i}" for i in [16, 23, 30]]
+
+        self.errorText.tag_configure("integrate", background=grays[0])
+        self.errorText.tag_configure("structure", background=grays[0])
+        self.errorText.tag_configure("solve", background=grays[1])
+        self.errorText.tag_configure("minimize", background=grays[2])
+
+        style = ttk.Style(self)
         bgc = str(style.lookup("TFrame", "background"))
         fgc = str(style.lookup("TFrame", "foreground"))
         # noinspection SpellCheckingInspection
         fbgc = str(style.lookup("TCombobox", "fieldbackground"))
+
+        # some widgets also needs to be manually updated
+        for w in self.forceUpdOnThemeWidget:
+            w.config(background=fbgc, foreground=fgc)
 
         GEOM_CONTEXT.update(
             {
@@ -2379,17 +2421,6 @@ class InteriorBallisticsFrame(Frame):
                 "ytick.color": fgc,
             }
         )
-
-        grays = [f"gray{i}" for i in [90, 80, 70]] if self.themeRadio.get() else [f"gray{i}" for i in [16, 23, 30]]
-
-        self.errorText.tag_configure("integrate", background=grays[0])
-        self.errorText.tag_configure("structure", background=grays[0])
-        self.errorText.tag_configure("solve", background=grays[1])
-        self.errorText.tag_configure("minimize", background=grays[2])
-
-        # some widgets also needs to be manually updated
-        for w in self.forceUpdOnThemeWidget:
-            w.config(background=fbgc, foreground=fgc)
 
         try:
             self.fig.set_facecolor(bgc)

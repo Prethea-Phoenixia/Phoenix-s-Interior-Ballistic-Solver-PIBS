@@ -12,6 +12,7 @@ from . import (
     Points,
     Solutions,
 )
+from .prop import Propellant
 from .gun import pidduck
 from .num import RKF78, cubic, dekker, gss
 
@@ -33,21 +34,21 @@ logger = logging.getLogger(__name__)
 class Constrained:
     def __init__(
         self,
-        caliber,
-        shotMass,
-        propellant,
-        startPressure,
-        dragCoefficient,
-        designPressure,
-        designVelocity,
-        chambrage,
-        tol,
-        minWeb=1e-6,
-        maxLength=1e3,
+        caliber: float,
+        shotMass: float,
+        propellant: Propellant,
+        startPressure: float,
+        dragCoefficient: float,
+        designPressure: float,
+        designVelocity: float,
+        chambrage: float,
+        tol: float,
+        minWeb: float = 1e-6,
+        maxLength: float = 1e3,
         sol: Solutions = SOL_LAGRANGE,
-        ambientRho=1.204,
-        ambientP=101.325e3,
-        ambientGamma=1.4,
+        ambientRho: float = 1.204,
+        ambientP: float = 101.325e3,
+        ambientGamma: float = 1.4,
         control: Points = POINT_PEAK_AVG,
         **_,
     ):
