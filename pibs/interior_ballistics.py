@@ -9,7 +9,7 @@ import tkinter.font as tkFont
 import traceback
 from ctypes import windll
 from logging.handlers import QueueHandler, QueueListener
-from math import ceil, log10, pi
+from math import ceil, log10, pi, inf
 from multiprocessing import Process, Queue
 from queue import Empty
 from tkinter import (
@@ -26,10 +26,11 @@ from tkinter import (
 
 import matplotlib as mpl
 from labellines import labelLines
-from matplotlib import font_manager
+from matplotlib import font_manager, rc_context
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+from pibs.guidegraph import guideGraph
 from .ballistics import CONVENTIONAL, SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV
 
 from .ballistics import (
@@ -102,6 +103,17 @@ GEOM_CONTEXT = {
     "axes.axisbelow": True,
     "font.family": "Sarasa Fixed SC",
 }  # this customizes matplotlib for the sigma-Z figure
+GUIDE_CONTEXT = {
+    "font.size": FONTSIZE,
+    "axes.titlesize": FONTSIZE,
+    "axes.labelsize": FONTSIZE,
+    "xtick.labelsize": FONTSIZE,
+    "ytick.labelsize": FONTSIZE,
+    "legend.fontsize": FONTSIZE,
+    "figure.titlesize": FONTSIZE + 2,
+    "lines.markersize": FONTSIZE / 4,
+    "lines.linewidth": 1,
+}
 
 FIG_CONTEXT = {
     "font.size": FONTSIZE,
@@ -119,18 +131,6 @@ FIG_CONTEXT = {
     "yaxis.labellocation": "top",
     "font.family": "Sarasa Fixed SC",
 }  # this customizes matplotlib for the main figure.
-
-GUIDE_CONTEXT = {
-    "font.size": FONTSIZE,
-    "axes.titlesize": FONTSIZE,
-    "axes.labelsize": FONTSIZE,
-    "xtick.labelsize": FONTSIZE,
-    "ytick.labelsize": FONTSIZE,
-    "legend.fontsize": FONTSIZE,
-    "figure.titlesize": FONTSIZE + 2,
-    "lines.markersize": FONTSIZE / 4,
-    "lines.linewidth": 1,
-}
 
 
 def grid_configure_recursive(widget, **kwargs):
@@ -187,10 +187,12 @@ class InteriorBallisticsFrame(Frame):
         self.option_add("*Font", default_font)
 
         self.jobQueue = Queue()
+        self.guideJobQueue = Queue()
         self.logQueue = Queue()
         self.progressQueue = Queue()
 
         self.process = None
+        self.guideProcess = None
 
         self.dpi = dpi
         self.parent = parent
@@ -249,6 +251,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.prop = None
         self.gun = None
+        self.guide = None
 
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
@@ -259,7 +262,7 @@ class InteriorBallisticsFrame(Frame):
         self.addRightFrm()
         self.addSpecFrm()
         self.addGeomPlot()
-        self.addGuidancePlot()
+        self.addGuidePlot()
         self.ambCallback()
         self.cvlfCallback()
         self.typeCallback()
@@ -302,8 +305,21 @@ class InteriorBallisticsFrame(Frame):
 
     def timedLoop(self):
         # polling function for the calculation subprocess
+        try:
+            p = None
+            while not self.progressQueue.empty():
+                pg = self.progressQueue.get_nowait()
+                p = pg if p is None else max(p, pg)
+            if p is not None:
+                self.progress.set(p)
+        except Empty:
+            pass
+
         if self.process:
             self.getValue()
+
+        if self.guideProcess:
+            self.getGuide()
 
         # noinspection PyTypeChecker
         self.tLid = self.after(100, self.timedLoop)
@@ -468,6 +484,7 @@ class InteriorBallisticsFrame(Frame):
         self.tabParent.tab(self.plotTab, text=self.getLocStr("plotTab"))
         self.tabParent.tab(self.tableTab, text=self.getLocStr("tableTab"))
         self.tabParent.tab(self.errorTab, text=self.getLocStr("errorTab"))
+        self.tabParent.tab(self.guideTab, text=self.getLocStr("guideTab"))
 
         self.propTabParent.tab(self.propFrm, text=self.getLocStr("propFrmLabel"))
         self.propTabParent.tab(self.grainFrm, text=self.getLocStr("grainFrmLabel"))
@@ -972,92 +989,129 @@ class InteriorBallisticsFrame(Frame):
             col=k,
         )
         j += 1
-        self.guideButton = ttk.Button(ctrlFrm, text=self.getLocStr("guideLabel"))
+        self.guideButton = ttk.Button(ctrlFrm, text=self.getLocStr("guideLabel"), command=self.onGuide)
         self.guideButton.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
-    def onCalculate(self):
-        if self.process is not None:
+    def generateKwargs(self):
+        constrain = self.solve_W_Lg.get() == 1
+        lock = self.lock_Lg.get() == 1
+        optimize = self.opt_lf.get() == 1
+        debug = self.DEBUG.get() == 1
+        atmosphere = self.inAtmos.get() == 1
+        autofrettage = self.isAf.get() == 1
+
+        gunType = self.typeOptn.getObj()
+
+        if self.prop is None:
+            raise ValueError("Invalid propellant.")
+
+        if self.useCv.getObj() == USE_CV:
+            chamberVolume = float(self.cvL.get()) * 1e-3
+        else:
+            chamberVolume = float(self.chgkg.get()) / self.prop.rho_p / float(self.ldf.get()) * 100
+
+        chambrage = float(self.clr.get())
+        chargeMass = float(self.chgkg.get())
+        caliber = float(self.calmm.get()) * 1e-3
+        boreS = pi * 0.25 * caliber**2
+        breechS = chambrage * boreS
+
+        gunLength = float(self.tblmm.get()) * 1e-3
+        loadFraction = float(self.ldf.get()) * 1e-2
+
+        self.kwargs = {
+            "opt": optimize,
+            "con": constrain,
+            "deb": debug,
+            "lock": lock,
+            "typ": gunType,
+            "dom": self.dropDomain.getObj(),
+            "sol": self.dropSoln.getObj(),
+            "control": self.pControl.getObj(),
+            "structuralMaterial": self.dropMat.getObj().createMaterialAtTemp(self.dropMatTemp.getObj()),
+            "structuralSafetyFactor": float(self.ssf.get()),
+            "caliber": caliber,
+            "shotMass": float(self.shtkg.get()),
+            "propellant": self.prop,
+            "grainSize": float(self.arcmm.get()) * 1e-3,
+            "chargeMass": chargeMass,
+            "chargeMassRatio": float(self.chgkg.get()) / float(self.shtkg.get()),
+            "chamberVolume": chamberVolume,
+            "portArea": breechS * float(self.perf.get()) * 1e-2,
+            "startPressure": float(self.stpMPa.get()) * 1e6,
+            "lengthGun": gunLength,
+            "chambrage": chambrage,  # chamber expansion
+            "nozzleExpansion": float(self.nozzExp.get()),  # nozzle expansion
+            "nozzleEfficiency": float(self.nozzEff.get()) * 1e-2,  # nozzle efficiency
+            "dragCoefficient": float(self.dgc.get()) * 1e-2,  # drag coefficient
+            "designPressure": float(self.pTgt.get()) * 1e6,  # design pressure
+            "designVelocity": float(self.vTgt.get()),  # design velocity
+            "tol": 10 ** -int(self.accExp.get()),
+            "minWeb": 1e-6 * float(self.minWeb.get()),
+            "maxLength": float(self.lgmax.get()),
+            "loadFraction": loadFraction,
+            "step": int(self.step.get()),
+            "autofrettage": autofrettage,
+            "knownBore": lock,
+            "minCMR": float(self.guideMinCMR.get()),
+            "maxCMR": float(self.guideMaxCMR.get()),
+            "stepCMR": float(self.guideStepCMR.get()),
+            "minLF": float(self.guideMinLF.get()) * 1e-2,
+            "maxLF": float(self.guideMaxLF.get()) * 1e-2,
+            "stepLF": float(self.guideStepLF.get()) * 1e-2,
+        }
+
+        if atmosphere:
+            self.kwargs.update(
+                {
+                    "ambientP": float(self.ambP.get()) * 1e3,
+                    "ambientRho": float(self.ambRho.get()),
+                    "ambientGamma": float(self.ambGam.get()),
+                }
+            )
+        else:
+            self.kwargs.update({"ambientP": 0, "ambientRho": 0, "ambientGamma": 1})
+
+    def onGuide(self):
+        if self.guideProcess:
             return
 
         self.focus()  # remove focus to force widget entry validation
         self.update()  # and wait for the event to update.
 
-        self.process = None
-
+        self.guideProcess = None
         try:
-            constrain = self.solve_W_Lg.get() == 1
-            lock = self.lock_Lg.get() == 1
-            optimize = self.opt_lf.get() == 1
-            debug = self.DEBUG.get() == 1
-            atmosphere = self.inAtmos.get() == 1
-            autofrettage = self.isAf.get() == 1
+            self.generateKwargs()
+            self.guideProcess = Process(
+                target=guide, args=(self.guideJobQueue, self.progressQueue, self.logQueue, self.kwargs)
+            )
+            self.guideProcess.start()
 
-            gunType = self.typeOptn.getObj()
+        except Exception:
+            self.guide = None
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            logging.error("exception when dispatching calculation:")
+            logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
-            if self.prop is None:
-                raise ValueError("Invalid propellant.")
+            self.updateGuideGraph()
+        else:
+            for loc in self.locs:
+                try:
+                    loc.inhibit()
+                except AttributeError:
+                    pass
 
-            if self.useCv.getObj() == USE_CV:
-                chamberVolume = float(self.cvL.get()) * 1e-3
-            else:
-                chamberVolume = float(self.chgkg.get()) / self.prop.rho_p / float(self.ldf.get()) * 100
+            self.guideButton.config(state="disabled")
 
-            chambrage = float(self.clr.get())
-            chargeMass = float(self.chgkg.get())
-            caliber = float(self.calmm.get()) * 1e-3
-            boreS = pi * 0.25 * caliber**2
-            breechS = chambrage * boreS
+    def onCalculate(self):
+        if self.process:
+            return
+        self.focus()  # remove focus to force widget entry validation
+        self.update()  # and wait for the event to update.
 
-            gunLength = float(self.tblmm.get()) * 1e-3
-            loadFraction = float(self.ldf.get()) * 1e-2
-
-            self.kwargs = {
-                "opt": optimize,
-                "con": constrain,
-                "deb": debug,
-                "lock": lock,
-                "typ": gunType,
-                "dom": self.dropDomain.getObj(),
-                "sol": self.dropSoln.getObj(),
-                "control": self.pControl.getObj(),
-                "structuralMaterial": self.dropMat.getObj().createMaterialAtTemp(self.dropMatTemp.getObj()),
-                "structuralSafetyFactor": float(self.ssf.get()),
-                "caliber": caliber,
-                "shotMass": float(self.shtkg.get()),
-                "propellant": self.prop,
-                "grainSize": float(self.arcmm.get()) * 1e-3,
-                "chargeMass": chargeMass,
-                "chargeMassRatio": float(self.chgkg.get()) / float(self.shtkg.get()),
-                "chamberVolume": chamberVolume,
-                "portArea": breechS * float(self.perf.get()) * 1e-2,
-                "startPressure": float(self.stpMPa.get()) * 1e6,
-                "lengthGun": gunLength,
-                "chambrage": chambrage,  # chamber expansion
-                "nozzleExpansion": float(self.nozzExp.get()),  # nozzle expansion
-                "nozzleEfficiency": float(self.nozzEff.get()) * 1e-2,  # nozzle efficiency
-                "dragCoefficient": float(self.dgc.get()) * 1e-2,  # drag coefficient
-                "designPressure": float(self.pTgt.get()) * 1e6,  # design pressure
-                "designVelocity": float(self.vTgt.get()),  # design velocity
-                "tol": 10 ** -int(self.accExp.get()),
-                "minWeb": 1e-6 * float(self.minWeb.get()),
-                "maxLength": float(self.lgmax.get()),
-                "loadFraction": loadFraction,
-                "step": int(self.step.get()),
-                "autofrettage": autofrettage,
-                "knownBore": lock,
-            }
-
-            if atmosphere:
-                self.kwargs.update(
-                    {
-                        "ambientP": float(self.ambP.get()) * 1e3,
-                        "ambientRho": float(self.ambRho.get()),
-                        "ambientGamma": float(self.ambGam.get()),
-                    }
-                )
-            else:
-                self.kwargs.update({"ambientP": 0, "ambientRho": 0, "ambientGamma": 1})
-
+        self.process = None
+        try:
+            self.generateKwargs()
             self.process = Process(
                 target=calculate, args=(self.jobQueue, self.progressQueue, self.logQueue, self.kwargs)
             )
@@ -1065,11 +1119,12 @@ class InteriorBallisticsFrame(Frame):
             self.process.start()
 
         except Exception:
-            self.gun = None
             exc_type, exc_value, exc_traceback = sys.exc_info()
-
             logging.error("exception when dispatching calculation:")
             logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+
+            self.gun = None
+            self.gunResult = None
 
             self.updateTable()
             self.updateFigPlot()
@@ -1080,32 +1135,19 @@ class InteriorBallisticsFrame(Frame):
                     loc.inhibit()
                 except AttributeError:
                     pass
-            self.guideButton.config(state="disabled")
+
             self.calcButton.config(state="disabled")
 
     def getValue(self):
-        jobQueue = self.jobQueue
-        progressQueue = self.progressQueue
         try:
-            p = None
-            while not progressQueue.empty():
-                pg = progressQueue.get_nowait()
-                p = pg if p is None else max(p, pg)
-            if p is not None:
-                self.progress.set(p)
-        except Empty:
-            pass
-
-        try:
-            self.kwargs, self.gun, self.gunResult = jobQueue.get_nowait()
-
+            self.kwargs, self.gun, self.gunResult = self.jobQueue.get_nowait()
         except Empty:
             return
 
         self.process = None
         kwargs = self.kwargs
 
-        constrain = kwargs["con"]
+        constrain = self.kwargs["con"]
         lock = kwargs["lock"]
         optimize = kwargs["opt"]
         gunType = kwargs["typ"]
@@ -1188,6 +1230,21 @@ class InteriorBallisticsFrame(Frame):
         self.updateFigPlot()
         self.updateAuxPlot()
         self.calcButton.config(state="normal")
+
+        for loc in self.locs:
+            try:
+                loc.disinhibit()
+            except AttributeError:
+                pass
+
+    def getGuide(self):
+        try:
+            self.guide = self.guideJobQueue.get_nowait()
+        except Empty:
+            return
+
+        self.guideProcess = None
+        self.updateGuideGraph()
         self.guideButton.config(state="normal")
 
         for loc in self.locs:
@@ -1511,12 +1568,7 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
 
-        mecFrm = LocLabelFrame(
-            specFrm,
-            locKey="matFrmLabel",
-            locFunc=self.getLocStr,
-            allLLF=self.locs,
-        )
+        mecFrm = LocLabelFrame(specFrm, locKey="matFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
         mecFrm.grid(row=i, column=0, sticky="nsew", columnspan=3)
         mecFrm.columnconfigure(0, weight=1)
         i += 1
@@ -1586,17 +1638,19 @@ class InteriorBallisticsFrame(Frame):
             self.geomCanvas.draw_idle()
             self.geomCanvas.get_tk_widget().place(relheight=1, relwidth=1)
 
-    def addGuidancePlot(self):
-        plotFrm = LocLabelFrame(self.guidanceTab, locKey="guideFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
+    def addGuidePlot(self):
+        plotFrm = LocLabelFrame(self.guideTab, locKey="guideFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
         plotFrm.grid(row=0, column=0, sticky="nsew")
+        # plotFrm.rowconfigure(0, weight=1)
+        # plotFrm.columnconfigure(0, weight=1)
 
         with mpl.rc_context(GUIDE_CONTEXT):
             fig = Figure(dpi=96, layout="constrained")
             self.guideFig = fig
             self.guideAx = fig.add_subplot(111)
             self.guideCanvas = FigureCanvasTkAgg(fig, master=plotFrm)
-            self.geomCanvas.draw_idle()
-            self.geomCanvas.get_tk_widget().place(relheight=1, relwidth=1)
+            self.guideCanvas.draw_idle()
+            self.guideCanvas.get_tk_widget().place(relheight=1, relwidth=1)
 
     def addCenterFrm(self):
         self.tabParent = ttk.Notebook(self, padding=0)
@@ -1616,10 +1670,10 @@ class InteriorBallisticsFrame(Frame):
         self.tableTab.rowconfigure(0, weight=1)
         self.tableTab.columnconfigure(0, weight=1)
 
-        self.guidanceTab = Frame(self.tabParent)
-        self.guidanceTab.grid(row=0, column=0, sticky="nsew")
-        self.guidanceTab.rowconfigure(0, weight=1)
-        self.guidanceTab.columnconfigure(0, weight=1)
+        self.guideTab = Frame(self.tabParent)
+        self.guideTab.grid(row=0, column=0, sticky="nsew")
+        self.guideTab.rowconfigure(0, weight=1)
+        self.guideTab.columnconfigure(0, weight=1)
 
         self.errorTab = Frame(self.tabParent)
         self.errorTab.grid(row=0, column=0, sticky="nsew")
@@ -1628,7 +1682,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.tabParent.add(self.plotTab, text=self.getLocStr("plotTab"))
         self.tabParent.add(self.tableTab, text=self.getLocStr("tableTab"))
-        self.tabParent.add(self.guidanceTab, text=self.getLocStr("guideTab"))
+        self.tabParent.add(self.guideTab, text=self.getLocStr("guideTab"))
         self.tabParent.add(self.errorTab, text=self.getLocStr("errorTab"))
 
         self.tabParent.enable_traversal()
@@ -1790,162 +1844,166 @@ class InteriorBallisticsFrame(Frame):
 
     # noinspection PyUnusedLocal
     def updateFigPlot(self, *args):
-        if self.gun is None:
-            with mpl.rc_context(FIG_CONTEXT):
-                self.ax.cla()
-                self.axP.cla()
-                self.axv.cla()
-                self.pltCanvas.draw_idle()
-            return
-
         with mpl.rc_context(FIG_CONTEXT):
             self.ax.cla()
             self.axP.cla()
             self.axv.cla()
 
-            vTgt = self.kwargs["designVelocity"]
-            gunType = self.kwargs["typ"]
-            dom = self.kwargs["dom"]
+            if self.gun:
+                vTgt = self.kwargs["designVelocity"]
+                gunType = self.kwargs["typ"]
+                dom = self.kwargs["dom"]
 
-            xs, vs = [], []
+                xs, vs = [], []
 
-            Pas, Pss, Pbs, P0s = [], [], [], []
-            psis, etas = [], []
-            vxs = []
+                Pas, Pss, Pbs, P0s = [], [], [], []
+                psis, etas = [], []
+                vxs = []
 
-            if gunType == CONVENTIONAL:
-                for tag, t, l, psi, v, Pb, P, Ps, T in self.gunResult.getRawTableData():
-                    if tag == POINT_PEAK_AVG:
+                if gunType == CONVENTIONAL:
+                    for tag, t, l, psi, v, Pb, P, Ps, T in self.gunResult.getRawTableData():
+                        if tag == POINT_PEAK_AVG:
+                            if dom == DOMAIN_TIME:
+                                xPeak = t * 1e3
+                            elif dom == DOMAIN_LEN:
+                                xPeak = l
+
                         if dom == DOMAIN_TIME:
-                            xPeak = t * 1e3
+                            xs.append(t * 1000)
                         elif dom == DOMAIN_LEN:
-                            xPeak = l
+                            xs.append(l)
 
-                    if dom == DOMAIN_TIME:
-                        xs.append(t * 1000)
-                    elif dom == DOMAIN_LEN:
-                        xs.append(l)
+                        vs.append(v)
+                        Pas.append(P / 1e6)
+                        Pss.append(Ps / 1e6)
+                        Pbs.append(Pb / 1e6)
+                        psis.append(psi)
 
-                    vs.append(v)
-                    Pas.append(P / 1e6)
-                    Pss.append(Ps / 1e6)
-                    Pbs.append(Pb / 1e6)
-                    psis.append(psi)
+                elif gunType == RECOILLESS:
+                    for tag, t, l, psi, v, vx, Px, P0, P, Ps, T, eta in self.gunResult.getRawTableData():
+                        if tag == POINT_PEAK_AVG:
+                            if dom == DOMAIN_TIME:
+                                xPeak = t * 1e3
+                            elif dom == DOMAIN_LEN:
+                                xPeak = l
 
-            elif gunType == RECOILLESS:
-                for tag, t, l, psi, v, vx, Px, P0, P, Ps, T, eta in self.gunResult.getRawTableData():
-                    if tag == POINT_PEAK_AVG:
                         if dom == DOMAIN_TIME:
-                            xPeak = t * 1e3
+                            xs.append(t * 1000)
                         elif dom == DOMAIN_LEN:
-                            xPeak = l
+                            xs.append(l)
 
-                    if dom == DOMAIN_TIME:
-                        xs.append(t * 1000)
-                    elif dom == DOMAIN_LEN:
-                        xs.append(l)
+                        # Fr = P * gun.S * (1 - gun.C_f * gun.S_j_bar)
+                        vs.append(v)
+                        vxs.append(vx)
+                        Pas.append(P / 1e6)
+                        Pss.append(Ps / 1e6)
+                        Pbs.append(Px / 1e6)
+                        P0s.append(P0 / 1e6)
+                        # Frs.append(Fr / 1e6)
+                        psis.append(psi)
+                        etas.append(eta)
 
-                    # Fr = P * gun.S * (1 - gun.C_f * gun.S_j_bar)
-                    vs.append(v)
-                    vxs.append(vx)
-                    Pas.append(P / 1e6)
-                    Pss.append(Ps / 1e6)
-                    Pbs.append(Px / 1e6)
-                    P0s.append(P0 / 1e6)
-                    # Frs.append(Fr / 1e6)
-                    psis.append(psi)
-                    etas.append(eta)
+                # noinspection PyTypeChecker,PyUnreachableCode
+                self.axP.spines.left.set_position(("data", xPeak))
 
-            # noinspection PyTypeChecker,PyUnreachableCode
-            self.axP.spines.left.set_position(("data", xPeak))
+                if self.plotBreechP.get():
+                    self.axP.plot(
+                        xs,
+                        Pbs,
+                        c="xkcd:goldenrod",
+                        label=(
+                            self.getLocStr("figBreech")
+                            if gunType == CONVENTIONAL
+                            else (
+                                self.getLocStr("figNozzleP") if gunType == RECOILLESS else self.getLocStr("figBleedP")
+                            )
+                        ),
+                    )
 
-            if self.plotBreechP.get():
-                self.axP.plot(
-                    xs,
-                    Pbs,
-                    c="xkcd:goldenrod",
-                    label=(
-                        self.getLocStr("figBreech")
-                        if gunType == CONVENTIONAL
-                        else (self.getLocStr("figNozzleP") if gunType == RECOILLESS else self.getLocStr("figBleedP"))
+                if gunType == RECOILLESS:
+                    if self.plotStagP.get():
+                        self.axP.plot(xs, P0s, "seagreen", label=self.getLocStr("figStagnation"))
+
+                    if self.plotNozzleV.get():
+                        self.axv.plot(xs, vxs, "royalblue", label=self.getLocStr("figNozzleV"))
+
+                    if self.plotEta.get():
+                        self.ax.plot(xs, etas, "crimson", label=self.getLocStr("figOutflow"))
+
+                if self.plotAvgP.get():
+                    self.axP.plot(
+                        xs,
+                        Pas,
+                        "tab:green",
+                        label=self.getLocStr("figAvgP"),
+                    )
+
+                if self.plotBaseP.get():
+                    self.axP.plot(xs, Pss, "yellowgreen", label=self.getLocStr("figShotBase"))
+
+                if gunType == CONVENTIONAL or gunType == RECOILLESS:
+                    self.axP.axhline(
+                        float(self.pTgt.get()), c="tab:green", linestyle=":", label=self.getLocStr("figTgtP")
+                    )
+
+                if self.plotVel.get():
+                    self.axv.plot(xs, vs, "tab:blue", label=self.getLocStr("figShotVel"))
+                self.axv.axhline(vTgt, c="tab:blue", linestyle=":", label=self.getLocStr("figTgtV"))
+
+                if self.plotBurnup.get():
+                    self.ax.plot(xs, psis, c="tab:red", label=self.getLocStr("figPsi"))
+
+                linesLabeled = []
+                for lines, xvals in zip(
+                    (self.axP.get_lines(), self.ax.get_lines(), self.axv.get_lines()),
+                    (
+                        (0.2 * xs[-1] + 0.8 * xPeak, xs[-1]),
+                        (0, xs[-1]),
+                        (xPeak, 0.2 * xs[-1] + 0.8 * xPeak),
+                        (0, xPeak),
                     ),
-                )
+                ):
+                    labelLines(lines, align=True, xvals=xvals, outline_width=4)
+                    linesLabeled.append(lines)
 
-            if gunType == RECOILLESS:
-                if self.plotStagP.get():
-                    self.axP.plot(xs, P0s, "seagreen", label=self.getLocStr("figStagnation"))
+                self.ax.set_xlim(left=0, right=xs[-1])
+                # noinspection SpellCheckingInspection
+                pmax = max(Pas + Pbs + Pss + P0s)
+                self.axP.set(ylim=(0, pmax * 1.1))
+                self.axv.set(ylim=(0, max(vs + vxs) * 1.15))
+                self.ax.set_ylim(bottom=0, top=1.05)
 
-                if self.plotNozzleV.get():
-                    self.axv.plot(xs, vxs, "royalblue", label=self.getLocStr("figNozzleV"))
+                self.axP.yaxis.set_ticks([v for v in self.axP.get_yticks() if v <= pmax][1:])
 
-                if self.plotEta.get():
-                    self.ax.plot(xs, etas, "crimson", label=self.getLocStr("figOutflow"))
+                self.ax.yaxis.tick_right()
+                self.axP.yaxis.tick_left()
+                self.axv.yaxis.tick_left()
 
-            if self.plotAvgP.get():
-                self.axP.plot(
-                    xs,
-                    Pas,
-                    "tab:green",
-                    label=self.getLocStr("figAvgP"),
-                )
+                tkw = dict(size=4, width=1.5)
 
-            if self.plotBaseP.get():
-                self.axP.plot(xs, Pss, "yellowgreen", label=self.getLocStr("figShotBase"))
+                self.ax.tick_params(axis="y", colors="tab:red", **tkw)
+                self.axv.tick_params(axis="y", colors="tab:blue", **tkw)
+                self.axP.tick_params(axis="y", colors="tab:green", **tkw)
+                self.ax.tick_params(axis="x", **tkw)
 
-            if gunType == CONVENTIONAL or gunType == RECOILLESS:
-                self.axP.axhline(float(self.pTgt.get()), c="tab:green", linestyle=":", label=self.getLocStr("figTgtP"))
+                if dom == DOMAIN_TIME:
+                    self.ax.set_xlabel(self.getLocStr("figTimeDomain"))
+                elif dom == DOMAIN_LEN:
+                    self.ax.set_xlabel(self.getLocStr("figLenDomain"))
 
-            if self.plotVel.get():
-                self.axv.plot(xs, vs, "tab:blue", label=self.getLocStr("figShotVel"))
-            self.axv.axhline(vTgt, c="tab:blue", linestyle=":", label=self.getLocStr("figTgtV"))
+                self.axP.set_ylabel("MPa")
+                self.axP.yaxis.label.set_color("tab:green")
 
-            if self.plotBurnup.get():
-                self.ax.plot(xs, psis, c="tab:red", label=self.getLocStr("figPsi"))
+                self.axv.set_ylabel("m/s")
+                self.axv.yaxis.label.set_color("tab:blue")
+            else:
+                pass
 
-            linesLabeled = []
-            for lines, xvals in zip(
-                (self.axP.get_lines(), self.ax.get_lines(), self.axv.get_lines()),
-                ((0.2 * xs[-1] + 0.8 * xPeak, xs[-1]), (0, xs[-1]), (xPeak, 0.2 * xs[-1] + 0.8 * xPeak), (0, xPeak)),
-            ):
-                labelLines(lines, align=True, xvals=xvals, outline_width=4)
-                linesLabeled.append(lines)
-
-            self.ax.set_xlim(left=0, right=xs[-1])
-            # noinspection SpellCheckingInspection
-            pmax = max(Pas + Pbs + Pss + P0s)
-            self.axP.set(ylim=(0, pmax * 1.1))
-            self.axv.set(ylim=(0, max(vs + vxs) * 1.15))
-            self.ax.set_ylim(bottom=0, top=1.05)
-
-            self.axP.yaxis.set_ticks([v for v in self.axP.get_yticks() if v <= pmax][1:])
-
-            self.ax.yaxis.tick_right()
-            self.axP.yaxis.tick_left()
-            self.axv.yaxis.tick_left()
-
-            tkw = dict(size=4, width=1.5)
-
-            self.ax.tick_params(axis="y", colors="tab:red", **tkw)
-            self.axv.tick_params(axis="y", colors="tab:blue", **tkw)
-            self.axP.tick_params(axis="y", colors="tab:green", **tkw)
-            self.ax.tick_params(axis="x", **tkw)
-
-            if dom == DOMAIN_TIME:
-                self.ax.set_xlabel(self.getLocStr("figTimeDomain"))
-            elif dom == DOMAIN_LEN:
-                self.ax.set_xlabel(self.getLocStr("figLenDomain"))
-
-            self.axP.set_ylabel("MPa")
-            self.axP.yaxis.label.set_color("tab:green")
-
-            self.axv.set_ylabel("m/s")
-            self.axv.yaxis.label.set_color("tab:blue")
             self.pltCanvas.draw_idle()
 
     # noinspection PyUnusedLocal
     def updateAuxPlot(self, *args):
-        gun = self.gun
-        if gun is None:
+        if self.gun is None:
             with mpl.rc_context(FIG_CONTEXT):
                 self.auxAx.cla()
                 self.auxAxH.cla()
@@ -2047,10 +2105,7 @@ class InteriorBallisticsFrame(Frame):
         horzscroll.grid(row=1, column=0, sticky="nsew")
 
         self.tv = ttk.Treeview(
-            tblPlaceFrm,
-            selectmode="browse",
-            yscrollcommand=vertscroll.set,
-            xscrollcommand=horzscroll.set,
+            tblPlaceFrm, selectmode="browse", yscrollcommand=vertscroll.set, xscrollcommand=horzscroll.set
         )  # this set the nbr. of values
         self.tv.place(relwidth=1, relheight=1)
 
@@ -2069,10 +2124,7 @@ class InteriorBallisticsFrame(Frame):
             "end", "{:}: {:>4.0f} K {:}\n".format(self.getLocStr("TvDesc"), compo.T_v, self.getLocStr("isochorDesc"))
         )
 
-        self.specs.insert(
-            "end",
-            "{:}: {:>4.0f} kg/m³\n".format(self.getLocStr("densityDesc"), compo.rho_p),
-        )
+        self.specs.insert("end", "{:}: {:>4.0f} kg/m³\n".format(self.getLocStr("densityDesc"), compo.rho_p))
         isp = compo.getIsp()
         self.specs.insert(
             "end", "{:}: {:>4.0f} m/s {:>3.0f} s\n".format(self.getLocStr("vacISPDesc"), isp, isp / 9.805)
@@ -2170,10 +2222,9 @@ class InteriorBallisticsFrame(Frame):
             self.geomCanvas.draw_idle()
 
     def updateTable(self):
-        gun = self.gun
-        if gun is None:
-            return
         self.tv.delete(*self.tv.get_children())
+        if self.gun is None:
+            return
 
         try:
             gunType = self.kwargs["typ"]
@@ -2234,6 +2285,31 @@ class InteriorBallisticsFrame(Frame):
                 str(i + 1), "end", str(-i - 1), values=tuple("±" + e if "." in e else e for e in erow), tags="error"
             )
             self.tv.move(str(-i - 1), str(i + 1), -1)
+
+    def updateGuideGraph(self):
+        # logger.info(self.guide)
+
+        with mpl.rc_context(GUIDE_CONTEXT):
+            self.guideAx.cla()
+
+            if self.guide:
+                loadDensities = list(list(value[0] for value in line) for line in self.guide)
+                chargeMasses = list(list(value[1] for value in line) for line in self.guide)
+                lengths = list(list(value[3] if value[3] else inf for value in line) for line in self.guide)
+                minLength = min(min(value[3] if value[3] else inf for value in line) for line in self.guide)
+
+                pcm = self.guideAx.pcolormesh(
+                    loadDensities,
+                    chargeMasses,
+                    lengths,
+                    shading="nearest",
+                    cmap="Spectral",
+                    vmin=minLength,
+                    vmax=2 * minLength,
+                )
+                # self.guideFig.colorbar(pcm, ax=self.guideAx, label="Length", pad=0)
+
+            self.guideCanvas.draw_idle()
 
     # noinspection PyUnusedLocal
     def callback(self, *args):
@@ -2398,36 +2474,25 @@ class InteriorBallisticsFrame(Frame):
         for w in self.forceUpdOnThemeWidget:
             w.config(background=fbgc, foreground=fgc)
 
-        GEOM_CONTEXT.update(
-            {
-                "xtick.color": fgc,
-                "ytick.color": fgc,
-                "axes.edgecolor": fgc,
-                "axes.facecolor": fbgc,
-                "figure.facecolor": bgc,
-                "figure.edgecolor": fgc,
-            }
-        )
-
-        FIG_CONTEXT.update(
-            {
-                "figure.facecolor": bgc,
-                "figure.edgecolor": fgc,
-                "axes.edgecolor": fgc,
-                "axes.facecolor": fbgc,
-                "axes.labelcolor": fgc,
-                "text.color": fgc,
-                "xtick.color": fgc,
-                "ytick.color": fgc,
-            }
-        )
+        for context in (GEOM_CONTEXT, FIG_CONTEXT, GUIDE_CONTEXT):
+            context.update(
+                {
+                    "figure.facecolor": bgc,
+                    "figure.edgecolor": fgc,
+                    "axes.edgecolor": fgc,
+                    "axes.facecolor": fbgc,
+                    "axes.labelcolor": fgc,
+                    "text.color": fgc,
+                    "xtick.color": fgc,
+                    "ytick.color": fgc,
+                }
+            )
 
         try:
-            self.fig.set_facecolor(bgc)
-            self.geomFig.set_facecolor(bgc)
-            self.auxFig.set_facecolor(bgc)
+            for fig in (self.fig, self.geomFig, self.auxFig, self.guideFig):
+                fig.set_facecolor(bgc)
 
-            for ax in (self.ax, self.axv, self.axP, self.geomAx, self.auxAx, self.auxAxH):
+            for ax in (self.ax, self.axv, self.axP, self.geomAx, self.auxAx, self.auxAxH, self.guideAx):
                 ax.set_facecolor(fbgc)
                 ax.spines["top"].set_color(fgc)
                 ax.spines["bottom"].set_color(fgc)
@@ -2439,6 +2504,7 @@ class InteriorBallisticsFrame(Frame):
             self.updateGeomPlot()
             self.updateFigPlot()
             self.updateAuxPlot()
+            self.updateGuideGraph()
 
         except AttributeError:
             pass
@@ -2447,9 +2513,8 @@ class InteriorBallisticsFrame(Frame):
 
 
 def calculate(jobQueue, progressQueue, logQueue, kwargs):
-    h = QueueHandler(logQueue)
     root = logging.getLogger()
-    root.addHandler(h)
+    root.addHandler(QueueHandler(logQueue))
     root.setLevel(logging.INFO)
 
     logging.info("calculation started.")
@@ -2461,8 +2526,7 @@ def calculate(jobQueue, progressQueue, logQueue, kwargs):
     debug = kwargs["deb"]
 
     try:
-        gun = None
-        gunResult = None
+        gun, gunResult = None, None
         if constrain:
             if gunType == CONVENTIONAL:
                 constrained = Constrained(**kwargs)
@@ -2504,15 +2568,31 @@ def calculate(jobQueue, progressQueue, logQueue, kwargs):
         logging.info("calculation concluded successfully.")
 
     except Exception:
-        gun = None
-        gunResult = None
-
+        gun, gunResult = None, None
         exc_type, exc_value, exc_traceback = sys.exc_info()
         logging.error("exception while calculating:")
         logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
     finally:
         # noinspection PyUnboundLocalVariable
         jobQueue.put((kwargs, gun, gunResult))
+
+
+def guide(guideJobQueue, progressQueue, logQueue, kwargs):
+    root = logging.getLogger()
+    root.addHandler(QueueHandler(logQueue))
+    root.setLevel(logging.INFO)
+
+    guideResults = None
+    try:
+        guideResults = guideGraph(**kwargs)
+    except Exception:
+        guideResults = None
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        logging.error("exception while calculating guide graph:")
+        logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+    finally:
+        # noinspection PyUnboundLocalVariable
+        guideJobQueue.put(guideResults)
 
 
 def main(loc: str = None):

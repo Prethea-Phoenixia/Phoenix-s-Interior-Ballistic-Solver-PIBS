@@ -117,6 +117,8 @@ def guideGraph(
     minCMR: float = 0.3,
     maxCMR: float = 0.9,
     stepCMR: float = 0.1,
+    *_,
+    **__,
 ):
     target = Constrained(
         tol=tol,
@@ -179,17 +181,4 @@ def guideGraph(
         results[i * len(loadFractions) : (i + 1) * len(loadFractions)] for i in range(len(chargeMassRatios))
     ]
 
-    # serial implementation for debugging
-    # results = [f(**parameter) for parameter in parameters]
-
-    fig, ax = plt.subplots(layout="constrained")
-
-    lengths = list(list(value[3] if value[3] else inf for value in line) for line in shapedResults)
-    minLength = min(value[3] if value[3] else inf for value in results)
-
-    pcm = ax.pcolormesh(
-        loadDensities, chargeMasses, lengths, shading="nearest", cmap="Spectral", vmin=minLength, vmax=2 * minLength
-    )
-    fig.colorbar(pcm, ax=ax, label="Length", pad=0)
-
-    plt.show()
+    return shapedResults
