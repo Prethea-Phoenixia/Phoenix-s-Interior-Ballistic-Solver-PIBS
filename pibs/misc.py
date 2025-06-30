@@ -3,6 +3,8 @@ import os
 import sys
 from ctypes import byref, create_string_buffer, create_unicode_buffer, windll
 from math import floor, log, log10
+import matplotlib
+import numpy as np
 
 _prefix = {
     "y": 1e-24,  # yocto

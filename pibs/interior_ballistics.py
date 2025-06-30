@@ -12,18 +12,8 @@ from logging.handlers import QueueHandler, QueueListener
 from math import ceil, log10, pi, inf
 from multiprocessing import Process, Queue
 from queue import Empty
-from tkinter import (
-    Frame,
-    IntVar,
-    Menu,
-    StringVar,
-    Text,
-    Tk,
-    filedialog,
-    messagebox,
-    ttk,
-)
-
+from tkinter import Frame, IntVar, Menu, StringVar, Text, Tk, filedialog, messagebox, ttk
+from matplotlib.widgets import Cursor
 import matplotlib as mpl
 from labellines import labelLines
 from matplotlib import font_manager, rc_context
@@ -90,7 +80,7 @@ USE_CV = "USE_CV"
 FONTNAME = "Sarasa Fixed SC"
 FONTSIZE = 8
 
-GEOM_CONTEXT = {
+CONTEXT = {
     "font.size": FONTSIZE,
     "axes.titlesize": FONTSIZE,
     "axes.labelsize": FONTSIZE,
@@ -100,37 +90,10 @@ GEOM_CONTEXT = {
     "figure.titlesize": FONTSIZE + 2,
     "lines.markersize": FONTSIZE / 4,
     "lines.linewidth": 1,
-    "axes.axisbelow": True,
-    "font.family": "Sarasa Fixed SC",
-}  # this customizes matplotlib for the sigma-Z figure
-GUIDE_CONTEXT = {
-    "font.size": FONTSIZE,
-    "axes.titlesize": FONTSIZE,
-    "axes.labelsize": FONTSIZE,
-    "xtick.labelsize": FONTSIZE,
-    "ytick.labelsize": FONTSIZE,
-    "legend.fontsize": FONTSIZE,
-    "figure.titlesize": FONTSIZE + 2,
-    "lines.markersize": FONTSIZE / 4,
-    "lines.linewidth": 1,
-}
-
-FIG_CONTEXT = {
-    "font.size": FONTSIZE,
-    "axes.titlesize": FONTSIZE,
-    "axes.labelsize": FONTSIZE,
-    "xtick.labelsize": FONTSIZE,
-    "ytick.labelsize": FONTSIZE,
-    "legend.fontsize": FONTSIZE,
-    "figure.titlesize": FONTSIZE + 2,
-    "lines.linewidth": 1,
-    "font.weight": "bold",
-    "lines.markersize": FONTSIZE / 2,
-    "axes.axisbelow": False,
+    "font.family": FONTNAME,
     "axes.labelweight": "bold",
     "yaxis.labellocation": "top",
-    "font.family": "Sarasa Fixed SC",
-}  # this customizes matplotlib for the main figure.
+}
 
 
 def grid_configure_recursive(widget, **kwargs):
@@ -328,6 +291,11 @@ class InteriorBallisticsFrame(Frame):
         if self.process:
             self.process.terminate()
             self.process.kill()
+
+        if self.guideProcess:
+            self.guideProcess.terminate()
+            self.guideProcess.kill()
+
         self.listener.stop()
 
         if self.tLid is not None:
@@ -923,7 +891,7 @@ class InteriorBallisticsFrame(Frame):
         self.guideMinLF = Loc3Input(
             ctrlFrm,
             labelLocKey="minLFLabel",
-            default="10",
+            default="10.0",
             unitText="%",
             validation=validationNN,
             locFunc=self.getLocStr,
@@ -935,7 +903,7 @@ class InteriorBallisticsFrame(Frame):
         self.guideMaxLF = Loc3Input(
             ctrlFrm,
             labelLocKey="maxLFLabel",
-            default="90",
+            default="90.0",
             unitText="%",
             validation=validationNN,
             locFunc=self.getLocStr,
@@ -947,7 +915,7 @@ class InteriorBallisticsFrame(Frame):
         self.guideStepLF = Loc3Input(
             ctrlFrm,
             labelLocKey="stepLFLabel",
-            default="3",
+            default="10.0",
             unitText="%",
             validation=validationNN,
             locFunc=self.getLocStr,
@@ -1101,6 +1069,7 @@ class InteriorBallisticsFrame(Frame):
                 except AttributeError:
                     pass
 
+            self.calcButton.config(state="disabled")
             self.guideButton.config(state="disabled")
 
     def onCalculate(self):
@@ -1137,6 +1106,7 @@ class InteriorBallisticsFrame(Frame):
                     pass
 
             self.calcButton.config(state="disabled")
+            self.guideButton.config(state="disabled")
 
     def getValue(self):
         try:
@@ -1220,7 +1190,7 @@ class InteriorBallisticsFrame(Frame):
             self.mv.set(toSI(muzzleEntry.velocity, unit="m/s"))
 
             p = self.tabParent.index(self.tabParent.select())  # find the currently active tab
-            if p == 2:  # if the error/logging pane is currently selected.
+            if p == 2 or p == 3:  # if the guidance/logging pane is currently selected.
                 self.tabParent.select(0)  # goto the graphing pane
 
         else:  # calculation results in some error
@@ -1230,6 +1200,7 @@ class InteriorBallisticsFrame(Frame):
         self.updateFigPlot()
         self.updateAuxPlot()
         self.calcButton.config(state="normal")
+        self.guideButton.config(state="normal")
 
         for loc in self.locs:
             try:
@@ -1245,6 +1216,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.guideProcess = None
         self.updateGuideGraph()
+        self.calcButton.config(state="normal")
         self.guideButton.config(state="normal")
 
         for loc in self.locs:
@@ -1629,7 +1601,7 @@ class InteriorBallisticsFrame(Frame):
         self.typeOptn.trace_add("write", self.typeCallback)
 
     def addGeomPlot(self):
-        with mpl.rc_context(GEOM_CONTEXT):
+        with mpl.rc_context(CONTEXT):
             fig = Figure(dpi=96, layout="constrained")
             self.geomFig = fig
             self.geomAx = fig.add_subplot(111)
@@ -1644,7 +1616,7 @@ class InteriorBallisticsFrame(Frame):
         # plotFrm.rowconfigure(0, weight=1)
         # plotFrm.columnconfigure(0, weight=1)
 
-        with mpl.rc_context(GUIDE_CONTEXT):
+        with mpl.rc_context(CONTEXT):
             fig = Figure(dpi=96, layout="constrained")
             self.guideFig = fig
             self.guideAx = fig.add_subplot(111)
@@ -1769,7 +1741,7 @@ class InteriorBallisticsFrame(Frame):
         plotPlaceFrm = Frame(plotFrm)
         plotPlaceFrm.grid(row=0, column=0, padx=2, pady=2, sticky="nsew", columnspan=5)
 
-        with mpl.rc_context(FIG_CONTEXT):
+        with mpl.rc_context(CONTEXT):
             fig = Figure(dpi=96, layout="constrained")
             axes = fig.add_subplot(111)
 
@@ -1827,7 +1799,7 @@ class InteriorBallisticsFrame(Frame):
         auxPlaceFrm = Frame(auxFrm)
         auxPlaceFrm.grid(row=0, column=0, padx=2, pady=2, sticky="nsew", columnspan=2)
 
-        with mpl.rc_context(FIG_CONTEXT):
+        with mpl.rc_context(CONTEXT):
             fig = Figure(dpi=96, layout="constrained")
             axes = fig.add_subplot(111)
 
@@ -1844,7 +1816,7 @@ class InteriorBallisticsFrame(Frame):
 
     # noinspection PyUnusedLocal
     def updateFigPlot(self, *args):
-        with mpl.rc_context(FIG_CONTEXT):
+        with mpl.rc_context(CONTEXT):
             self.ax.cla()
             self.axP.cla()
             self.axv.cla()
@@ -1931,12 +1903,7 @@ class InteriorBallisticsFrame(Frame):
                         self.ax.plot(xs, etas, "crimson", label=self.getLocStr("figOutflow"))
 
                 if self.plotAvgP.get():
-                    self.axP.plot(
-                        xs,
-                        Pas,
-                        "tab:green",
-                        label=self.getLocStr("figAvgP"),
-                    )
+                    self.axP.plot(xs, Pas, "tab:green", label=self.getLocStr("figAvgP"))
 
                 if self.plotBaseP.get():
                     self.axP.plot(xs, Pss, "yellowgreen", label=self.getLocStr("figShotBase"))
@@ -1979,12 +1946,10 @@ class InteriorBallisticsFrame(Frame):
                 self.axP.yaxis.tick_left()
                 self.axv.yaxis.tick_left()
 
-                tkw = dict(size=4, width=1.5)
-
-                self.ax.tick_params(axis="y", colors="tab:red", **tkw)
-                self.axv.tick_params(axis="y", colors="tab:blue", **tkw)
-                self.axP.tick_params(axis="y", colors="tab:green", **tkw)
-                self.ax.tick_params(axis="x", **tkw)
+                self.ax.tick_params(axis="y", colors="tab:red")
+                self.axv.tick_params(axis="y", colors="tab:blue")
+                self.axP.tick_params(axis="y", colors="tab:green")
+                self.ax.tick_params(axis="x")
 
                 if dom == DOMAIN_TIME:
                     self.ax.set_xlabel(self.getLocStr("figTimeDomain"))
@@ -2004,13 +1969,13 @@ class InteriorBallisticsFrame(Frame):
     # noinspection PyUnusedLocal
     def updateAuxPlot(self, *args):
         if self.gun is None:
-            with mpl.rc_context(FIG_CONTEXT):
+            with mpl.rc_context(CONTEXT):
                 self.auxAx.cla()
                 self.auxAxH.cla()
                 self.auxCanvas.draw_idle()
             return
 
-        with mpl.rc_context(FIG_CONTEXT):
+        with mpl.rc_context(CONTEXT):
             self.auxAx.cla()
             self.auxAxH.cla()
 
@@ -2054,10 +2019,9 @@ class InteriorBallisticsFrame(Frame):
             self.auxAx.set_xlim(left=0, right=x_max)
             self.auxAx.set_ylim(bottom=0, top=y_max * 1.15)
 
-            tkw = dict(size=4, width=1.5)
-            self.auxAx.tick_params(axis="y", colors="tab:green", **tkw)
-            self.auxAxH.tick_params(axis="y", colors="tab:blue", **tkw)
-            self.auxAx.tick_params(axis="x", **tkw)
+            self.auxAx.tick_params(axis="y", colors="tab:green")
+            self.auxAxH.tick_params(axis="y", colors="tab:blue")
+            self.auxAx.tick_params(axis="x")
 
             self.auxAx.set_xlabel(self.getLocStr("figAuxDomain"))
 
@@ -2192,7 +2156,7 @@ class InteriorBallisticsFrame(Frame):
         self.callback()
 
     def updateGeomPlot(self):
-        with mpl.rc_context(GEOM_CONTEXT):
+        with mpl.rc_context(CONTEXT):
             N = 10
             prop = self.prop
             Zb = prop.Z_b
@@ -2289,7 +2253,13 @@ class InteriorBallisticsFrame(Frame):
     def updateGuideGraph(self):
         # logger.info(self.guide)
 
-        with mpl.rc_context(GUIDE_CONTEXT):
+        style = ttk.Style(self)
+        bgc = str(style.lookup("TFrame", "background"))
+        fgc = str(style.lookup("TFrame", "foreground"))
+        # noinspection SpellCheckingInspection
+        fbgc = str(style.lookup("TCombobox", "fieldbackground"))
+
+        with mpl.rc_context(CONTEXT):
             self.guideAx.cla()
 
             if self.guide:
@@ -2297,18 +2267,36 @@ class InteriorBallisticsFrame(Frame):
                 chargeMasses = list(list(value[1] for value in line) for line in self.guide)
                 lengths = list(list(value[3] if value[3] else inf for value in line) for line in self.guide)
                 minLength = min(min(value[3] if value[3] else inf for value in line) for line in self.guide)
-
-                pcm = self.guideAx.pcolormesh(
+                maxLength = max(max(value[3] if value[3] else 0 for value in line) for line in self.guide)
+                maxLength = min(2 * minLength, maxLength)
+                self.guideAx.pcolormesh(
                     loadDensities,
                     chargeMasses,
                     lengths,
                     shading="nearest",
-                    cmap="Spectral",
+                    # cmap="Spectral",
+                    cmap="afmhot" + ("" if self.themeRadio.get() else "_r"),
                     vmin=minLength,
-                    vmax=2 * minLength,
+                    vmax=maxLength,
                 )
-                # self.guideFig.colorbar(pcm, ax=self.guideAx, label="Length", pad=0)
+                threshold = 0.5 * (minLength + maxLength)
+                for line in self.guide:
+                    for value in line:
+                        loadDensity, chargeMass, web, length, *_ = value
+                        self.guideAx.text(
+                            loadDensity,
+                            chargeMass,
+                            f"{length:.3g}" if length else "N/A",
+                            color=bgc if (length and length < threshold) else fgc,
+                            # color=bgc if length else fgc,
+                            horizontalalignment="center",
+                            verticalalignment="center",
+                        )
 
+                self.guideAx.set_xlabel("Load Density")
+                self.guideAx.set_ylabel("Charge Mass")
+
+                # self.guideCursor = Cursor(self.guideAx, useblit=True, color=fgc, linewidth=1)
             self.guideCanvas.draw_idle()
 
     # noinspection PyUnusedLocal
@@ -2474,19 +2462,18 @@ class InteriorBallisticsFrame(Frame):
         for w in self.forceUpdOnThemeWidget:
             w.config(background=fbgc, foreground=fgc)
 
-        for context in (GEOM_CONTEXT, FIG_CONTEXT, GUIDE_CONTEXT):
-            context.update(
-                {
-                    "figure.facecolor": bgc,
-                    "figure.edgecolor": fgc,
-                    "axes.edgecolor": fgc,
-                    "axes.facecolor": fbgc,
-                    "axes.labelcolor": fgc,
-                    "text.color": fgc,
-                    "xtick.color": fgc,
-                    "ytick.color": fgc,
-                }
-            )
+        CONTEXT.update(
+            {
+                "figure.facecolor": bgc,
+                "figure.edgecolor": fgc,
+                "axes.edgecolor": fgc,
+                "axes.facecolor": fbgc,
+                "axes.labelcolor": fgc,
+                "text.color": fgc,
+                "xtick.color": fgc,
+                "ytick.color": fgc,
+            }
+        )
 
         try:
             for fig in (self.fig, self.geomFig, self.auxFig, self.guideFig):
@@ -2498,8 +2485,8 @@ class InteriorBallisticsFrame(Frame):
                 ax.spines["bottom"].set_color(fgc)
                 ax.spines["left"].set_color(fgc)
                 ax.spines["right"].set_color(fgc)
-                ax.tick_params(axis="x", colors=fgc)
-                ax.tick_params(axis="y", colors=fgc)
+                ax.tick_params(axis="x", which="both", colors=fgc, labelsize=FONTSIZE, labelfontfamily=FONTNAME)
+                ax.tick_params(axis="y", which="both", colors=fgc, labelsize=FONTSIZE, labelfontfamily=FONTNAME)
 
             self.updateGeomPlot()
             self.updateFigPlot()
