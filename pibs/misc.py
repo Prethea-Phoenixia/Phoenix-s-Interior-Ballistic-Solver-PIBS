@@ -3,8 +3,6 @@ import os
 import sys
 from ctypes import byref, create_string_buffer, create_unicode_buffer, windll
 from math import floor, log, log10
-import matplotlib
-import numpy as np
 
 _prefix = {
     "y": 1e-24,  # yocto
@@ -31,6 +29,7 @@ _prefix = {
 }
 
 
+# noinspection PyTypeChecker
 def resolvepath(path):
     if getattr(sys, "frozen", False):
         # If the 'frozen' flag is set, we are in bundled-app mode!
@@ -153,6 +152,20 @@ def validatePI(inp):  # validate an input such that the result is a positive int
         return True  # we will catch this by filling the default value
     try:
         return float(inp).is_integer() and float(inp) > 0 and "." not in inp
+    except ValueError:
+        return False
+
+
+def validateCE(inp: float) -> float:
+    return validateRange(inp, low=0.0, high=100.0)
+
+
+def validateRange(inp: float, low: float, high: float) -> float:  # validate a range
+    high, low = max((high, low)), min((high, low))
+    if inp == "":
+        return True
+    try:
+        return high >= float(inp) >= low
     except ValueError:
         return False
 

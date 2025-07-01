@@ -13,16 +13,15 @@ from math import ceil, log10, pi, inf
 from multiprocessing import Process, Queue
 from queue import Empty
 from tkinter import Frame, IntVar, Menu, StringVar, Text, Tk, filedialog, messagebox, ttk
-from matplotlib.widgets import Cursor
+
 import matplotlib as mpl
 from labellines import labelLines
-from matplotlib import font_manager, rc_context
+from matplotlib import font_manager
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from pibs.guidegraph import guideGraph
-from .ballistics import CONVENTIONAL, SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV
-
+from . import __version__
 from .ballistics import (
     COMPUTE,
     DOMAIN_LEN,
@@ -47,6 +46,7 @@ from .ballistics import (
     Recoilless,
     SimpleGeometry,
 )
+from .ballistics import CONVENTIONAL, SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV
 from .locWidget import (
     Loc2Input,
     Loc3Input,
@@ -68,6 +68,7 @@ from .misc import (
     validateFLT,
     validateNN,
     validatePI,
+    validateCE,
 )
 from .tip import CreateToolTip
 
@@ -84,6 +85,7 @@ CONTEXT = {
     "font.size": FONTSIZE,
     "axes.titlesize": FONTSIZE,
     "axes.labelsize": FONTSIZE,
+    "axes.titlelocation": "right",
     "xtick.labelsize": FONTSIZE,
     "ytick.labelsize": FONTSIZE,
     "legend.fontsize": FONTSIZE,
@@ -92,6 +94,7 @@ CONTEXT = {
     "lines.linewidth": 1,
     "font.family": FONTNAME,
     "axes.labelweight": "bold",
+    "xaxis.labellocation": "right",
     "yaxis.labellocation": "top",
 }
 
@@ -462,6 +465,7 @@ class InteriorBallisticsFrame(Frame):
         self.updateSpec()
         self.updateFigPlot()
         self.updateAuxPlot()
+        self.updateGuideGraph()
 
     def getLocStr(self, name):
         try:
@@ -612,14 +616,10 @@ class InteriorBallisticsFrame(Frame):
 
         validationNN = self.register(validateNN)
         validationPI = self.register(validatePI)
+        validationCE = self.register(validateCE)
 
         i = 1
-        envFrm = LocLabelFrame(
-            rightFrm,
-            locKey="envFrmLabel",
-            locFunc=self.getLocStr,
-            allLLF=self.locs,
-        )
+        envFrm = LocLabelFrame(rightFrm, locKey="envFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
         envFrm.grid(row=i, column=0, sticky="nsew")
         envFrm.columnconfigure(0, weight=1)
         i += 1
@@ -893,7 +893,7 @@ class InteriorBallisticsFrame(Frame):
             labelLocKey="minLFLabel",
             default="10.0",
             unitText="%",
-            validation=validationNN,
+            validation=validationCE,
             locFunc=self.getLocStr,
             allInputs=self.locs,
             row=j,
@@ -905,7 +905,7 @@ class InteriorBallisticsFrame(Frame):
             labelLocKey="maxLFLabel",
             default="90.0",
             unitText="%",
-            validation=validationNN,
+            validation=validationCE,
             locFunc=self.getLocStr,
             allInputs=self.locs,
             row=j,
@@ -917,7 +917,7 @@ class InteriorBallisticsFrame(Frame):
             labelLocKey="stepLFLabel",
             default="10.0",
             unitText="%",
-            validation=validationNN,
+            validation=validationCE,
             locFunc=self.getLocStr,
             allInputs=self.locs,
             row=j,
@@ -1005,7 +1005,7 @@ class InteriorBallisticsFrame(Frame):
             "chargeMass": chargeMass,
             "chargeMassRatio": float(self.chgkg.get()) / float(self.shtkg.get()),
             "chamberVolume": chamberVolume,
-            "portArea": breechS * float(self.perf.get()) * 1e-2,
+            # "portArea": breechS * float(self.perf.get()) * 1e-2,
             "startPressure": float(self.stpMPa.get()) * 1e6,
             "lengthGun": gunLength,
             "chambrage": chambrage,  # chamber expansion
@@ -1189,12 +1189,13 @@ class InteriorBallisticsFrame(Frame):
 
             self.mv.set(toSI(muzzleEntry.velocity, unit="m/s"))
 
-            p = self.tabParent.index(self.tabParent.select())  # find the currently active tab
-            if p == 2 or p == 3:  # if the guidance/logging pane is currently selected.
-                self.tabParent.select(0)  # goto the graphing pane
+            # p = self.tabParent.index(self.tabParent.select())  # find the currently active tab
+            # if p == 2 or p == 3:  # if the guidance/logging pane is currently selected.
+            #     self.tabParent.select(0)  # goto the graphing pane
 
         else:  # calculation results in some error
-            self.tabParent.select(3)  # goto the error pane
+            # self.tabParent.select(3)  # goto the error pane
+            pass
 
         self.updateTable()
         self.updateFigPlot()
@@ -1232,7 +1233,7 @@ class InteriorBallisticsFrame(Frame):
 
         # validation
         validationNN = self.register(validateNN)
-        validationFLT = self.register(validateFLT)
+        validationCE = self.register(validateCE)
 
         i = 0
         # noinspection SpellCheckingInspection
@@ -1444,7 +1445,7 @@ class InteriorBallisticsFrame(Frame):
             labelLocKey="ldfLabel",
             unitText="%",
             default="50.0",
-            validation=validationNN,
+            validation=validationCE,
             tooltipLocKey="ldfText",
             locFunc=self.getLocStr,
             allInputs=self.locs,
@@ -1484,7 +1485,7 @@ class InteriorBallisticsFrame(Frame):
             labelLocKey="dgcLabel",
             unitText="%",
             default="3.0",
-            validation=validationNN,
+            validation=validationCE,
             tooltipLocKey="dgcText",
             locFunc=self.getLocStr,
             allInputs=self.locs,
@@ -1503,18 +1504,6 @@ class InteriorBallisticsFrame(Frame):
         )
         i += 1
 
-        self.perf = Loc3Input(
-            parent=specFrm,
-            row=i,
-            labelLocKey="perfLabel",
-            unitText="%",
-            default="50.0",
-            validation=validationNN,
-            tooltipLocKey="perfText",
-            locFunc=self.getLocStr,
-            allInputs=self.locs,
-        )
-        i += 1
         # noinspection SpellCheckingInspection
         self.nozzExp = Loc3Input(
             parent=specFrm,
@@ -1534,11 +1523,12 @@ class InteriorBallisticsFrame(Frame):
             labelLocKey="nozzEffLabel",
             unitText="%",
             default="92.0",
-            validation=validationNN,
+            validation=validationCE,
             tooltipLocKey="nozzEffText",
             locFunc=self.getLocStr,
             allInputs=self.locs,
         )
+        i += 1
 
         mecFrm = LocLabelFrame(specFrm, locKey="matFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
         mecFrm.grid(row=i, column=0, sticky="nsew", columnspan=3)
@@ -1613,8 +1603,6 @@ class InteriorBallisticsFrame(Frame):
     def addGuidePlot(self):
         plotFrm = LocLabelFrame(self.guideTab, locKey="guideFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
         plotFrm.grid(row=0, column=0, sticky="nsew")
-        # plotFrm.rowconfigure(0, weight=1)
-        # plotFrm.columnconfigure(0, weight=1)
 
         with mpl.rc_context(CONTEXT):
             fig = Figure(dpi=96, layout="constrained")
@@ -1623,6 +1611,29 @@ class InteriorBallisticsFrame(Frame):
             self.guideCanvas = FigureCanvasTkAgg(fig, master=plotFrm)
             self.guideCanvas.draw_idle()
             self.guideCanvas.get_tk_widget().place(relheight=1, relwidth=1)
+
+        controlFrm = Frame(self.guideTab)
+        controlFrm.grid(row=1, column=0, sticky="nsew")
+
+        self.guideIndex = IntVar(value=3)
+        self.guideIndex.trace_add("write", callback=self.guideCallback)
+
+        for i in range(3):
+            controlFrm.columnconfigure(i, weight=1)
+        self.guidePlotTravel = ttk.Radiobutton(
+            controlFrm, text=self.getLocStr("guidePlotTravel"), variable=self.guideIndex, value=3
+        )
+        self.guidePlotTravel.grid(row=0, column=0, sticky="nsew")
+
+        self.guidePlotVolume = ttk.Radiobutton(
+            controlFrm, text=self.getLocStr("guidePlotVolume"), variable=self.guideIndex, value=4
+        )
+        self.guidePlotVolume.grid(row=0, column=1, sticky="nsew")
+
+        self.guidePlotBurnout = ttk.Radiobutton(
+            controlFrm, text=self.getLocStr("guidePlotBurnout"), variable=self.guideIndex, value=5
+        )
+        self.guidePlotBurnout.grid(row=0, column=2, sticky="nsew")
 
     def addCenterFrm(self):
         self.tabParent = ttk.Notebook(self, padding=0)
@@ -1665,12 +1676,7 @@ class InteriorBallisticsFrame(Frame):
         self.addFigPlot()
 
     def addErrFrm(self):
-        errorFrm = LocLabelFrame(
-            self.errorTab,
-            locKey="errFrmLabel",
-            locFunc=self.getLocStr,
-            allLLF=self.locs,
-        )
+        errorFrm = LocLabelFrame(self.errorTab, locKey="errFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
         errorFrm.grid(row=0, column=0, columnspan=3, sticky="nsew")
         errorFrm.columnconfigure(0, weight=1)
         errorFrm.rowconfigure(0, weight=1)
@@ -2262,39 +2268,62 @@ class InteriorBallisticsFrame(Frame):
         with mpl.rc_context(CONTEXT):
             self.guideAx.cla()
 
-            if self.guide:
+            if self.guide and any(line for line in self.guide):
                 loadDensities = list(list(value[0] for value in line) for line in self.guide)
                 chargeMasses = list(list(value[1] for value in line) for line in self.guide)
-                lengths = list(list(value[3] if value[3] else inf for value in line) for line in self.guide)
-                minLength = min(min(value[3] if value[3] else inf for value in line) for line in self.guide)
-                maxLength = max(max(value[3] if value[3] else 0 for value in line) for line in self.guide)
-                maxLength = min(2 * minLength, maxLength)
-                self.guideAx.pcolormesh(
-                    loadDensities,
-                    chargeMasses,
-                    lengths,
-                    shading="nearest",
-                    # cmap="Spectral",
-                    cmap="afmhot" + ("" if self.themeRadio.get() else "_r"),
-                    vmin=minLength,
-                    vmax=maxLength,
-                )
-                threshold = 0.5 * (minLength + maxLength)
-                for line in self.guide:
-                    for value in line:
-                        loadDensity, chargeMass, web, length, *_ = value
-                        self.guideAx.text(
-                            loadDensity,
-                            chargeMass,
-                            f"{length:.3g}" if length else "N/A",
-                            color=bgc if (length and length < threshold) else fgc,
-                            # color=bgc if length else fgc,
-                            horizontalalignment="center",
-                            verticalalignment="center",
-                        )
 
-                self.guideAx.set_xlabel("Load Density")
-                self.guideAx.set_ylabel("Charge Mass")
+                self.guideAx.set_xlabel(self.getLocStr("guideLDDomain"))
+                self.guideAx.set_ylabel(self.getLocStr("guideCMDomain"))
+
+                index = int(self.guideIndex.get())
+                if index in (3, 4, 5):
+                    values = list(
+                        list(value[index] * (1e3 if index == 4 else 1) if value[index] else inf for value in line)
+                        for line in self.guide
+                    )
+
+                    if index != 5:
+                        minVal = min(min(line) for line in values)
+                        maxVal = max(
+                            max(value[index] if value[index] else 0 for value in line) for line in self.guide
+                        ) * (1e3 if index == 4 else 1)
+                        maxVal = min(2 * minVal, maxVal)
+                    else:
+                        minVal = 0
+                        maxVal = 1
+
+                    self.guideAx.pcolormesh(
+                        loadDensities,
+                        chargeMasses,
+                        values,
+                        shading="nearest",
+                        cmap="afmhot" + ("" if self.themeRadio.get() else "_r"),
+                        vmin=minVal,
+                        vmax=maxVal,
+                    )
+                    threshold = 0.5 * (minVal + maxVal)
+                    for line in self.guide:
+                        for value in line:
+                            loadDensity, chargeMass = value[0], value[1]
+                            entry = value[index]
+                            entry = entry * (1e3 if index == 4 else 1) if entry else None
+                            self.guideAx.text(
+                                loadDensity,
+                                chargeMass,
+                                f"{entry:.3g}" if entry else "N/A",
+                                color=bgc if (entry and entry < threshold) else fgc,
+                                horizontalalignment="center",
+                                verticalalignment="center",
+                            )
+                    if index == 3:
+                        self.guideAx.set_title(self.getLocStr("guideTravelTitle"))
+                    elif index == 4:
+                        self.guideAx.set_title(self.getLocStr("guideBVTitle"))
+                    else:
+                        self.guideAx.set_title(self.getLocStr("guideBurnoutTitle"))
+
+                else:
+                    raise ValueError("unknown guidance diagram plotting control.")
 
                 # self.guideCursor = Cursor(self.guideAx, useblit=True, color=fgc, linewidth=1)
             self.guideCanvas.draw_idle()
@@ -2332,12 +2361,11 @@ class InteriorBallisticsFrame(Frame):
             self.nozzExp.restore()
             self.nozzEff.restore()
             self.plotNozzleV.restore()
-            self.perf.restore()
+
         else:
             self.nozzExp.remove()
             self.nozzEff.remove()
             self.plotNozzleV.remove()
-            self.perf.remove()
 
         if gunType == CONVENTIONAL:
             self.plotBreechP.reLocalize("plotBreechP")
@@ -2422,6 +2450,9 @@ class InteriorBallisticsFrame(Frame):
         self.ldf.disable() if useCv else self.ldf.enable()
         self.cvL.enable() if useCv else self.cvL.disable()
 
+    def guideCallback(self, *args):
+        self.updateGuideGraph()
+
     def useTheme(self):
         style = ttk.Style(self)
         choice = self.themeRadio.get()
@@ -2432,7 +2463,6 @@ class InteriorBallisticsFrame(Frame):
             style.theme_use("awlight")
             pass
 
-        #
         # ensure that the treeview rows are roughly the same height
         # regardless of dpi. on Windows, default is Segoe UI at 9 points
         # so the default row height should be around 12
@@ -2569,13 +2599,17 @@ def guide(guideJobQueue, progressQueue, logQueue, kwargs):
     root.addHandler(QueueHandler(logQueue))
     root.setLevel(logging.INFO)
 
+    logging.info("guidance diagram calculation started")
+
     guideResults = None
     try:
         guideResults = guideGraph(**kwargs)
+        logging.info("guidance diagram calculation concluded successfully.")
+
     except Exception:
         guideResults = None
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        logging.error("exception while calculating guide graph:")
+        logging.error("exception while calculating guidance diagram:")
         logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
     finally:
         # noinspection PyUnboundLocalVariable
@@ -2639,7 +2673,7 @@ def main(loc: str = None):
     root.tk.call("lappend", "auto_path", resolvepath("ui/tksvg0.12"))
 
     root.option_add("*tearOff", False)
-    root.title("PIBS v0.5.0")
+    root.title("PIBS v" + __version__)
     menubar = Menu(root)
     root.config(menu=menubar)
 

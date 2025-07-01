@@ -1,19 +1,15 @@
+import logging
+import multiprocessing
+from itertools import repeat
 from math import inf
 from typing import Optional
-import matplotlib.pyplot as plt
-import multiprocessing
 
 from .ballistics import Constrained, Solutions, Points, Domains
-
-from .ballistics import Propellant
 from .ballistics import Gun
-from .ballistics import DOMAIN_TIME
-from .ballistics import SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV
-from .ballistics import POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT, POINT_BURNOUT
+from .ballistics import POINT_BURNOUT
+from .ballistics import Propellant
 
-from labellines import labelLines
-
-from itertools import repeat
+logger = logging.getLogger(__name__)
 
 
 def starstarmap(pool, fn, args_iter, kwargs_iter):
@@ -82,7 +78,7 @@ def f(
         try:
             burnout = gunResult.readTableData(POINT_BURNOUT).travel / lengthGun
         except ValueError:
-            burnout = 1.0
+            burnout = inf
 
         tubeVolume = lengthGun * target.S
         volume = chamberVolume + tubeVolume  # convert to liters
@@ -90,10 +86,13 @@ def f(
     except ValueError:
         halfWeb, lengthGun, volume, burnout = None, None, None, None
 
-    return loadDensity, chargeMass, halfWeb, lengthGun, burnout, volume
+    return loadDensity, chargeMass, halfWeb, lengthGun, volume, burnout
 
 
 def guideGraph(
+    sol: Solutions,
+    dom: Domains,
+    control: Points,
     caliber: float,
     shotMass: float,
     propellant: Propellant,
@@ -103,20 +102,17 @@ def guideGraph(
     designVelocity: float,
     chambrage: float,
     tol: float,
-    minWeb: float = 1e-6,
-    maxLength: float = 1e3,
-    sol: Solutions = SOL_LAGRANGE,
-    dom: Domains = DOMAIN_TIME,
-    ambientRho: float = 1.204,
-    ambientP: float = 101.325e3,
-    ambientGamma: float = 1.4,
-    control: Points = POINT_PEAK_AVG,
-    minLF: float = 0.3,
-    maxLF: float = 0.9,
-    stepLF: float = 0.1,
-    minCMR: float = 0.3,
-    maxCMR: float = 0.9,
-    stepCMR: float = 0.1,
+    minWeb: float,
+    maxLength: float,
+    ambientRho: float,
+    ambientP: float,
+    ambientGamma: float,
+    minLF: float,
+    maxLF: float,
+    stepLF: float,
+    minCMR: float,
+    maxCMR: float,
+    stepCMR: float,
     *_,
     **__,
 ):

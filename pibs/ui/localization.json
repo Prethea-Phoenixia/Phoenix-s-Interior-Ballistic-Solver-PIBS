@@ -161,7 +161,6 @@
     "peffLabel": "Piezo Efficiency",
     "peffText": "Piezoelectric efficiency of the gun system, i.e. the ratio of average pressure to peak pressure. Higher value indicate more efficient utilization of tube length.",
     "perfLRText": "Specify length to diameter ratio of the grain.\n higher value leads to progressive burning, but induce higher mechanical stress onto grains leading to premature fracture. A value too low means propellant primarily burns along the  axial direction, exhibiting regressive burning behaviour",
-    "perfLabel": "Perforation",
     "plotAvgP": "Space Mean Pressure",
     "plotBaseP": "Shot Base Pressure",
     "plotBreechP": "Breech Pressure",
@@ -223,7 +222,15 @@
     "guideLabel": "Make Guide Diagram",
     "guideCtrlFrmLabel": "Guidance",
     "guideTab": "Guidance",
-    "guideFrmLabel": "Guide Diagram"
+    "guideFrmLabel": "Guide Diagram",
+    "guideLDDomain": "Load Density - kg/m",
+    "guideCMDomain": "Charge Mass - kg",
+    "guideTravelTitle": "Travel - m",
+    "guideBVTitle": "Bore Volume - L",
+    "guideBurnoutTitle": "Relative Burnout Point - Burnout Point / Travel",
+    "guidePlotTravel": "Travel Contour",
+    "guidePlotVolume": "Bore Volume Contour",
+    "guidePlotBurnout": "Burnout Point Contour"
   },
   "中文": {
     "BURNOUT": "火药燃尽",
@@ -386,7 +393,6 @@
     "peffLabel": "压电效率",
     "peffText": "火炮压电效率（γp）又称充满系数，是弹底平均压强（加速度）与弹底最大压强（加速度）的比值，该指标衡量火炮工作容积利用效率。",
     "perfLRText": "设置火药药粒的长径比。多孔火药长径比一般在1.82-3.57之间。该比例越大，火药燃烧增面性越强。当取值过小，以至于药粒柱高小于弧厚时，药粒可能出现减面燃烧的现象。一般而言较长的药粒难以同时着火，需要每隔一定间隔开槽。运动性越差，发射时停留在在膛底，作用压强越高。",
-    "perfLabel": "喷口面积比",
     "plotAvgP": "空间平均压强",
     "plotBaseP": "弹底压强",
     "plotBreechP": "膛底压强",
@@ -445,7 +451,7 @@
     "stepCMRLabel": "装药:弹重比增量",
     "guideLabel": "计算指导图",
     "guideCtrlFrmLabel": "指导",
-    "guideTab": "指导",
+    "guideTab": "指导图",
     "guideFrmLabel": "指导图"
   }
 }
