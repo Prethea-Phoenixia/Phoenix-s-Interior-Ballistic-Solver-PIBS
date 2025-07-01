@@ -1,4 +1,5 @@
 from tkinter import IntVar, StringVar, ttk
+from typing import Literal
 
 from .misc import formatFloatInput
 from .tip import CreateToolTip
@@ -14,7 +15,7 @@ class Loc12Disp:
         unitText="",
         default="",
         entryWidth=20,
-        justify="center",
+        justify: Literal["left", "right", "center"] = "center",
         tooltipLocKey=None,
         reverse=False,
         locFunc=None,
@@ -75,8 +76,8 @@ class Loc122Disp(Loc12Disp):
         default_up="",
         default_dn="",
         entryWidth=20,
-        justify_up="center",
-        justify_dn="center",
+        justify_up: Literal["left", "right", "center"] = "center",
+        justify_dn: Literal["left", "right", "center"] = "center",
         tooltipLocKey=None,
         reverse=False,
         locFunc=None,

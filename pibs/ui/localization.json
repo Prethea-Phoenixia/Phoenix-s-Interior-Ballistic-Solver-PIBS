@@ -220,7 +220,7 @@
     "maxCMRLabel": "Max. Charge:Shot Mass",
     "stepCMRLabel": "Charge:Shot Mass Step",
     "guideLabel": "Make Guide Diagram",
-    "guideCtrlFrmLabel": "Guidance",
+    "guideCtrlFrmLabel": "Guidance Parameter",
     "guideTab": "Guidance",
     "guideFrmLabel": "Guide Diagram",
     "guideLDDomain": "Load Density - kg/m",
@@ -230,7 +230,8 @@
     "guideBurnoutTitle": "Relative Burnout Point - Burnout Point / Travel",
     "guidePlotTravel": "Travel Contour",
     "guidePlotVolume": "Bore Volume Contour",
-    "guidePlotBurnout": "Burnout Point Contour"
+    "guidePlotBurnout": "Burnout Point Contour",
+    "force": "   Force"
   },
   "中文": {
     "BURNOUT": "火药燃尽",
@@ -450,8 +451,17 @@
     "maxCMRLabel": "最大装药:弹重比",
     "stepCMRLabel": "装药:弹重比增量",
     "guideLabel": "计算指导图",
-    "guideCtrlFrmLabel": "指导",
+    "guideFrmLabel": "指导图",
+    "guideCtrlFrmLabel": "指导图参量",
     "guideTab": "指导图",
-    "guideFrmLabel": "指导图"
+    "guideLDDomain": "装填密度 - kg/m",
+    "guideCMDomain": "装药量 - kg",
+    "guideTravelTitle": "行程 - m",
+    "guideBVTitle": "膛内容积 - L",
+    "guideBurnoutTitle": "相对燃尽点位置 - 燃尽点 / 行程",
+    "guidePlotTravel": "行程图",
+    "guidePlotVolume": "膛容图",
+    "guidePlotBurnout": "燃尽点图",
+    "force": "　　　火药力"
   }
 }

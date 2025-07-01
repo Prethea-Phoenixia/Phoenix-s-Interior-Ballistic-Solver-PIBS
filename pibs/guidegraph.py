@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import os
 from itertools import repeat
 from math import inf
 from typing import Optional
@@ -41,6 +42,7 @@ def f(
     sol: Solutions,
     dom: Domains,
 ):
+
     chargeMass = target.m * chargeMassRatio
     loadDensity = loadFraction * target.propellant.rho_p
     try:
@@ -116,6 +118,7 @@ def guideGraph(
     *_,
     **__,
 ):
+
     target = Constrained(
         tol=tol,
         caliber=caliber,
@@ -169,8 +172,11 @@ def guideGraph(
                 }
             )
 
+    processes = os.cpu_count()
+    logger.info(f"dispatching {processes:}-process for constructing guidance diagram.")
+
     # parallel implementation
-    with multiprocessing.Pool() as pool:
+    with multiprocessing.Pool(processes=processes) as pool:
         results = starstarmap(pool, f, repeat([], len(parameters)), parameters)
 
     shapedResults = [

@@ -13,6 +13,7 @@ from math import ceil, log10, pi, inf
 from multiprocessing import Process, Queue
 from queue import Empty
 from tkinter import Frame, IntVar, Menu, StringVar, Text, Tk, filedialog, messagebox, ttk
+from typing import Literal
 
 import matplotlib as mpl
 from labellines import labelLines
@@ -47,15 +48,7 @@ from .ballistics import (
     SimpleGeometry,
 )
 from .ballistics import CONVENTIONAL, SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV
-from .locWidget import (
-    Loc2Input,
-    Loc3Input,
-    Loc12Disp,
-    Loc122Disp,
-    LocDropdown,
-    LocLabelCheck,
-    LocLabelFrame,
-)
+from .locWidget import Loc2Input, Loc3Input, Loc12Disp, Loc122Disp, LocDropdown, LocLabelCheck, LocLabelFrame
 from .misc import (
     STRING,
     dot_aligned,
@@ -65,14 +58,19 @@ from .misc import (
     resolvepath,
     roundSig,
     toSI,
-    validateFLT,
     validateNN,
     validatePI,
     validateCE,
+    filenameize,
 )
 from .tip import CreateToolTip
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(sys.stderr)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 USE_LF = "USE_LF"
@@ -133,7 +131,7 @@ class TextHandler(logging.Handler):
             self.text.yview("end")
 
         # This is necessary because we can't modify the Text from other threads
-        self.text.after(100, append)
+        self.text.after(33, append)
 
 
 # noinspection PyAttributeOutsideInit
@@ -185,7 +183,23 @@ class InteriorBallisticsFrame(Frame):
 
         fileMenu.add_command(label=self.getLocStr("saveLabel"), command=self.save, underline=0)
         fileMenu.add_command(label=self.getLocStr("loadLabel"), command=self.load, underline=0)
-        fileMenu.add_command(label=self.getLocStr("exportLabel"), command=self.export, underline=0)
+        fileMenu.add_separator()
+
+        fileMenu.add_command(
+            label=self.getLocStr("exportMain"), command=lambda: self.exportGraph(save="main"), underline=0
+        )
+        fileMenu.add_command(
+            label=self.getLocStr("exportAux"), command=lambda: self.exportGraph(save="aux"), underline=0
+        )
+        fileMenu.add_command(
+            label=self.getLocStr("exportGeom"), command=lambda: self.exportGraph(save="geom"), underline=0
+        )
+        fileMenu.add_command(
+            label=self.getLocStr("exportGuide"), command=lambda: self.exportGraph(save="guide"), underline=0
+        )
+
+        fileMenu.add_separator()
+        fileMenu.add_command(label=self.getLocStr("exportLabel"), command=self.exportTable, underline=0)
 
         themeMenu.add_radiobutton(
             label=self.getLocStr("darkLabel"), variable=self.themeRadio, value=0, command=self.useTheme, underline=0
@@ -253,7 +267,7 @@ class InteriorBallisticsFrame(Frame):
         textHandler = TextHandler(self.errorText)
         logger.addHandler(textHandler)
 
-        logging.info("text handler attached to root logger.")
+        logger.info("text handler attached to root logger.")
 
         console = logging.StreamHandler(sys.stderr)
         console.setFormatter(
@@ -265,7 +279,7 @@ class InteriorBallisticsFrame(Frame):
         self.listener = QueueListener(self.logQueue, textHandler, console)
         self.listener.start()
 
-        logging.info("text handler attached to subprocess log queue listener.")
+        logger.info("text handler attached to subprocess log queue listener.")
 
         self.timedLoop()
 
@@ -288,7 +302,7 @@ class InteriorBallisticsFrame(Frame):
             self.getGuide()
 
         # noinspection PyTypeChecker
-        self.tLid = self.after(100, self.timedLoop)
+        self.tLid = self.after(33, self.timedLoop)
 
     def quit(self):
         if self.process:
@@ -317,7 +331,7 @@ class InteriorBallisticsFrame(Frame):
             car_len = kwargs["chamberVolume"] / (pi * (0.5 * cal) ** 2 * kwargs["chambrage"])
             w = kwargs["shotMass"]
             return (
-                "{:} {:.3g}x{:.4g}mm L{:.0f} ".format(
+                "{:} {:.0f}x{:.0f} mm L{:.0f} ".format(
                     "{:.4g} g".format(w * 1e3) if w < 1 else "{:.4g} kg".format(w), cal * 1e3, car_len * 1e3, blr
                 )
                 + typ
@@ -333,7 +347,7 @@ class InteriorBallisticsFrame(Frame):
             title=self.getLocStr("saveLabel"),
             filetypes=(("JSON file", "*.json"),),
             defaultextension=".json",
-            initialfile=self.getDescriptive(),
+            initialfile=filenameize(self.getDescriptive()),
         )
 
         if fileName == "":
@@ -366,10 +380,7 @@ class InteriorBallisticsFrame(Frame):
 
     def load(self):
         fileName = filedialog.askopenfilename(
-            title=self.getLocStr("loadLabel"),
-            filetypes=(("JSON File", "*.json"),),
-            defaultextension=".json",
-            initialfile=self.getDescriptive(),
+            title=self.getLocStr("loadLabel"), filetypes=(("JSON File", "*.json"),), defaultextension=".json"
         )
         if fileName == "":
             messagebox.showinfo("Exception Loading Design", "No File Selected")
@@ -396,7 +407,7 @@ class InteriorBallisticsFrame(Frame):
                 errMsg = str(e)
             messagebox.showinfo(self.getLocStr("excTitle"), errMsg)
 
-    def export(self):
+    def exportTable(self):
         gun = self.gun
         if gun is None:
             messagebox.showinfo(self.getLocStr("excTitle"), self.getLocStr("noDataMsg"))
@@ -406,7 +417,7 @@ class InteriorBallisticsFrame(Frame):
             title=self.getLocStr("exportLabel"),
             filetypes=(("Comma Separated File", "*.csv"),),
             defaultextension=".csv",
-            initialfile=self.getDescriptive(),
+            initialfile=filenameize(self.getDescriptive()),
         )
         gunType = self.kwargs["typ"]
         columnList = self.getLocStr("columnList")[gunType]
@@ -417,16 +428,11 @@ class InteriorBallisticsFrame(Frame):
         try:
             with open(fileName, "w", encoding="utf-8", newline="") as csvFile:
                 csvWriter = csv.writer(csvFile, delimiter=",", quoting=csv.QUOTE_MINIMAL)
-
                 csvWriter.writerow(columnList)
-
                 for line in self.gunResult.getRawTableData():
                     csvWriter.writerow(line)
 
-            messagebox.showinfo(
-                self.getLocStr("sucTitle"),
-                self.getLocStr("savedLocMsg").format(fileName),
-            )
+            messagebox.showinfo(self.getLocStr("sucTitle"), self.getLocStr("savedLocMsg") + " {:}".format(fileName))
 
         except Exception as e:
             messagebox.showinfo(self.getLocStr("excTitle"), str(e))
@@ -438,7 +444,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.fileMenu.entryconfig(0, label=self.getLocStr("saveLabel"))
         self.fileMenu.entryconfig(1, label=self.getLocStr("loadLabel"))
-        self.fileMenu.entryconfig(2, label=self.getLocStr("exportLabel"))
+        self.fileMenu.entryconfig(3, label=self.getLocStr("exportLabel"))
 
         self.themeMenu.entryconfig(0, label=self.getLocStr("darkLabel"))
         self.themeMenu.entryconfig(1, label=self.getLocStr("lightLabel"))
@@ -460,6 +466,10 @@ class InteriorBallisticsFrame(Frame):
         self.propTabParent.tab(self.propFrm, text=self.getLocStr("propFrmLabel"))
         self.propTabParent.tab(self.grainFrm, text=self.getLocStr("grainFrmLabel"))
 
+        self.guidePlotTravel.config(text=self.getLocStr("guidePlotTravel"))
+        self.guidePlotVolume.config(text=self.getLocStr("guidePlotVolume"))
+        self.guidePlotBurnout.config(text=self.getLocStr("guidePlotBurnout"))
+
         self.updateTable()
         self.updateGeom()
         self.updateSpec()
@@ -474,6 +484,7 @@ class InteriorBallisticsFrame(Frame):
             try:
                 return STRING["English"][name]
             except KeyError:
+                # return f"<{name}>"
                 return name
 
     def addNamePlate(self):
@@ -484,11 +495,7 @@ class InteriorBallisticsFrame(Frame):
         nameFrm.rowconfigure(0, weight=1)
         name = StringVar(self)
         namePlate = ttk.Entry(
-            nameFrm,
-            textvariable=name,
-            state="disabled",
-            justify="left",
-            font=(FONTNAME, FONTSIZE + 2),
+            nameFrm, textvariable=name, state="disabled", justify="left", font=(FONTNAME, FONTSIZE + 2)
         )
         namePlate.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
@@ -500,12 +507,7 @@ class InteriorBallisticsFrame(Frame):
         leftFrm.columnconfigure(0, weight=1)
         leftFrm.rowconfigure(0, weight=1)
 
-        parFrm = LocLabelFrame(
-            leftFrm,
-            locKey="parFrmLabel",
-            locFunc=self.getLocStr,
-            allLLF=self.locs,
-        )
+        parFrm = LocLabelFrame(leftFrm, locKey="parFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
         parFrm.grid(row=0, column=0, sticky="nsew")
         parFrm.columnconfigure(0, weight=1)
 
@@ -581,32 +583,14 @@ class InteriorBallisticsFrame(Frame):
             allDisps=self.locs,
         )
         i += 2
-        self.ld = Loc12Disp(
-            parent=parFrm,
-            row=i,
-            labelLocKey="ldLabel",
-            locFunc=self.getLocStr,
-            allDisps=self.locs,
-        )
+
+        self.ld = Loc12Disp(parent=parFrm, row=i, labelLocKey="ldLabel", locFunc=self.getLocStr, allDisps=self.locs)
         i += 2
 
-        self.pa = Loc12Disp(
-            parent=parFrm,
-            row=i,
-            labelLocKey="paLabel",
-            # unitText="m/s²",
-            locFunc=self.getLocStr,
-            allDisps=self.locs,
-        )
-
+        self.pa = Loc12Disp(parent=parFrm, row=i, labelLocKey="paLabel", locFunc=self.getLocStr, allDisps=self.locs)
         i += 2
-        self.gm = Loc12Disp(
-            parent=parFrm,
-            row=i,
-            labelLocKey="gmLabel",
-            locFunc=self.getLocStr,
-            allDisps=self.locs,
-        )
+
+        self.gm = Loc12Disp(parent=parFrm, row=i, labelLocKey="gmLabel", locFunc=self.getLocStr, allDisps=self.locs)
 
     def addRightFrm(self):
         rightFrm = ttk.Frame(self)
@@ -927,7 +911,7 @@ class InteriorBallisticsFrame(Frame):
         self.guideMinCMR = Loc3Input(
             ctrlFrm,
             labelLocKey="minCMRLabel",
-            default="0.5",
+            default="0.25",
             validation=validationNN,
             locFunc=self.getLocStr,
             allInputs=self.locs,
@@ -938,7 +922,7 @@ class InteriorBallisticsFrame(Frame):
         self.guideMaxCMR = Loc3Input(
             ctrlFrm,
             labelLocKey="maxCMRLabel",
-            default="1.5",
+            default="1.25",
             validation=validationNN,
             locFunc=self.getLocStr,
             allInputs=self.locs,
@@ -949,7 +933,7 @@ class InteriorBallisticsFrame(Frame):
         self.guideStepCMR = Loc3Input(
             ctrlFrm,
             labelLocKey="stepCMRLabel",
-            default="0.1",
+            default="0.05",
             validation=validationNN,
             locFunc=self.getLocStr,
             allInputs=self.locs,
@@ -981,8 +965,8 @@ class InteriorBallisticsFrame(Frame):
         chambrage = float(self.clr.get())
         chargeMass = float(self.chgkg.get())
         caliber = float(self.calmm.get()) * 1e-3
-        boreS = pi * 0.25 * caliber**2
-        breechS = chambrage * boreS
+        # boreS = pi * 0.25 * caliber**2
+        # breechS = chambrage * boreS
 
         gunLength = float(self.tblmm.get()) * 1e-3
         loadFraction = float(self.ldf.get()) * 1e-2
@@ -1058,8 +1042,8 @@ class InteriorBallisticsFrame(Frame):
         except Exception:
             self.guide = None
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            logging.error("exception when dispatching calculation:")
-            logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+            logger.error("exception when dispatching calculation:")
+            logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
             self.updateGuideGraph()
         else:
@@ -1089,8 +1073,8 @@ class InteriorBallisticsFrame(Frame):
 
         except Exception:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            logging.error("exception when dispatching calculation:")
-            logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+            logger.error("exception when dispatching calculation:")
+            logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
             self.gun = None
             self.gunResult = None
@@ -1718,23 +1702,39 @@ class InteriorBallisticsFrame(Frame):
 
         j = 1
         k = 0
-        self.plotAvgP = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
+        self.plotAvgP = LocLabelCheck(
+            parent=plotFrm, labelLocKey="plotAvgP", row=j, col=k, locFunc=self.getLocStr, allLC=checks
+        )
         k += 1
-        self.plotBaseP = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
+        self.plotBaseP = LocLabelCheck(
+            parent=plotFrm, labelLocKey="plotBaseP", row=j, col=k, locFunc=self.getLocStr, allLC=checks
+        )
         k += 1
-        self.plotBreechP = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
+        self.plotBreechP = LocLabelCheck(
+            parent=plotFrm, labelLocKey="plotBreechP", row=j, col=k, locFunc=self.getLocStr, allLC=checks
+        )
         k += 1
-        self.plotStagP = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
+        self.plotStagP = LocLabelCheck(
+            parent=plotFrm, labelLocKey="plotStagP", row=j, col=k, locFunc=self.getLocStr, allLC=checks
+        )
 
         j += 1
         k = 0
-        self.plotVel = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
+        self.plotVel = LocLabelCheck(
+            parent=plotFrm, labelLocKey="plotVel", row=j, col=k, locFunc=self.getLocStr, allLC=checks
+        )
         k += 1
-        self.plotNozzleV = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
+        self.plotNozzleV = LocLabelCheck(
+            parent=plotFrm, labelLocKey="plotNozzleV", row=j, col=k, locFunc=self.getLocStr, allLC=checks
+        )
         k += 1
-        self.plotBurnup = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
+        self.plotBurnup = LocLabelCheck(
+            parent=plotFrm, labelLocKey="plotBurnup", row=j, col=k, locFunc=self.getLocStr, allLC=checks
+        )
         k += 1
-        self.plotEta = LocLabelCheck(parent=plotFrm, row=j, col=k, locFunc=self.getLocStr, allLC=checks)
+        self.plotEta = LocLabelCheck(
+            parent=plotFrm, labelLocKey="plotEta", row=j, col=k, locFunc=self.getLocStr, allLC=checks
+        )
 
         for check in checks:
             check.trace_add("write", self.updateFigPlot)
@@ -2093,8 +2093,8 @@ class InteriorBallisticsFrame(Frame):
         self.specs.insert(
             "end", "{:}: {:>4.0f} K {:}\n".format(self.getLocStr("TvDesc"), compo.T_v, self.getLocStr("isochorDesc"))
         )
-
         self.specs.insert("end", "{:}: {:>4.0f} kg/m³\n".format(self.getLocStr("densityDesc"), compo.rho_p))
+        self.specs.insert("end", "{:}: {:>4.0f} kJ/kg\n".format(self.getLocStr("force"), compo.f / 1e3))
         isp = compo.getIsp()
         self.specs.insert(
             "end", "{:}: {:>4.0f} m/s {:>3.0f} s\n".format(self.getLocStr("vacISPDesc"), isp, isp / 9.805)
@@ -2257,7 +2257,6 @@ class InteriorBallisticsFrame(Frame):
             self.tv.move(str(-i - 1), str(i + 1), -1)
 
     def updateGuideGraph(self):
-        # logger.info(self.guide)
 
         style = ttk.Style(self)
         bgc = str(style.lookup("TFrame", "background"))
@@ -2344,8 +2343,8 @@ class InteriorBallisticsFrame(Frame):
         except Exception:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.prop = None
-            logging.error("exception in propellant callback:")
-            logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+            logger.error("exception in propellant callback:")
+            logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
     # noinspection PyUnusedLocal
     def typeCallback(self, *args):
@@ -2528,13 +2527,44 @@ class InteriorBallisticsFrame(Frame):
 
         self.update_idletasks()
 
+    def exportGraph(self, save: Literal["main", "aux", "guide", "geom"]):
+        fileName = filedialog.asksaveasfilename(
+            title=self.getLocStr("exportGraphLabel"),
+            filetypes=(("Portable Network Graphics", "*.png"),),
+            defaultextension=".png",
+            initialfile=filenameize(self.getDescriptive() + " " + save),
+        )
+
+        if fileName == "":
+            messagebox.showinfo(self.getLocStr("excTitle"), self.getLocStr("cancelMsg"))
+            return
+        try:
+            if save == "main":
+                fig = self.fig
+            elif save == "aux":
+                fig = self.auxFig
+            elif save == "guide":
+                fig = self.guideFig
+            elif save == "geom":
+                fig = self.geomFig
+            else:
+                raise ValueError("unknown save destination")
+
+            with mpl.rc_context(CONTEXT):
+                fig.savefig(fileName, transparent=True)
+
+            messagebox.showinfo(self.getLocStr("sucTitle"), self.getLocStr("savedLocMsg") + f" {fileName:}")
+
+        except Exception as e:
+            messagebox.showinfo(self.getLocStr("excTitle"), str(e))
+
 
 def calculate(jobQueue, progressQueue, logQueue, kwargs):
-    root = logging.getLogger()
-    root.addHandler(QueueHandler(logQueue))
-    root.setLevel(logging.INFO)
+    logger = logging.getLogger(__file__)
+    logger.addHandler(QueueHandler(logQueue))
+    # root.setLevel(logging.INFO)
 
-    logging.info("calculation started.")
+    logger.info("calculation started.")
 
     gunType = kwargs["typ"]
     constrain = kwargs["con"]
@@ -2582,35 +2612,35 @@ def calculate(jobQueue, progressQueue, logQueue, kwargs):
             raise ValueError("unknown gun type")
 
         gunResult = gun.integrate(**kwargs, progressQueue=progressQueue)
-        logging.info("calculation concluded successfully.")
+        logger.info("calculation concluded successfully.")
 
     except Exception:
         gun, gunResult = None, None
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        logging.error("exception while calculating:")
-        logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        logger.error("exception while calculating:")
+        logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
     finally:
         # noinspection PyUnboundLocalVariable
         jobQueue.put((kwargs, gun, gunResult))
 
 
 def guide(guideJobQueue, progressQueue, logQueue, kwargs):
-    root = logging.getLogger()
-    root.addHandler(QueueHandler(logQueue))
-    root.setLevel(logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.addHandler(QueueHandler(logQueue))
+    logger.setLevel(logging.INFO)
 
-    logging.info("guidance diagram calculation started")
+    logger.info("guidance diagram calculation started")
 
     guideResults = None
     try:
         guideResults = guideGraph(**kwargs)
-        logging.info("guidance diagram calculation concluded successfully.")
+        logger.info("guidance diagram calculation concluded successfully.")
 
     except Exception:
         guideResults = None
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        logging.error("exception while calculating guidance diagram:")
-        logging.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        logger.error("exception while calculating guidance diagram:")
+        logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
     finally:
         # noinspection PyUnboundLocalVariable
         guideJobQueue.put(guideResults)
@@ -2619,13 +2649,7 @@ def guide(guideJobQueue, progressQueue, logQueue, kwargs):
 def main(loc: str = None):
     multiprocessing.freeze_support()
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(sys.stderr)],
-    )  # configure the root-logger.
-
-    logging.info("Initializing")
+    logger.info("Initializing")
 
     # if check avoids hackery when not profiling
     # Optional; hackery *seems* to work fine even when not profiling, it's just wasteful

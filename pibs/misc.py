@@ -250,6 +250,10 @@ with open(resolvepath("ui/localization.json")) as file:
     STRING = json.load(file)
 
 
+def filenameize(str: str) -> str:
+    return str.lower().replace(" ", "_")
+
+
 if __name__ == "__main__":
     print(toSI(1e-4).strip())
     from math import pi
