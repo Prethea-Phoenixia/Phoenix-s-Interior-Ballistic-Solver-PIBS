@@ -65,12 +65,12 @@ from .misc import (
 )
 from .tip import CreateToolTip
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+rootLogger = logging.getLogger()
+rootLogger.setLevel(logging.INFO)
 handler = logging.StreamHandler(sys.stderr)
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 handler.setFormatter(formatter)
-logger.addHandler(handler)
+rootLogger.addHandler(handler)
 
 
 USE_LF = "USE_LF"
@@ -137,7 +137,7 @@ class TextHandler(logging.Handler):
 # noinspection PyAttributeOutsideInit
 class InteriorBallisticsFrame(Frame):
 
-    def __init__(self, parent, menubar, dpi, defaultLang=None):
+    def __init__(self, parent, root, menubar, dpi, defaultLang=None):
         super().__init__(parent)
 
         self.grid(row=0, column=0, sticky="nsew")
@@ -160,6 +160,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.dpi = dpi
         self.parent = parent
+        self.root = root
         self.forceUpdOnThemeWidget = []
 
         self.menubar = menubar
@@ -257,7 +258,6 @@ class InteriorBallisticsFrame(Frame):
 
         # self.bind("<Configure>", self.resizePlot)
 
-        parent.bind("<Return>", lambda *_: self.onCalculate())
         parent.protocol("WM_DELETE_WINDOW", self.quit)
 
         self.useTheme()  # <- an update is authorized here
@@ -265,9 +265,8 @@ class InteriorBallisticsFrame(Frame):
         self.tLid = None
 
         textHandler = TextHandler(self.errorText)
-        logger.addHandler(textHandler)
-
-        logger.info("text handler attached to root logger.")
+        rootLogger.addHandler(textHandler)
+        rootLogger.info("text handler attached to root logger.")
 
         console = logging.StreamHandler(sys.stderr)
         console.setFormatter(
@@ -275,11 +274,10 @@ class InteriorBallisticsFrame(Frame):
                 "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             )
         )
-
         self.listener = QueueListener(self.logQueue, textHandler, console)
         self.listener.start()
 
-        logger.info("text handler attached to subprocess log queue listener.")
+        rootLogger.info("text handler attached to subprocess log queue listener.")
 
         self.timedLoop()
 
@@ -444,7 +442,13 @@ class InteriorBallisticsFrame(Frame):
 
         self.fileMenu.entryconfig(0, label=self.getLocStr("saveLabel"))
         self.fileMenu.entryconfig(1, label=self.getLocStr("loadLabel"))
-        self.fileMenu.entryconfig(3, label=self.getLocStr("exportLabel"))
+
+        self.fileMenu.entryconfig(3, label=self.getLocStr("exportMain"))
+        self.fileMenu.entryconfig(4, label=self.getLocStr("exportAux"))
+        self.fileMenu.entryconfig(5, label=self.getLocStr("exportGeom"))
+        self.fileMenu.entryconfig(6, label=self.getLocStr("exportGuide"))
+
+        self.fileMenu.entryconfig(8, label=self.getLocStr("exportLabel"))
 
         self.themeMenu.entryconfig(0, label=self.getLocStr("darkLabel"))
         self.themeMenu.entryconfig(1, label=self.getLocStr("lightLabel"))
@@ -856,6 +860,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.calcButton = ttk.Button(opFrm, text=self.getLocStr("calcLabel"), command=self.onCalculate)
         self.calcButton.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.root.bind("<Return>", lambda *_: self.onCalculate())
         opFrm.rowconfigure(i, weight=1)
         i += 1
         self.progress = IntVar()
@@ -942,6 +947,7 @@ class InteriorBallisticsFrame(Frame):
         )
         j += 1
         self.guideButton = ttk.Button(ctrlFrm, text=self.getLocStr("guideLabel"), command=self.onGuide)
+        self.root.bind("<space>", lambda *_: self.onGuide())
         self.guideButton.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
     def generateKwargs(self):
@@ -1025,7 +1031,7 @@ class InteriorBallisticsFrame(Frame):
             self.kwargs.update({"ambientP": 0, "ambientRho": 0, "ambientGamma": 1})
 
     def onGuide(self):
-        if self.guideProcess:
+        if self.process or self.guideProcess:
             return
 
         self.focus()  # remove focus to force widget entry validation
@@ -1042,8 +1048,8 @@ class InteriorBallisticsFrame(Frame):
         except Exception:
             self.guide = None
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            logger.error("exception when dispatching calculation:")
-            logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+            rootLogger.error("exception when dispatching calculation:")
+            rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
             self.updateGuideGraph()
         else:
@@ -1057,7 +1063,7 @@ class InteriorBallisticsFrame(Frame):
             self.guideButton.config(state="disabled")
 
     def onCalculate(self):
-        if self.process:
+        if self.process or self.guideProcess:
             return
         self.focus()  # remove focus to force widget entry validation
         self.update()  # and wait for the event to update.
@@ -1073,8 +1079,8 @@ class InteriorBallisticsFrame(Frame):
 
         except Exception:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            logger.error("exception when dispatching calculation:")
-            logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+            rootLogger.error("exception when dispatching calculation:")
+            rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
             self.gun = None
             self.gunResult = None
@@ -2343,8 +2349,8 @@ class InteriorBallisticsFrame(Frame):
         except Exception:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             self.prop = None
-            logger.error("exception in propellant callback:")
-            logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+            rootLogger.error("exception in propellant callback:")
+            rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
     # noinspection PyUnusedLocal
     def typeCallback(self, *args):
@@ -2551,7 +2557,7 @@ class InteriorBallisticsFrame(Frame):
                 raise ValueError("unknown save destination")
 
             with mpl.rc_context(CONTEXT):
-                fig.savefig(fileName, transparent=True)
+                fig.savefig(fileName, transparent=True, dpi=600)
 
             messagebox.showinfo(self.getLocStr("sucTitle"), self.getLocStr("savedLocMsg") + f" {fileName:}")
 
@@ -2560,11 +2566,9 @@ class InteriorBallisticsFrame(Frame):
 
 
 def calculate(jobQueue, progressQueue, logQueue, kwargs):
-    logger = logging.getLogger(__file__)
-    logger.addHandler(QueueHandler(logQueue))
-    # root.setLevel(logging.INFO)
-
-    logger.info("calculation started.")
+    # rootLogger = logging.getLogger()
+    rootLogger.addHandler(QueueHandler(logQueue))
+    rootLogger.info("calculation started.")
 
     gunType = kwargs["typ"]
     constrain = kwargs["con"]
@@ -2612,35 +2616,33 @@ def calculate(jobQueue, progressQueue, logQueue, kwargs):
             raise ValueError("unknown gun type")
 
         gunResult = gun.integrate(**kwargs, progressQueue=progressQueue)
-        logger.info("calculation concluded successfully.")
+        rootLogger.info("calculation concluded successfully.")
 
     except Exception:
         gun, gunResult = None, None
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        logger.error("exception while calculating:")
-        logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        rootLogger.error("exception while calculating:")
+        rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
     finally:
         # noinspection PyUnboundLocalVariable
         jobQueue.put((kwargs, gun, gunResult))
 
 
 def guide(guideJobQueue, progressQueue, logQueue, kwargs):
-    logger = logging.getLogger(__name__)
-    logger.addHandler(QueueHandler(logQueue))
-    logger.setLevel(logging.INFO)
-
-    logger.info("guidance diagram calculation started")
+    # rootLogger = logging.getLogger()
+    rootLogger.addHandler(QueueHandler(logQueue))
+    rootLogger.info("guidance diagram calculation started")
 
     guideResults = None
     try:
         guideResults = guideGraph(**kwargs)
-        logger.info("guidance diagram calculation concluded successfully.")
+        rootLogger.info("guidance diagram calculation concluded successfully.")
 
     except Exception:
         guideResults = None
         exc_type, exc_value, exc_traceback = sys.exc_info()
-        logger.error("exception while calculating guidance diagram:")
-        logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        rootLogger.error("exception while calculating guidance diagram:")
+        rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
     finally:
         # noinspection PyUnboundLocalVariable
         guideJobQueue.put(guideResults)
@@ -2649,7 +2651,7 @@ def guide(guideJobQueue, progressQueue, logQueue, kwargs):
 def main(loc: str = None):
     multiprocessing.freeze_support()
 
-    logger.info("Initializing")
+    rootLogger.info("Initializing")
 
     # if check avoids hackery when not profiling
     # Optional; hackery *seems* to work fine even when not profiling, it's just wasteful
@@ -2707,7 +2709,7 @@ def main(loc: str = None):
 
     root.bind("<Escape>", lambda event: root.state("normal"))
     root.bind("<F11>", lambda event: root.state("zoomed"))
-    InteriorBallisticsFrame(root, menubar, dpi, defaultLang="English" if loc != "zh_CN" else "中文")
+    InteriorBallisticsFrame(root, root, menubar, dpi, defaultLang="English" if loc != "zh_CN" else "中文")
     root.minsize(root.winfo_width(), root.winfo_height())  # set minimum size
     # root.state("zoomed")
 

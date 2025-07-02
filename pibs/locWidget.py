@@ -141,13 +141,7 @@ class Loc2Input:
         # noinspection PyTypeChecker
         lb = ttk.Label(parent, text=locFunc(labelLocKey), width=labelWidth, anchor=anchor)
 
-        lb.grid(
-            row=row,
-            column=col + (1 if reverse else 0),
-            sticky="nsew",
-            padx=2,
-            pady=2,
-        )
+        lb.grid(row=row, column=col + (1 if reverse else 0), sticky="nsew", padx=2, pady=2)
         if tooltipLocKey is not None:
             self.locTooltipVar = StringVar(parent, value=locFunc(tooltipLocKey))
             CreateToolTip(lb, self.locTooltipVar)
@@ -167,13 +161,7 @@ class Loc2Input:
             justify="center",
         )
         en.default = default
-        en.grid(
-            row=row,
-            column=col + (0 if reverse else 1),
-            sticky="nsew",
-            padx=2,
-            pady=2,
-        )
+        en.grid(row=row, column=col + (0 if reverse else 1), sticky="nsew", padx=2, pady=2)
         en.bind("<FocusOut>", lambda event: formatter(event, e))
 
         self.labelWidget = lb
@@ -426,20 +414,8 @@ class LocLabelCheck:
         self.nominalState = "normal"
         self.checkVar = IntVar(value=default)
         self.locFunc = locFunc
-        self.checkWidget = ttk.Checkbutton(
-            parent,
-            text=locFunc(labelLocKey),
-            variable=self.checkVar,
-            width=width,
-        )
-        self.checkWidget.grid(
-            row=row,
-            column=col,
-            sticky="nsew",
-            columnspan=columnspan,
-            padx=2,
-            pady=2,
-        )
+        self.checkWidget = ttk.Checkbutton(parent, text=locFunc(labelLocKey), variable=self.checkVar, width=width)
+        self.checkWidget.grid(row=row, column=col, sticky="nsew", columnspan=columnspan, padx=2, pady=2)
 
         if tooltipLocKey is not None:
             self.locTooltipVar = StringVar(value=locFunc(tooltipLocKey))

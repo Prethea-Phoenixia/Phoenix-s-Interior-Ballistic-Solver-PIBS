@@ -4,7 +4,7 @@ from enum import Enum
 def _30SIMN2MOVA_Y(T):
     return (
         -0.047 * (T / 293) ** 4 + 0.201 * (T / 293) ** 3 - 0.15 * (T / 293) ** 2 - 0.376 * (T / 293) + 1.375
-    ) * 900e6  # Circumferential Yield Strength in Pa
+    ) * 1195e6  # Circumferential Yield Strength in Pa
 
 
 """
@@ -28,7 +28,7 @@ class Material(Enum):
 
     material_30SIMN2MOVA = (
         "30SiMn2MoVA",
-        "Cao et al., (2017); Gu et al., (2018); Rp0.2",
+        "Cao, Xu, (2017); Gu et al., (2018); Rp0.2",
         7801,
         [_30SIMN2MOVA_Y(293 + i * 100) for i in range(7)],
         [293 + i * 100 for i in range(7)],
