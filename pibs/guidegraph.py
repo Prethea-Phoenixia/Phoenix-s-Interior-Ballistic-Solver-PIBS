@@ -5,10 +5,20 @@ from itertools import repeat
 from math import inf
 from typing import Optional
 
-from .ballistics import Constrained, Solutions, Points, Domains
-from .ballistics import Gun
-from .ballistics import POINT_BURNOUT
-from .ballistics import Propellant
+from .ballistics import (
+    Constrained,
+    ConstrainedRecoilless,
+    Gun,
+    Recoilless,
+    Solutions,
+    Points,
+    Domains,
+    GunTypes,
+    Propellant,
+    POINT_BURNOUT,
+    CONVENTIONAL,
+    RECOILLESS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +36,14 @@ OptionalFloat = Optional[float]
 
 
 def f(
+    target: Constrained,
     loadFraction: float,
     chargeMassRatio: float,
-    target: Constrained,
     caliber: float,
     propellant: Propellant,
     dragCoefficient: float,
+    nozzleExpansion: float,
+    nozzleEfficiency: float,
     tol: float,
     minWeb: float,
     maxLength: float,
@@ -41,6 +53,9 @@ def f(
     control: Points,
     sol: Solutions,
     dom: Domains,
+    typ: GunTypes,
+    *_,
+    **__,
 ):
 
     chargeMass = target.m * chargeMassRatio
@@ -49,7 +64,7 @@ def f(
         halfWeb, lengthGun = target.solve(
             loadFraction,
             chargeMassRatio,
-            tol,
+            tol=tol,
             minWeb=minWeb,
             maxLength=maxLength,
             sol=sol,
@@ -61,18 +76,37 @@ def f(
 
         chamberVolume = chargeMass / loadDensity
 
-        gun = Gun(
-            caliber=caliber,
-            shotMass=target.m,
-            propellant=propellant,
-            grainSize=2 * halfWeb,
-            chargeMass=chargeMass,
-            chamberVolume=chamberVolume,
-            startPressure=target.p_0,
-            lengthGun=lengthGun,
-            chambrage=target.chi_k,
-            dragCoefficient=dragCoefficient,
-        )
+        if typ == CONVENTIONAL:
+            gun = Gun(
+                caliber=caliber,
+                shotMass=target.m,
+                propellant=propellant,
+                grainSize=2 * halfWeb,
+                chargeMass=chargeMass,
+                chamberVolume=chamberVolume,
+                startPressure=target.p_0,
+                lengthGun=lengthGun,
+                chambrage=target.chi_k,
+                dragCoefficient=dragCoefficient,
+            )
+        elif typ == RECOILLESS:
+            gun = Recoilless(
+                caliber=caliber,
+                shotMass=target.m,
+                propellant=propellant,
+                grainSize=2 * halfWeb,
+                chargeMass=chargeMass,
+                chamberVolume=chamberVolume,
+                startPressure=target.p_0,
+                lengthGun=lengthGun,
+                chambrage=target.chi_k,
+                dragCoefficient=dragCoefficient,
+                nozzleExpansion=nozzleExpansion,
+                nozzleEfficiency=nozzleEfficiency,
+            )
+        else:
+            raise ValueError("unknown gun type")
+
         gunResult = gun.integrate(
             step=0, tol=tol, dom=dom, sol=sol, ambientRho=ambientRho, ambientP=ambientP, ambientGamma=ambientGamma
         )
@@ -91,45 +125,15 @@ def f(
     return loadDensity, chargeMass, halfWeb, lengthGun, volume, burnout
 
 
-def guideGraph(
-    sol: Solutions,
-    dom: Domains,
-    control: Points,
-    caliber: float,
-    shotMass: float,
-    propellant: Propellant,
-    startPressure: float,
-    dragCoefficient: float,
-    designPressure: float,
-    designVelocity: float,
-    chambrage: float,
-    tol: float,
-    minWeb: float,
-    maxLength: float,
-    ambientRho: float,
-    ambientP: float,
-    ambientGamma: float,
-    minLF: float,
-    maxLF: float,
-    stepLF: float,
-    minCMR: float,
-    maxCMR: float,
-    stepCMR: float,
-    *_,
-    **__,
-):
+def guideGraph(*_, **kwargs):
+    typ = kwargs["typ"]
 
-    target = Constrained(
-        tol=tol,
-        caliber=caliber,
-        shotMass=shotMass,
-        propellant=propellant,
-        startPressure=startPressure,
-        dragCoefficient=dragCoefficient,
-        designPressure=designPressure,
-        designVelocity=designVelocity,
-        chambrage=chambrage,
-    )
+    if typ == CONVENTIONAL:
+        target = Constrained(**kwargs)
+    elif typ == RECOILLESS:
+        target = ConstrainedRecoilless(**kwargs)
+    else:
+        raise ValueError("unknown gun type")
 
     loadFractions = []
     chargeMassRatios = []
@@ -137,13 +141,16 @@ def guideGraph(
     chargeMasses = []
     loadDensities = []
 
+    minCMR, maxCMR, stepCMR = (kwargs[k] for k in ("minCMR", "maxCMR", "stepCMR"))
     chargeMassRatio = minCMR
     while chargeMassRatio < maxCMR + 0.5 * stepCMR:
         chargeMassRatios.append(chargeMassRatio)
         chargeMasses.append(chargeMassRatio * target.m)
         chargeMassRatio += stepCMR
 
+    minLF, maxLF, stepLF = (kwargs[k] for k in ("minLF", "maxLF", "stepLF"))
     loadFraction = minLF
+
     while loadFraction < maxLF + 0.5 * stepLF:
         loadFractions.append(loadFraction)
         loadDensities.append(loadFraction * target.propellant.rho_p)
@@ -152,32 +159,21 @@ def guideGraph(
     parameters = []
     for chargeMassRatio in chargeMassRatios:
         for loadFraction in loadFractions:
-            parameters.append(
+            kv = {k: v for k, v in kwargs.items()}
+            kv.update(
                 {
                     "loadFraction": loadFraction,
                     "chargeMassRatio": chargeMassRatio,
-                    "minWeb": minWeb,
-                    "maxLength": maxLength,
-                    "ambientRho": ambientRho,
-                    "ambientP": ambientP,
-                    "ambientGamma": ambientGamma,
-                    "control": control,
-                    "sol": sol,
-                    "dom": dom,
-                    "target": target,
-                    "caliber": caliber,
-                    "propellant": propellant,
-                    "dragCoefficient": dragCoefficient,
-                    "tol": tol,
                 }
             )
+            parameters.append(kv)
 
     processes = os.cpu_count()
     logger.info(f"dispatching {processes:}-process for constructing guidance diagram.")
 
     # parallel implementation
     with multiprocessing.Pool(processes=processes) as pool:
-        results = starstarmap(pool, f, repeat([], len(parameters)), parameters)
+        results = starstarmap(pool, f, repeat([target], len(parameters)), parameters)
 
     shapedResults = [
         results[i * len(loadFractions) : (i + 1) * len(loadFractions)] for i in range(len(chargeMassRatios))

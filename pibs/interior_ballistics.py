@@ -995,7 +995,6 @@ class InteriorBallisticsFrame(Frame):
             "chargeMass": chargeMass,
             "chargeMassRatio": float(self.chgkg.get()) / float(self.shtkg.get()),
             "chamberVolume": chamberVolume,
-            # "portArea": breechS * float(self.perf.get()) * 1e-2,
             "startPressure": float(self.stpMPa.get()) * 1e6,
             "lengthGun": gunLength,
             "chambrage": chambrage,  # chamber expansion
@@ -2315,7 +2314,7 @@ class InteriorBallisticsFrame(Frame):
                             self.guideAx.text(
                                 loadDensity,
                                 chargeMass,
-                                f"{entry:.3g}" if entry else "N/A",
+                                (f"{entry:.3g}" if index != 5 else f"{entry:.3f}") if entry else "N/A",
                                 color=bgc if (entry and entry < threshold) else fgc,
                                 horizontalalignment="center",
                                 verticalalignment="center",
