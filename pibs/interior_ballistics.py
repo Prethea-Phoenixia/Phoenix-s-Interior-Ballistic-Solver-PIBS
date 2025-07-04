@@ -2119,7 +2119,7 @@ class InteriorBallisticsFrame(Frame):
                 + " @ {:>12}\n".format(toSI(p, unit="Pa", dec=3)),
             )
 
-        self.specs.insert("end", "-" * width + "\n")
+        # self.specs.insert("end", "-" * width + "\n")
         for line in compo.desc.split(","):
             self.specs.insert("end", line + "\n")
         self.specs.config(state="disabled")
@@ -2649,21 +2649,7 @@ def guide(guideJobQueue, progressQueue, logQueue, kwargs):
 
 def main(loc: str = None):
     multiprocessing.freeze_support()
-
     rootLogger.info("Initializing")
-
-    # if check avoids hackery when not profiling
-    # Optional; hackery *seems* to work fine even when not profiling, it's just wasteful
-    # import cProfile
-
-    # if sys.modules["__main__"].__file__ == cProfile.__file__:
-    #     # noinspection PyUnresolvedReferences
-    #     import IB  # Imports you again (does *not* use cache or execute as __main__)
-
-    #     globals().update(vars(IB))
-    #     # Replaces current contents with newly imported stuff
-    #     sys.modules["__main__"] = IB
-    #     # Ensures pickle lookups on __main__ find matching version
 
     # this tells windows that our program will handle scaling ourselves
     winRelease = platform.release()
@@ -2685,9 +2671,6 @@ def main(loc: str = None):
 
     root = Tk()
     root.iconbitmap(resolvepath("ui/logo.ico"))
-
-    # from tkinter import font
-    # print(font.families())
 
     dpi = root.winfo_fpixels("1i")
     # Tk was originally developed for a dpi of 72
