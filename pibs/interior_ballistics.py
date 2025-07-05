@@ -65,6 +65,8 @@ from .misc import (
 )
 from .tip import CreateToolTip
 
+DESCRIPTION = "Description"
+
 rootLogger = logging.getLogger()
 rootLogger.setLevel(logging.INFO)
 handler = logging.StreamHandler(sys.stderr)
@@ -143,7 +145,7 @@ class InteriorBallisticsFrame(Frame):
         self.grid(row=0, column=0, sticky="nsew")
         parent.rowconfigure(0, weight=1)
         parent.columnconfigure(0, weight=1)
-        self.LANG = StringVar(value=list(STRING.keys())[0] if defaultLang is None else defaultLang)
+        self.langVar = StringVar(value=list(STRING.keys())[0] if defaultLang is None else defaultLang)
 
         self.locs = []
 
@@ -180,7 +182,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.themeRadio = IntVar(value=0)
 
-        self.DEBUG = IntVar(value=0)
+        self.debug = IntVar(value=0)
 
         fileMenu.add_command(label=self.getLocStr("saveLabel"), command=self.save, underline=0)
         fileMenu.add_command(label=self.getLocStr("loadLabel"), command=self.load, underline=0)
@@ -215,7 +217,7 @@ class InteriorBallisticsFrame(Frame):
 
         debugMenu.add_checkbutton(
             label=self.getLocStr("enableLabel"),
-            variable=self.DEBUG,
+            variable=self.debug,
             onvalue=1,
             offvalue=0,
             underline=0,
@@ -224,7 +226,7 @@ class InteriorBallisticsFrame(Frame):
         for lang in STRING.keys():
             langMenu.add_radiobutton(
                 label=lang,
-                variable=self.LANG,
+                variable=self.langVar,
                 value=lang,
                 command=self.changeLang,
                 underline=0,
@@ -252,9 +254,6 @@ class InteriorBallisticsFrame(Frame):
         self.updateTable()
         self.updateSpec()
         self.updateGeom()
-
-        self.forceUpdOnThemeWidget.append(self.errorText)
-        self.forceUpdOnThemeWidget.append(self.specs)
 
         # self.bind("<Configure>", self.resizePlot)
 
@@ -320,20 +319,17 @@ class InteriorBallisticsFrame(Frame):
 
     def getDescriptive(self):
         if self.gun is None:
-            return "Unknown Design"
+            return "N/A"
         else:
             kwargs = self.kwargs
             typ = kwargs["typ"]
             cal = kwargs["caliber"]
-            blr = kwargs["lengthGun"] / cal
-            car_len = kwargs["chamberVolume"] / (pi * (0.5 * cal) ** 2 * kwargs["chambrage"])
+            # blr = kwargs["lengthGun"] / cal
+            # car_len = kwargs["chamberVolume"] / (pi * (0.5 * cal) ** 2 * kwargs["chambrage"])
             w = kwargs["shotMass"]
-            return (
-                "{:} {:.0f}x{:.0f} mm L{:.0f} ".format(
-                    "{:.4g} g".format(w * 1e3) if w < 1 else "{:.4g} kg".format(w), cal * 1e3, car_len * 1e3, blr
-                )
-                + typ
-            )
+            return "{:} {:.0f} mm ".format(
+                "{:.4g} g".format(w * 1e3) if w < 1 else "{:.4g} kg".format(w), cal * 1e3
+            ) + self.getLocStr(typ)
 
     def save(self):
         gun = self.gun
@@ -352,24 +348,11 @@ class InteriorBallisticsFrame(Frame):
             messagebox.showinfo(self.getLocStr("excTitle"), self.getLocStr("cancelMsg"))
             return
 
-        comment = None
-        try:
-            with open(fileName, "r", encoding="utf-8") as file:
-                comment = json.load(file)["Comment"]
-        except Exception:
-            pass  # either file DNE or some exception occurred during reading.
-
         try:
             locValDict = {loc.getDescriptive(): str(loc.get()) for loc in self.locs if hasattr(loc, "getDescriptive")}
-
-            if comment is None:
-                locValDict.update({"Comment": "Comment written here will be preserved even if file is overwritten!"})
-
-            else:
-                locValDict.update({"Comment": comment})
-
+            kvs = {**locValDict, "Description": self.description.get(1.0, "end")}
             with open(fileName, "w", encoding="utf-8") as file:
-                json.dump(locValDict, file, indent="\t", ensure_ascii=False)
+                json.dump(kvs, file, indent="\t", ensure_ascii=False, sort_keys=True)
 
             messagebox.showinfo(self.getLocStr("sucTitle"), self.getLocStr("savedLocMsg") + " {:}".format(fileName))
 
@@ -386,7 +369,6 @@ class InteriorBallisticsFrame(Frame):
 
         try:
             locDict = {loc.getDescriptive(): loc for loc in self.locs if hasattr(loc, "getDescriptive")}
-
             with open(fileName, "r", encoding="utf-8") as file:
                 fileDict = json.load(file)
 
@@ -396,10 +378,14 @@ class InteriorBallisticsFrame(Frame):
                 except KeyError:
                     pass
 
+            if DESCRIPTION in fileDict.keys():  # update description from file.
+                self.description.delete(1.0, "end")
+                self.description.insert("end", fileDict[DESCRIPTION])
+
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
 
-            if self.DEBUG.get() == 1:
+            if self.debug.get() == 1:
                 errMsg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
             else:
                 errMsg = str(e)
@@ -481,14 +467,14 @@ class InteriorBallisticsFrame(Frame):
         self.updateAuxPlot()
         self.updateGuideGraph()
 
-    def getLocStr(self, name):
+    def getLocStr(self, name, forceDefault: bool = False):
         try:
-            return STRING[self.LANG.get()][name]
+
+            return STRING["English" if forceDefault else self.langVar.get()][name]
         except KeyError:
             try:
                 return STRING["English"][name]
             except KeyError:
-                # return f"<{name}>"
                 return name
 
     def addNamePlate(self):
@@ -497,13 +483,16 @@ class InteriorBallisticsFrame(Frame):
 
         nameFrm.columnconfigure(0, weight=1)
         nameFrm.rowconfigure(0, weight=1)
-        name = StringVar(self)
+        self.name = StringVar(self)
         namePlate = ttk.Entry(
-            nameFrm, textvariable=name, state="disabled", justify="left", font=(FONTNAME, FONTSIZE + 2)
+            nameFrm, textvariable=self.name, state="disabled", justify="left", font=(FONTNAME, FONTSIZE + 2)
         )
         namePlate.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
-        self.name = name
+        self.description = Text(nameFrm, wrap="word", height=3, width=80, font=(FONTNAME, FONTSIZE))
+        self.description.grid(row=1, column=0, sticky="nsew")
+
+        self.forceUpdOnThemeWidget.append(self.description)
 
     def addLeftFrm(self):
         leftFrm = ttk.Frame(self)
@@ -860,7 +849,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.calcButton = ttk.Button(opFrm, text=self.getLocStr("calcLabel"), command=self.onCalculate)
         self.calcButton.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        self.root.bind("<Return>", lambda *_: self.onCalculate())
+        # self.root.bind("<Return>", lambda *_: self.onCalculate())
         opFrm.rowconfigure(i, weight=1)
         i += 1
         self.progress = IntVar()
@@ -947,14 +936,14 @@ class InteriorBallisticsFrame(Frame):
         )
         j += 1
         self.guideButton = ttk.Button(ctrlFrm, text=self.getLocStr("guideLabel"), command=self.onGuide)
-        self.root.bind("<space>", lambda *_: self.onGuide())
+        # self.root.bind("<space>", lambda *_: self.onGuide())
         self.guideButton.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
     def generateKwargs(self):
         constrain = self.solve_W_Lg.get() == 1
         lock = self.lock_Lg.get() == 1
         optimize = self.opt_lf.get() == 1
-        debug = self.DEBUG.get() == 1
+        debug = self.debug.get() == 1
         atmosphere = self.inAtmos.get() == 1
         autofrettage = self.isAf.get() == 1
 
@@ -971,8 +960,6 @@ class InteriorBallisticsFrame(Frame):
         chambrage = float(self.clr.get())
         chargeMass = float(self.chgkg.get())
         caliber = float(self.calmm.get()) * 1e-3
-        # boreS = pi * 0.25 * caliber**2
-        # breechS = chambrage * boreS
 
         gunLength = float(self.tblmm.get()) * 1e-3
         loadFraction = float(self.ldf.get()) * 1e-2
@@ -1109,7 +1096,7 @@ class InteriorBallisticsFrame(Frame):
         constrain = self.kwargs["con"]
         lock = kwargs["lock"]
         optimize = kwargs["opt"]
-        gunType = kwargs["typ"]
+        # gunType = kwargs["typ"]
         caliber = kwargs["caliber"]
         chambrage = kwargs["chambrage"]
         trueLF = kwargs["loadFraction"]
@@ -1159,8 +1146,7 @@ class InteriorBallisticsFrame(Frame):
                 )
             )
 
-            self.ammo.set("{:.0f} x {:.0f} mm".format(caliber * 1e3, cartridge_len * 1e3))
-
+            self.ammo.set(toSI(cartridge_len, unit="m"))
             self.pa.set(toSI(ps * gun.S / gun.m, unit="m/s²"))
             self.name.set(self.getDescriptive())
 
@@ -1334,6 +1320,8 @@ class InteriorBallisticsFrame(Frame):
         self.specs.grid(row=1, column=0, sticky="nsew")
         specScroll.config(command=self.specs.yview)
         specHScroll.config(command=self.specs.xview)
+
+        self.forceUpdOnThemeWidget.append(self.specs)
 
         grainFrm = LocLabelFrame(
             self.propTabParent,
@@ -1689,6 +1677,7 @@ class InteriorBallisticsFrame(Frame):
         self.errorText.tag_configure(str(logging.CRITICAL), foreground="red")
 
         errScroll.config(command=self.errorText.yview)
+        self.forceUpdOnThemeWidget.append(self.errorText)
 
     def addFigPlot(self):
         plotFrm = LocLabelFrame(
@@ -1744,7 +1733,7 @@ class InteriorBallisticsFrame(Frame):
         for check in checks:
             check.trace_add("write", self.updateFigPlot)
 
-        self.locs.extend(checks)
+        # self.locs.extend(checks) # this prevents user plotting setting from being saved.
 
         plotFrm.columnconfigure(0, weight=1)
         plotFrm.rowconfigure(0, weight=1)
@@ -1802,7 +1791,7 @@ class InteriorBallisticsFrame(Frame):
         for check in auxChecks:
             check.trace_add("write", self.updateAuxPlot)
 
-        self.locs.extend(auxChecks)
+        # self.locs.extend(auxChecks) # this prevents user plot settings from being saved
 
         auxFrm.columnconfigure(0, weight=1)
         auxFrm.rowconfigure(0, weight=1)
@@ -2267,7 +2256,7 @@ class InteriorBallisticsFrame(Frame):
         bgc = str(style.lookup("TFrame", "background"))
         fgc = str(style.lookup("TFrame", "foreground"))
         # noinspection SpellCheckingInspection
-        fbgc = str(style.lookup("TCombobox", "fieldbackground"))
+        # fbgc = str(style.lookup("TCombobox", "fieldbackground"))
 
         with mpl.rc_context(CONTEXT):
             self.guideAx.cla()
@@ -2454,6 +2443,7 @@ class InteriorBallisticsFrame(Frame):
         self.ldf.disable() if useCv else self.ldf.enable()
         self.cvL.enable() if useCv else self.cvL.disable()
 
+    # noinspection PyUnusedLocal,
     def guideCallback(self, *args):
         self.updateGuideGraph()
 
@@ -2494,7 +2484,7 @@ class InteriorBallisticsFrame(Frame):
 
         # some widgets also needs to be manually updated
         for w in self.forceUpdOnThemeWidget:
-            w.config(background=fbgc, foreground=fgc)
+            w.config(background=fbgc, foreground=fgc, insertbackground=fgc)
 
         CONTEXT.update(
             {
@@ -2573,7 +2563,7 @@ def calculate(jobQueue, progressQueue, logQueue, kwargs):
     constrain = kwargs["con"]
     optimize = kwargs["opt"]
     lock = kwargs["lock"]
-    debug = kwargs["deb"]
+    # debug = kwargs["deb"]
 
     try:
         gun, gunResult = None, None

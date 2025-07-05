@@ -3,7 +3,7 @@ from pibs.guidegraph import guideGraph
 
 
 if __name__ == "__main__":
-    compositions = GrainComp.readFile("pibs/ballistics/resource/propellants.csv")
+    compositions = GrainComp.readFile("../pibs/ballistics/resource/propellants.csv")
     pyroxylin = compositions["Pyroxylin 单基发射药"]
 
     guideGraph(
