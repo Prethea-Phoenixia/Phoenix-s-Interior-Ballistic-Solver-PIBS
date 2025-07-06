@@ -85,7 +85,7 @@ class GrainComp:
         redAdbIndex,
         burnVel,
         pressureExp,
-        flameTemp,
+        flameTemp=None,
     ):
         self.name = name
         self.desc = desc
@@ -106,7 +106,7 @@ class GrainComp:
         self.u_1 = burnVel
         self.n = pressureExp
         self.T_v = flameTemp  # isochoric (const volume) adiabatic temperature
-        self.R = self.f / self.T_v
+        # self.R = self.f / self.T_v
 
     def __str__(self):
         return self.name
@@ -151,7 +151,7 @@ class GrainComp:
                     float(redAdbIndex),
                     float(burnRateCoe),
                     float(pressureExp),
-                    float(flameTemp),
+                    float(flameTemp) if flameTemp else None,
                 )
 
                 composition.append(newComp)

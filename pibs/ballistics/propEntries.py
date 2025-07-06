@@ -178,6 +178,8 @@ def main():
 
     CMR160 = Mixture(name="CMR160", compoDict={NC1315: 95.77, MEC: 2.43, DPA: 0.73, K2SO4: 0.84})
     CMR160.prettyPrint()
+    #
+    # P5BPfl = Mixture(name="P5BPFl", compoDict={NC1315: 95.77})
 
 
 """

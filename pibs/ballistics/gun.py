@@ -404,9 +404,12 @@ class Gun:
         given pressure and travel, return temperature
         using the Nobel-Abel EOS
         """
-        l_psi = self.l_0 * (1 - self.Delta / self.rho_p - self.Delta * (self.alpha * -1 / self.rho_p) * psi)
-
-        return self.S * p * (l + l_psi) / (self.omega * psi * self.R)
+        if self.T_v:
+            R = self.f / self.T_v
+            l_psi = self.l_0 * (1 - self.Delta / self.rho_p - self.Delta * (self.alpha * -1 / self.rho_p) * psi)
+            return self.S * p * (l + l_psi) / (self.omega * psi * R)
+        else:
+            return None
 
     def dPdZ(self, Z, l_bar, v_bar):
         psi = self.f_psi_Z(Z)

@@ -673,7 +673,7 @@ class Recoilless:
             if tag == POINT_PEAK_AVG:
                 return p_bar
 
-            Ps, P0, Pb, Vb = self.toPsP0PbVb(l_bar * self.l_0, v_bar * self.v_j, p_bar * pScale, tau * self.T_v, eta)
+            Ps, P0, Pb, Vb = self.toPsP0PbVb(l_bar * self.l_0, v_bar * self.v_j, p_bar * pScale, tau, eta)
 
             if tag == POINT_PEAK_BREECH:
                 return Pb / pScale
@@ -825,15 +825,15 @@ class Recoilless:
             v, v_err = v_bar * self.v_j, v_bar_err * self.v_j
 
             p, p_err = p_bar * pScale, (p_bar_err if isinstance(p_bar_err, str) else p_bar_err * pScale)
-            T = tau * self.T_v
-            T_err = tau_err * self.T_v
+            T = tau * self.T_v if self.T_v else None
+            T_err = tau_err * self.T_v if self.T_v else None
 
-            ps, p0, pb, vb = self.toPsP0PbVb(l, v, p, T, eta)
+            ps, p0, pb, vb = self.toPsP0PbVb(l, v, p, tau, eta)
 
             p_line = []
             for i in range(step):  # 0....step -1
                 x = i / step * (l + l_c)
-                px = self.toPx(l, v, vb, ps, T, eta, x)
+                px = self.toPx(l, v, vb, ps, eta, x)
 
                 p_line.append(PressureProbePoint(x, px))
 
@@ -849,14 +849,14 @@ class Recoilless:
             t = t_bar * tScale
             if t in [tableEntry.time for tableEntry in data]:
                 continue
-            l, v, p, T = (l_bar * self.l_0, v_bar * self.v_j, p_bar * pScale, tau * self.T_v)
+            l, v, p, T = (l_bar * self.l_0, v_bar * self.v_j, p_bar * pScale, tau * self.T_v if self.T_v else None)
 
-            ps, p0, pb, vb = self.toPsP0PbVb(l, v, p, T, eta)
+            ps, p0, pb, vb = self.toPsP0PbVb(l, v, p, tau, eta)
 
             p_line = []
             for i in range(step):  # 0....step -1
                 x = i / step * (l + l_c)
-                px = self.toPx(l, v, vb, ps, T, eta, x)
+                px = self.toPx(l, v, vb, ps, eta, x)
                 pp = PressureProbePoint(x, px)
                 p_line.append(pp)
 
@@ -890,7 +890,7 @@ class Recoilless:
 
         return recoillessResult
 
-    def toPsP0PbVb(self, l, v, p, T, eta):
+    def toPsP0PbVb(self, l, v, p, tau, eta):
         """
         Diagrammatic explanation of the calculated values:
             ----\___     __________________
@@ -911,7 +911,6 @@ class Recoilless:
         P0  : Stagnation point pressure
         vb  : Rearward flow velocity at the rear of chamber
         """
-        tau = T / self.T_v
         y = self.omega * eta
         m_dot = self.C_A * self.v_j * self.S_j * p / (self.f * tau**0.5)
         # mass flow rate, rearward
@@ -929,7 +928,7 @@ class Recoilless:
         # l0 = H / (1 + H) * l  # location of the stagnation point
         return ps, p0, pb, vb
 
-    def toPx(self, l, v, vb, ps, T, eta, x):
+    def toPx(self, l, v, vb, ps, eta, x):
         m = self.m
         omega = self.omega
         phi_1 = self.phi_1
@@ -1011,7 +1010,7 @@ class Recoilless:
 
             for i, x in enumerate(x_probes):
                 if (x - l_c) <= l:
-                    p_x = self.toPx(l, v, vb, ps, T, eta, x)
+                    p_x = self.toPx(l, v, vb, ps, eta, x)
                     p_probes[i] = max(p_probes[i], p_x)
                 else:
                     break

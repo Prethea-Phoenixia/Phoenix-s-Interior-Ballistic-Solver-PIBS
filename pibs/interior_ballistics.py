@@ -350,7 +350,7 @@ class InteriorBallisticsFrame(Frame):
 
         try:
             locValDict = {loc.getDescriptive(): str(loc.get()) for loc in self.locs if hasattr(loc, "getDescriptive")}
-            kvs = {**locValDict, "Description": self.description.get(1.0, "end")}
+            kvs = {**locValDict, "Description": self.description.get(1.0, "end").strip("\n")}
             with open(fileName, "w", encoding="utf-8") as file:
                 json.dump(kvs, file, indent="\t", ensure_ascii=False, sort_keys=True)
 
@@ -380,7 +380,7 @@ class InteriorBallisticsFrame(Frame):
 
             if DESCRIPTION in fileDict.keys():  # update description from file.
                 self.description.delete(1.0, "end")
-                self.description.insert("end", fileDict[DESCRIPTION])
+                self.description.insert("end", fileDict[DESCRIPTION].strip("\n"))
 
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -390,6 +390,8 @@ class InteriorBallisticsFrame(Frame):
             else:
                 errMsg = str(e)
             messagebox.showinfo(self.getLocStr("excTitle"), errMsg)
+
+        self.onCalculate()
 
     def exportTable(self):
         gun = self.gun
@@ -487,10 +489,16 @@ class InteriorBallisticsFrame(Frame):
         namePlate = ttk.Entry(
             nameFrm, textvariable=self.name, state="disabled", justify="left", font=(FONTNAME, FONTSIZE + 2)
         )
-        namePlate.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+        namePlate.grid(row=0, column=0, sticky="nsew", padx=2, pady=2, columnspan=2)
 
-        self.description = Text(nameFrm, wrap="word", height=3, width=80, font=(FONTNAME, FONTSIZE))
+        descScroll = ttk.Scrollbar(nameFrm, orient="vertical")
+        descScroll.grid(row=1, column=1, sticky="nsew")
+        self.description = Text(
+            nameFrm, wrap="word", height=3, width=80, yscrollcommand=descScroll.set, font=(FONTNAME, FONTSIZE)
+        )
         self.description.grid(row=1, column=0, sticky="nsew")
+
+        descScroll.config(command=self.description.yview)
 
         self.forceUpdOnThemeWidget.append(self.description)
 
@@ -865,79 +873,32 @@ class InteriorBallisticsFrame(Frame):
         ctrlFrm.columnconfigure(0, weight=1)
         i += 1
 
-        j, k = 0, 0
-        self.guideMinLF = Loc3Input(
-            ctrlFrm,
-            labelLocKey="minLFLabel",
-            default="10.0",
-            unitText="%",
-            validation=validationCE,
-            locFunc=self.getLocStr,
-            allInputs=self.locs,
-            row=j,
-            col=k,
+        self.guideMinLF, self.guideMaxLF, self.guideStepLF, self.guideMinCMR, self.guideMaxCMR, self.guideStepCMR = (
+            Loc3Input(
+                ctrlFrm,
+                locFunc=self.getLocStr,
+                allInputs=self.locs,
+                labelLocKey=locKey,
+                default=default,
+                unitText=unit,
+                validation=validation,
+                row=j,
+                col=0,
+            )
+            for j, (locKey, default, unit, validation) in enumerate(
+                (
+                    ("minLFLabel", "10.0", "%", validationCE),
+                    ("maxLFLabel", "90.0", "%", validationCE),
+                    ("stepLFLabel", "5.0", "%", validationCE),
+                    ("minCMRLabel", "0.25", "", validationNN),
+                    ("maxCMRLabel", "1.75", "", validationNN),
+                    ("stepCMRLabel", "0.05", "", validationNN),
+                )
+            )
         )
-        j += 1
-        self.guideMaxLF = Loc3Input(
-            ctrlFrm,
-            labelLocKey="maxLFLabel",
-            default="90.0",
-            unitText="%",
-            validation=validationCE,
-            locFunc=self.getLocStr,
-            allInputs=self.locs,
-            row=j,
-            col=k,
-        )
-        j += 1
-        self.guideStepLF = Loc3Input(
-            ctrlFrm,
-            labelLocKey="stepLFLabel",
-            default="10.0",
-            unitText="%",
-            validation=validationCE,
-            locFunc=self.getLocStr,
-            allInputs=self.locs,
-            row=j,
-            col=k,
-        )
-        j += 1
-        self.guideMinCMR = Loc3Input(
-            ctrlFrm,
-            labelLocKey="minCMRLabel",
-            default="0.25",
-            validation=validationNN,
-            locFunc=self.getLocStr,
-            allInputs=self.locs,
-            row=j,
-            col=k,
-        )
-        j += 1
-        self.guideMaxCMR = Loc3Input(
-            ctrlFrm,
-            labelLocKey="maxCMRLabel",
-            default="1.25",
-            validation=validationNN,
-            locFunc=self.getLocStr,
-            allInputs=self.locs,
-            row=j,
-            col=k,
-        )
-        j += 1
-        self.guideStepCMR = Loc3Input(
-            ctrlFrm,
-            labelLocKey="stepCMRLabel",
-            default="0.05",
-            validation=validationNN,
-            locFunc=self.getLocStr,
-            allInputs=self.locs,
-            row=j,
-            col=k,
-        )
-        j += 1
         self.guideButton = ttk.Button(ctrlFrm, text=self.getLocStr("guideLabel"), command=self.onGuide)
         # self.root.bind("<space>", lambda *_: self.onGuide())
-        self.guideButton.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.guideButton.grid(row=6, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
     def generateKwargs(self):
         constrain = self.solve_W_Lg.get() == 1
@@ -1979,34 +1940,40 @@ class InteriorBallisticsFrame(Frame):
             self.auxAx.cla()
             self.auxAxH.cla()
 
-            # gunType = self.kwargs["typ"]
-
             pTrace = self.gunResult.pressureTrace
             # noinspection SpellCheckingInspection
             cmap = mpl.colormaps["afmhot"]
 
             x_max = 0
             y_max = 0
-            T_max = max(trace.T for trace in pTrace)
-            T_min = min(trace.T for trace in pTrace)
+
+            T_min = inf
+            T_max = 0
+            for trace in pTrace:
+                if not trace.T:
+                    continue
+                if trace.T > T_max:
+                    T_max = trace.T
+                elif trace.T < T_min:
+                    T_min = trace.T
 
             for pressureTraceEntry in pTrace[::-1]:
 
                 tag, T, trace = pressureTraceEntry.tag, pressureTraceEntry.T, pressureTraceEntry.pressureTrace
 
-                if tag != SAMPLE:
+                if tag == SAMPLE:
+                    if T:
+                        v = (T - T_min) / (T_max - T_min)
+                        color = cmap(1 - v if self.themeRadio.get() else v)
+                    else:
+                        color = cmap(0.5)
+                    linestyle = None
+                    alpha = None
+
+                elif tag != SAMPLE:
                     color = "black" if self.themeRadio.get() else "white"
                     linestyle = "dotted"
                     alpha = 0.1
-
-                elif self.themeRadio.get():
-                    color = cmap(1 - (T - T_min) / (T_max - T_min))
-                    linestyle = None
-                    alpha = None
-                else:
-                    color = cmap((T - T_min) / (T_max - T_min))
-                    linestyle = None
-                    alpha = None
 
                 x, y = zip(*[(ppp.x, ppp.p) for ppp in trace])
                 y = [v * 1e-6 for v in y]
@@ -2084,9 +2051,11 @@ class InteriorBallisticsFrame(Frame):
         t_Font = tkFont.Font(font=self.specs.cget("font"))
         width = self.specs.winfo_width() // t_Font.measure("m")
         # noinspection SpellCheckingInspection
-        self.specs.insert(
-            "end", "{:}: {:>4.0f} K {:}\n".format(self.getLocStr("TvDesc"), compo.T_v, self.getLocStr("isochorDesc"))
-        )
+        if compo.T_v:
+            self.specs.insert(
+                "end",
+                "{:}: {:>4.0f} K {:}\n".format(self.getLocStr("TvDesc"), compo.T_v, self.getLocStr("isochorDesc")),
+            )
         self.specs.insert("end", "{:}: {:>4.0f} kg/m³\n".format(self.getLocStr("densityDesc"), compo.rho_p))
         self.specs.insert("end", "{:}: {:>4.0f} kJ/kg\n".format(self.getLocStr("force"), compo.f / 1e3))
         isp = compo.getIsp()
