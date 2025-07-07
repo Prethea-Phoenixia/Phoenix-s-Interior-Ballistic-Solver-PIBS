@@ -111,10 +111,10 @@ class Constrained:
         it=0,
         lengthGun=None,
         knownBore=False,
-        suppress=False,  # suppress design velocity exceeded before peak pressure check
+        suppress=False,
         progressQueue=None,
         **_,
-    ):
+    ):  # suppress design velocity exceeded before peak pressure check
 
         logger.info(f"solving constraint at specified load fraction, cycle {it}/{MAX_ITER}.")
         if any((chargeMassRatio <= 0, loadFraction <= 0, loadFraction > 1)):
@@ -288,9 +288,7 @@ class Constrained:
                     dv_bar = 0.5 * theta * (p_bar - p_d_bar) * dt_bar
 
                 else:
-                    dt_bar = 0
-                    dl_bar = 0
-                    dv_bar = 0
+                    dt_bar, dl_bar, dv_bar = 0, 0, 0
 
                 return [dt_bar, dl_bar, dv_bar]
 
