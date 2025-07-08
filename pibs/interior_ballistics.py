@@ -32,7 +32,6 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from pibs.guidegraph import guideGraph
-
 from . import __version__
 from .ballistics import (
     COMPUTE,
@@ -334,8 +333,6 @@ class InteriorBallisticsFrame(Frame):
             kwargs = self.kwargs
             typ = kwargs["typ"]
             cal = kwargs["caliber"]
-            # blr = kwargs["lengthGun"] / cal
-            # car_len = kwargs["chamberVolume"] / (pi * (0.5 * cal) ** 2 * kwargs["chambrage"])
             w = kwargs["shotMass"]
             return "{:} {:.0f} mm ".format(
                 "{:.4g} g".format(w * 1e3) if w < 1 else "{:.4g} kg".format(w), cal * 1e3
@@ -1486,11 +1483,7 @@ class InteriorBallisticsFrame(Frame):
 
         j = 0
         self.dropMat = LocDropdown(
-            parent=mecFrm,
-            strObjDict=MATERIALS,
-            locFunc=self.getLocStr,
-            dropdowns=self.locs,
-            descLabelKey="matFrmLabel",
+            parent=mecFrm, strObjDict=MATERIALS, locFunc=self.getLocStr, dropdowns=self.locs, descLabelKey="matFrmLabel"
         )
         self.dropMat.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         self.dropMat.trace_add("write", lambda *args: self.dropMatTemp.reset(self.dropMat.getObj().getTdict()))
@@ -1752,12 +1745,7 @@ class InteriorBallisticsFrame(Frame):
 
         k += 1
         self.tracePress = LocLabelCheck(
-            parent=auxFrm,
-            row=j,
-            col=k,
-            labelLocKey="tracePress",
-            locFunc=self.getLocStr,
-            allLC=auxChecks,
+            parent=auxFrm, row=j, col=k, labelLocKey="tracePress", locFunc=self.getLocStr, allLC=auxChecks
         )
 
         for check in auxChecks:
@@ -1955,11 +1943,7 @@ class InteriorBallisticsFrame(Frame):
             # noinspection SpellCheckingInspection
             cmap = mpl.colormaps["afmhot"]
 
-            x_max = 0
-            y_max = 0
-
-            T_min = inf
-            T_max = 0
+            x_max, y_max, T_min, T_max = 0, 0, inf, 0
             for trace in pTrace:
                 if not trace.T:
                     continue
@@ -2235,8 +2219,6 @@ class InteriorBallisticsFrame(Frame):
         style = ttk.Style(self)
         bgc = str(style.lookup("TFrame", "background"))
         fgc = str(style.lookup("TFrame", "foreground"))
-        # noinspection SpellCheckingInspection
-        # fbgc = str(style.lookup("TCombobox", "fieldbackground"))
 
         with mpl.rc_context(CONTEXT):
             self.guideAx.cla()
@@ -2262,8 +2244,7 @@ class InteriorBallisticsFrame(Frame):
                         ) * (1e3 if index == 4 else 1)
                         maxVal = min(2 * minVal, maxVal)
                     else:
-                        minVal = 0
-                        maxVal = 1
+                        minVal, maxVal = 0, 1
 
                     self.guideAx.pcolormesh(
                         loadDensities,
