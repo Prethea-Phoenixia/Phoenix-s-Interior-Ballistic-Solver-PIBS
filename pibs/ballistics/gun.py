@@ -182,7 +182,7 @@ def pidduck(wpm, k, tol):
         else:
             return I - 0.5 * ((k - 1) / k) * wpm * ((1 - Omega) ** (k / (k - 1)) / Omega)
 
-    a, b = dekker(f_Omega, 0, 1, tol, y_abs_tol=minTol)
+    a, b = dekker(f_Omega, 0, 1, tol, y_abs_tol=tol)
     Omega = 0.5 * (a + b)
 
     if k == 1:

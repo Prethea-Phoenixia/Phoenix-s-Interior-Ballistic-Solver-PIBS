@@ -183,8 +183,7 @@ class Constrained:
             c_a_bar = (self.ambientGamma * self.ambientP / self.ambientRho) ** 0.5 / v_j
             p_a_bar = self.ambientP / (f * Delta)
         else:
-            c_a_bar = 0
-            p_a_bar = 0
+            c_a_bar, p_a_bar = 0, 0
 
         gamma_1 = self.ambientGamma
 
@@ -341,13 +340,7 @@ class Constrained:
             else:
                 Z_i = Z_0
 
-            Z_1, Z_2 = gss(
-                lambda Z: _f_p_Z(Z)[0],
-                Z_i,
-                Z_j,
-                y_rel_tol=0.5 * tol,
-                findMin=False,
-            )
+            Z_1, Z_2 = gss(lambda Z: _f_p_Z(Z)[0], Z_i, Z_j, y_rel_tol=0.5 * tol, findMin=False)
             Z_p = 0.5 * (Z_1 + Z_2)
 
             if abs(Z_p - Z_b) < tol:
@@ -374,7 +367,7 @@ class Constrained:
             lambda web: _f_p_e_1(web)[0],
             probeWeb,  # >0
             0.5 * probeWeb,  # ?0
-            # x_tol=1e-14,
+            # x_tol=,
             y_abs_tol=p_bar_d * tol,
             f_report=fr if progressQueue is not None else None,
         )  # this is the e_1 that satisifies the pressure specification.
