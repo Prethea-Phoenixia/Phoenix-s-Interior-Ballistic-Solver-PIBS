@@ -1,6 +1,5 @@
-from pibs.ballistics import POINT_PEAK_AVG, GrainComp, SimpleGeometry, Propellant
+from pibs.ballistics import POINT_PEAK_AVG, GrainComp, Propellant, SimpleGeometry
 from pibs.guidegraph import guideGraph
-
 
 if __name__ == "__main__":
     compositions = GrainComp.readFile("../pibs/ballistics/resource/propellants.csv")

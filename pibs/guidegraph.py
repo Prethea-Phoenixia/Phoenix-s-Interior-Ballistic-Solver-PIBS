@@ -6,18 +6,18 @@ from math import inf
 from typing import Optional
 
 from .ballistics import (
+    CONVENTIONAL,
+    POINT_BURNOUT,
+    RECOILLESS,
     Constrained,
     ConstrainedRecoilless,
+    Domains,
     Gun,
+    GunTypes,
+    Points,
+    Propellant,
     Recoilless,
     Solutions,
-    Points,
-    Domains,
-    GunTypes,
-    Propellant,
-    POINT_BURNOUT,
-    CONVENTIONAL,
-    RECOILLESS,
 )
 
 logger = logging.getLogger(__name__)

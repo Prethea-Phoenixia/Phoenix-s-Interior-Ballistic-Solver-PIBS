@@ -114,7 +114,7 @@ class GrainComp:
     @classmethod
     def readFile(cls, fileName):
         composition = []
-        with open(fileName, newline="") as csvfile:
+        with open(fileName, newline="", encoding="utf-8") as csvfile:
             propReader = csv.reader(
                 csvfile,
                 delimiter=",",

@@ -89,9 +89,11 @@ class ToolTip(object):
 def CreateToolTip(widget, text):
     toolTip = ToolTip(widget)
 
+    # noinspection PyUnusedLocal
     def enter(event):
         toolTip.showtip(text)
 
+    # noinspection PyUnusedLocal
     def leave(event):
         toolTip.hidetip()
 

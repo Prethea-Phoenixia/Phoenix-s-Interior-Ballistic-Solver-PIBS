@@ -1,9 +1,9 @@
-from math import exp
-from ..num import quadratic
-from .nasa7 import Specie, Reaction
-
 import logging
+from math import exp
 from os import path
+
+from ..num import quadratic
+from .nasa7 import Reaction, Specie
 
 # create logger
 logger = logging.getLogger("CORNER")

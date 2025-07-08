@@ -11,13 +11,7 @@ def cubic(a, b, c, d):
         raise ValueError("coefficients must be real")
     if a == 0:
         return quadratic(b, c, d)
-    Delta = (
-        18 * a * b * c * d
-        - 4 * b**3 * d
-        + b**2 * c**2
-        - 4 * a * c**3
-        - 27 * a**2 * d**2
-    )
+    Delta = 18 * a * b * c * d - 4 * b**3 * d + b**2 * c**2 - 4 * a * c**3 - 27 * a**2 * d**2
     """
     Δ>0: distinct real roots.
     Δ=0: repeating real roots.
@@ -48,9 +42,7 @@ def cubic(a, b, c, d):
         xs = list(z.real for z in xs)
     else:
         # one real and 2 imaginary roots.
-        xs = list(
-            z.real if abs(z.imag) == min(abs(z.imag) for z in xs) else z for z in xs
-        )
+        xs = list(z.real if abs(z.imag) == min(abs(z.imag) for z in xs) else z for z in xs)
     # put the first real solution at first.
     xs.sort(key=lambda z: 1 if isinstance(z, complex) else 0)
     return tuple(xs)

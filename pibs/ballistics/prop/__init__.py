@@ -1,3 +1,1 @@
-from .prop import MultPerfGeometry, SimpleGeometry
-from .prop import GrainComp, Propellant
-from .prop import GEOMETRIES
+from .prop import GEOMETRIES, GrainComp, MultPerfGeometry, Propellant, SimpleGeometry

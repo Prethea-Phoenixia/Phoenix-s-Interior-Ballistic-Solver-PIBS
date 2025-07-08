@@ -90,12 +90,11 @@ Note that in practice, the Phase of species only has to values: G for gas and C 
 condensed phase? presumably.
 """
 
-import logging
 import difflib
+import logging
+from math import exp, log
 
 from .periodic import molarMasses
-from math import log, exp
-
 
 # create logger
 logger = logging.getLogger("THERMO")

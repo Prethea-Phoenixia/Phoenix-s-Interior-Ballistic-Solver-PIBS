@@ -1,6 +1,6 @@
 from __future__ import annotations
-from typing import Literal, Union
 
+from typing import Literal, Union
 
 DOMAIN_TIME = "DOMAIN_TIME"
 DOMAIN_LEN = "DOMAIN_LEN"
@@ -54,7 +54,7 @@ from .gun import (
     PressureTraceEntry,
 )
 from .material import MATERIALS
-from .optGun import Constrained
-from .optRecoilless import ConstrainedRecoilless
+from .optimize_gun import Constrained
+from .optimize_recoilless import ConstrainedRecoilless
 from .prop import GEOMETRIES, GrainComp, MultPerfGeometry, Propellant, SimpleGeometry
 from .recoilless import Recoilless

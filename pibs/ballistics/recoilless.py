@@ -8,6 +8,7 @@ from math import inf, pi, tan
 from typing import List
 
 from pibs.ballistics import (
+    COMPUTE,
     DOMAIN_LEN,
     DOMAIN_TIME,
     POINT_BURNOUT,
@@ -18,11 +19,18 @@ from pibs.ballistics import (
     POINT_PEAK_SHOT,
     POINT_PEAK_STAG,
     POINT_START,
-    Domains,
-    COMPUTE,
     SAMPLE,
+    Domains,
 )
-from .gun import GenericEntry, GenericResult, Gun, OutlineEntry, PressureProbePoint, PressureTraceEntry
+
+from .gun import (
+    GenericEntry,
+    GenericResult,
+    Gun,
+    OutlineEntry,
+    PressureProbePoint,
+    PressureTraceEntry,
+)
 from .num import RKF78, cubic, dekker, gss
 from .prop import GrainComp, Propellant
 

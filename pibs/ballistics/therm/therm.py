@@ -1,10 +1,9 @@
 import difflib
-
-from .corner import balance
-from ..num import secant
-from .periodic import molarMasses
-
 from os import path
+
+from ..num import secant
+from .corner import balance
+from .periodic import molarMasses
 
 
 class Ingredient:

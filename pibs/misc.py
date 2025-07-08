@@ -246,7 +246,7 @@ def formatMass(m, n=4):
     return "N/A"
 
 
-with open(resolvepath("ui/localization.json")) as file:
+with open(resolvepath("ui/localization.json"), encoding="utf-8") as file:
     STRING = json.load(file)
 
 

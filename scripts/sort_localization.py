@@ -1,6 +1,5 @@
 import json
 
-
 if __name__ == "__main__":
     with open("../pibs/ui/localization.json", "r", encoding="utf-8") as f:
         v = json.load(f)

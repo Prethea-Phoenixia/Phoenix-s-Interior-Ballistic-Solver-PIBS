@@ -1,5 +1,6 @@
 import inspect
-import sys, traceback
+import sys
+import traceback
 
 """
 Constants to be used for Runge-Kutta-Fehlberg 7(8), see:
@@ -100,19 +101,9 @@ def RKF78(
         adaptTo = [True] * len(iniVal)
 
     sig = inspect.signature(dFunc)
-    params = len(
-        [
-            param
-            for param in sig.parameters.values()
-            if param.kind == param.POSITIONAL_OR_KEYWORD
-        ]
-    )
+    params = len([param for param in sig.parameters.values() if param.kind == param.POSITIONAL_OR_KEYWORD])
     if debug:
-        paramstr = [
-            str(param)
-            for param in sig.parameters.values()
-            if param.kind == param.POSITIONAL_OR_KEYWORD
-        ]
+        paramstr = [str(param) for param in sig.parameters.values() if param.kind == param.POSITIONAL_OR_KEYWORD]
         print("setup")
 
         for i, param in enumerate(paramstr[:-1]):
@@ -272,9 +263,7 @@ def RKF78(
             x += h
             Rm = [max(Rmi, Rsi) for Rmi, Rsi in zip(Rm, Rs)]
 
-            if abortFunc is not None and abortFunc(
-                x=x, ys=y_this, record=record
-            ):  # premature terminating cond. is met
+            if abortFunc is not None and abortFunc(x=x, ys=y_this, record=record):  # premature terminating cond. is met
                 if debug:
                     print("exiting via debug")
                     print("record")
@@ -321,8 +310,7 @@ def RKF78(
 
     if abs(x - x_1) > abs(x_1 - x_0) * relTol:
         raise ValueError(
-            "Premature Termination of Integration due to vanishing step size,"
-            + " x at {}, h at {}.".format(x, h)
+            "Premature Termination of Integration due to vanishing step size," + " x at {}, h at {}.".format(x, h)
         )
 
     return x, y_this, Rm

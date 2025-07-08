@@ -12,9 +12,9 @@ from . import (
     Points,
     Solutions,
 )
-from .prop import Propellant
 from .gun import pidduck
 from .num import RKF78, cubic, dekker, gss
+from .prop import Propellant
 
 """
 Machine-accuracy factor, determines that, if a numerical method

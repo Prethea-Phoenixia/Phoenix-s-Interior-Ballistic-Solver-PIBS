@@ -1,6 +1,6 @@
 import inspect
-
-import sys, traceback
+import sys
+import traceback
 
 a2 = 2 / 27
 a3 = 1 / 9
@@ -126,20 +126,10 @@ def RKF78(
 
     sig = inspect.signature(dFunc)
 
-    params = len(
-        [
-            param
-            for param in sig.parameters.values()
-            if param.kind == param.POSITIONAL_OR_KEYWORD
-        ]
-    )
+    params = len([param for param in sig.parameters.values() if param.kind == param.POSITIONAL_OR_KEYWORD])
 
     if debug:
-        paramstr = [
-            str(param)
-            for param in sig.parameters.values()
-            if param.kind == param.POSITIONAL_OR_KEYWORD
-        ]
+        paramstr = [str(param) for param in sig.parameters.values() if param.kind == param.POSITIONAL_OR_KEYWORD]
         print("setup")
 
         for i, param in enumerate(paramstr[:-1]):
@@ -369,9 +359,7 @@ def RKF78(
         ):
             if debug:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
-                errMsg = "".join(
-                    traceback.format_exception(exc_type, exc_value, exc_traceback)
-                )
+                errMsg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
                 print(f"Error encountered at x={x:.8g}")
                 print(str(errMsg))
             h *= beta
@@ -402,9 +390,7 @@ def RKF78(
             x += h
             Rm = [max(Rmi, Rsi) for Rmi, Rsi in zip(Rm, Rs)]
 
-            if abortFunc is not None and abortFunc(
-                x=x, ys=y_this, record=record
-            ):  # premature terminating cond. is met
+            if abortFunc is not None and abortFunc(x=x, ys=y_this, record=record):  # premature terminating cond. is met
                 if debug:
                     print("exiting via abortFunc")
                     print("record")
@@ -444,8 +430,7 @@ def RKF78(
 
     if abs(x - x_1) > abs(x_1 - x_0) * relTol:
         raise ValueError(
-            "Premature Termination of Integration due to vanishing step size,"
-            + " x at {}, h at {}.".format(x, h)
+            "Premature Termination of Integration due to vanishing step size," + " x at {}, h at {}.".format(x, h)
         )
 
     return x, y_this, Rm

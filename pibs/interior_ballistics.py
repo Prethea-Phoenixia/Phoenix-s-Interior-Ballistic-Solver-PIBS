@@ -9,10 +9,20 @@ import tkinter.font as tkFont
 import traceback
 from ctypes import windll
 from logging.handlers import QueueHandler, QueueListener
-from math import ceil, log10, pi, inf
+from math import ceil, inf, log10, pi
 from multiprocessing import Process, Queue
 from queue import Empty
-from tkinter import Frame, IntVar, Menu, StringVar, Text, Tk, filedialog, messagebox, ttk
+from tkinter import (
+    Frame,
+    IntVar,
+    Menu,
+    StringVar,
+    Text,
+    Tk,
+    filedialog,
+    messagebox,
+    ttk,
+)
 from typing import Literal
 
 import matplotlib as mpl
@@ -22,9 +32,11 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from pibs.guidegraph import guideGraph
+
 from . import __version__
 from .ballistics import (
     COMPUTE,
+    CONVENTIONAL,
     DOMAIN_LEN,
     DOMAIN_TIME,
     GEOMETRIES,
@@ -39,6 +51,9 @@ from .ballistics import (
     POINT_START,
     RECOILLESS,
     SAMPLE,
+    SOL_LAGRANGE,
+    SOL_MAMONTOV,
+    SOL_PIDDUCK,
     Constrained,
     ConstrainedRecoilless,
     GrainComp,
@@ -47,21 +62,28 @@ from .ballistics import (
     Recoilless,
     SimpleGeometry,
 )
-from .ballistics import CONVENTIONAL, SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV
-from .locWidget import Loc2Input, Loc3Input, Loc12Disp, Loc122Disp, LocDropdown, LocLabelCheck, LocLabelFrame
+from .localized_widget import (
+    Loc2Input,
+    Loc3Input,
+    Loc12Disp,
+    Loc122Disp,
+    LocDropdown,
+    LocLabelCheck,
+    LocLabelFrame,
+)
 from .misc import (
     STRING,
     dot_aligned,
+    filenameize,
     formatIntInput,
     formatMass,
     loadfont,
     resolvepath,
     roundSig,
     toSI,
+    validateCE,
     validateNN,
     validatePI,
-    validateCE,
-    filenameize,
 )
 from .tip import CreateToolTip
 
@@ -208,28 +230,16 @@ class InteriorBallisticsFrame(Frame):
             label=self.getLocStr("darkLabel"), variable=self.themeRadio, value=0, command=self.useTheme, underline=0
         )
         themeMenu.add_radiobutton(
-            label=self.getLocStr("lightLabel"),
-            variable=self.themeRadio,
-            value=1,
-            command=self.useTheme,
-            underline=0,
+            label=self.getLocStr("lightLabel"), variable=self.themeRadio, value=1, command=self.useTheme, underline=0
         )
 
         debugMenu.add_checkbutton(
-            label=self.getLocStr("enableLabel"),
-            variable=self.debug,
-            onvalue=1,
-            offvalue=0,
-            underline=0,
+            label=self.getLocStr("enableLabel"), variable=self.debug, onvalue=1, offvalue=0, underline=0
         )
 
         for lang in STRING.keys():
             langMenu.add_radiobutton(
-                label=lang,
-                variable=self.langVar,
-                value=lang,
-                command=self.changeLang,
-                underline=0,
+                label=lang, variable=self.langVar, value=lang, command=self.changeLang, underline=0
             )
 
         self.prop = None
@@ -364,7 +374,8 @@ class InteriorBallisticsFrame(Frame):
             title=self.getLocStr("loadLabel"), filetypes=(("JSON File", "*.json"),), defaultextension=".json"
         )
         if fileName == "":
-            messagebox.showinfo("Exception Loading Design", "No File Selected")
+            # messagebox.showinfo("Exception Loading Design", "No File Selected")
+            messagebox.showinfo(self.getLocStr("excTitle"), self.getLocStr("cancelMsg"))
             return
 
         try:
@@ -2426,9 +2437,9 @@ class InteriorBallisticsFrame(Frame):
             style.theme_use("awlight")
             pass
 
-        # ensure that the treeview rows are roughly the same height
-        # regardless of dpi. on Windows, default is Segoe UI at 9 points
-        # so the default row height should be around 12
+        """ensure that the treeview rows are roughly the same height
+        regardless of dpi. on Windows, default is Segoe UI at 9 points
+        so the default row height should be around 12"""
 
         style.configure("Treeview", rowheight=round(12 * (FONTSIZE / 8) * self.dpi / 72.0))
         style.configure("Treeview.Heading", font=(FONTNAME, FONTSIZE))
@@ -2474,10 +2485,8 @@ class InteriorBallisticsFrame(Frame):
 
             for ax in (self.ax, self.axv, self.axP, self.geomAx, self.auxAx, self.auxAxH, self.guideAx):
                 ax.set_facecolor(fbgc)
-                ax.spines["top"].set_color(fgc)
-                ax.spines["bottom"].set_color(fgc)
-                ax.spines["left"].set_color(fgc)
-                ax.spines["right"].set_color(fgc)
+                for place in ("top", "bottom", "left", "right"):
+                    ax.spines[place].set_color(fgc)
                 ax.tick_params(axis="x", which="both", colors=fgc, labelsize=FONTSIZE, labelfontfamily=FONTNAME)
                 ax.tick_params(axis="y", which="both", colors=fgc, labelsize=FONTSIZE, labelfontfamily=FONTNAME)
 

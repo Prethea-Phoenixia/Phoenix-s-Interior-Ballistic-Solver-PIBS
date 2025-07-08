@@ -7,7 +7,7 @@
     },
     {
       "optionDest": "filenames",
-      "value": "run_pibs.py"
+      "value": "scripts/run_pibs.py"
     },
     {
       "optionDest": "onefile",
@@ -23,7 +23,7 @@
     },
     {
       "optionDest": "name",
-      "value": "Phoenix Interior Ballistics Solver"
+      "value": "PIBS"
     },
     {
       "optionDest": "clean_build",

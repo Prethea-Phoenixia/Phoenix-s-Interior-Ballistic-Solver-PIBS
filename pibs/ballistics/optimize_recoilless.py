@@ -2,9 +2,15 @@ import logging
 from math import floor, inf, log, pi
 from random import uniform
 
-from . import POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT, POINT_PEAK_STAG, Points
+from . import (
+    POINT_PEAK_AVG,
+    POINT_PEAK_BREECH,
+    POINT_PEAK_SHOT,
+    POINT_PEAK_STAG,
+    Points,
+)
 from .num import RKF78, cubic, dekker, gss
-from .optGun import MAX_GUESSES
+from .optimize_gun import MAX_GUESSES
 from .prop import Propellant
 from .recoilless import Recoilless
 

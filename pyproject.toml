@@ -3,17 +3,16 @@ profile = "black"
 [tool.black]
 line-length = 120
 
+[tool.setuptools]
+py-modules = []
+
 [tool.setuptools.dynamic]
 version = { attr = "pibs.__version__" }
 
 [project]
 name = "pibs"
 dynamic = ["version"]
-dependencies = [
-    "matplotlib",
-    "matplotlib-label-lines",
-    "tabulate"
-]
+dependencies = ["matplotlib", "matplotlib-label-lines", "tabulate"] # pip install .
 
 [project.optional-dependencies]
-dev = ["black", "isort", "auto-py-to-exe"]
+dev = ["black", "isort", "auto-py-to-exe"] # pip install .[dev]

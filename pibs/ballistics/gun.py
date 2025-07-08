@@ -8,24 +8,25 @@ from math import exp, inf, log, pi
 from typing import List
 
 from pibs.ballistics import (
+    COMPUTE,
     DOMAIN_LEN,
     DOMAIN_TIME,
+    POINT_BURNOUT,
     POINT_EXIT,
     POINT_FRACTURE,
     POINT_PEAK_AVG,
     POINT_PEAK_BREECH,
     POINT_PEAK_SHOT,
     POINT_START,
+    SAMPLE,
     SOL_LAGRANGE,
     SOL_MAMONTOV,
     SOL_PIDDUCK,
     Domains,
     Points,
     Solutions,
-    POINT_BURNOUT,
-    SAMPLE,
-    COMPUTE,
 )
+
 from .num import RKF78, cubic, dekker, gss, intg, secant
 from .prop import GrainComp, Propellant
 
