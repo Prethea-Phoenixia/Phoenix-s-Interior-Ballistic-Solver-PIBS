@@ -91,7 +91,7 @@ DESCRIPTION = "Description"
 rootLogger = logging.getLogger()
 rootLogger.setLevel(logging.INFO)
 handler = logging.StreamHandler(sys.stderr)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(message)s")
 handler.setFormatter(formatter)
 rootLogger.addHandler(handler)
 
@@ -135,7 +135,7 @@ class TextHandler(logging.Handler):
     def __init__(self, text):
         # run the regular Handler __init__
         logging.Handler.__init__(self)
-        self.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+        self.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(message)s"))
         self.setLevel(logging.INFO)
         # Store a reference to the Text it will log to
         self.text = text
@@ -277,11 +277,7 @@ class InteriorBallisticsFrame(Frame):
         rootLogger.info("text handler attached to root logger.")
 
         console = logging.StreamHandler(sys.stderr)
-        console.setFormatter(
-            logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            )
-        )
+        console.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(message)s"))
         self.listener = QueueListener(self.logQueue, textHandler, console)
         self.listener.start()
 
@@ -2624,9 +2620,7 @@ def main(loc: str = None):
 
     dpi = root.winfo_fpixels("1i")
     # Tk was originally developed for a dpi of 72
-    # root.tk.call("tk", "scaling", "-displayof", ".", dpi / 72.0)
-    scale = 1.0 * dpi / 72.0
-    root.tk.call("tk", "scaling", scale)
+    root.tk.call("tk", "scaling", 1.0 * dpi / 72.0)
     root.tk.call("lappend", "auto_path", resolvepath("ui/awthemes-10.4.0"))
     root.tk.call("lappend", "auto_path", resolvepath("ui/tksvg0.12"))
 
@@ -2634,21 +2628,10 @@ def main(loc: str = None):
     menubar = Menu(root)
     root.config(menu=menubar)
 
-    # root.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-    # root.resizable(False, False)
-    # root.iconify()
-
     root.bind("<Escape>", lambda event: root.state("normal"))
     root.bind("<F11>", lambda event: root.state("zoomed"))
     InteriorBallisticsFrame(root, root, menubar, dpi, defaultLang="English" if loc != "zh_CN" else "中文")
     root.minsize(root.winfo_width(), root.winfo_height())  # set minimum size
-    # root.state("zoomed")
-
-    # root.geometry("1600x1200")
-    # root.minsize(1600, 1200)  # set minimum size
-
-    # root.resizable(True, True)
-
     root.mainloop()
 
 
