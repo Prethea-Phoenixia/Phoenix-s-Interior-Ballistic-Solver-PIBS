@@ -59,13 +59,7 @@ class Constrained:
         if any((caliber <= 0, shotMass <= 0, startPressure <= 0, dragCoefficient < 0, dragCoefficient >= 1)):
             raise ValueError("Invalid parameters for constrained design")
 
-        if any(
-            (
-                designPressure <= 0,
-                # designPressure <= startPressure,
-                designVelocity <= 0,
-            )
-        ):
+        if any((designPressure <= 0, designVelocity <= 0)):
             raise ValueError("Invalid design constraint")
 
         self.S = (caliber / 2) ** 2 * pi
@@ -318,13 +312,7 @@ class Constrained:
 
                 r = []
                 _, (t_bar, l_bar, v_bar), _ = RKF78(
-                    dFunc=_ode_Z,
-                    iniVal=ys,
-                    x_0=x,
-                    x_1=Z,
-                    relTol=tol,
-                    absTol=tol**2,
-                    record=r,
+                    dFunc=_ode_Z, iniVal=ys, x_0=x, x_1=Z, relTol=tol, absTol=tol**2, record=r
                 )
                 xs = [v[0] for v in record]
                 record.extend(v for v in r if v[0] not in xs)
