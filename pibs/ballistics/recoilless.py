@@ -839,7 +839,7 @@ class Recoilless:
 
             p_line = []
             for i in range(traceStep):  # 0....step -1
-                x = i / traceStep* (l + l_c)
+                x = i / traceStep * (l + l_c)
                 px = self.toPx(l, v, vb, ps, eta, x)
 
                 p_line.append(PressureProbePoint(x, px))

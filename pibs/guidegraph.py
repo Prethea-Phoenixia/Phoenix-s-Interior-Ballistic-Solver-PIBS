@@ -135,11 +135,7 @@ def guideGraph(*_, **kwargs):
     else:
         raise ValueError("unknown gun type")
 
-    loadFractions = []
-    chargeMassRatios = []
-
-    chargeMasses = []
-    loadDensities = []
+    loadFractions, chargeMassRatios, chargeMasses, loadDensities = [], [], [], []
 
     minCMR, maxCMR, stepCMR = (kwargs[k] for k in ("minCMR", "maxCMR", "stepCMR"))
     chargeMassRatio = minCMR
@@ -160,12 +156,7 @@ def guideGraph(*_, **kwargs):
     for chargeMassRatio in chargeMassRatios:
         for loadFraction in loadFractions:
             kv = {k: v for k, v in kwargs.items()}
-            kv.update(
-                {
-                    "loadFraction": loadFraction,
-                    "chargeMassRatio": chargeMassRatio,
-                }
-            )
+            kv.update({"loadFraction": loadFraction, "chargeMassRatio": chargeMassRatio})
             parameters.append(kv)
 
     processes = os.cpu_count()

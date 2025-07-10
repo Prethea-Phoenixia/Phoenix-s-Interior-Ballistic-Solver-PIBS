@@ -167,9 +167,9 @@ def pidduck(wpm, k, tol):
 
     def f(omega, x):
         if k == 1:
-            return exp(-omega * x ** 2)
+            return exp(-omega * x**2)
         else:
-            return (1 - omega * x ** 2) ** (1 / (k - 1))
+            return (1 - omega * x**2) ** (1 / (k - 1))
 
     def g(omega, x):
         return f(omega, x) * x**2
@@ -911,7 +911,7 @@ class Gun:
 
             p_line = []
             for i in range(traceSteps):
-                x = i / traceSteps* (l + self.l_c)
+                x = i / traceSteps * (l + self.l_c)
                 p_x, _ = self.toPxU(l, ps, pb, v, x)
                 pp = PressureProbePoint(x, p_x)
                 p_line.append(pp)

@@ -32,6 +32,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from pibs.guidegraph import guideGraph
+
 from . import __version__
 from .ballistics import (
     COMPUTE,
@@ -222,7 +223,9 @@ class InteriorBallisticsFrame(Frame):
         fileMenu.add_command(label=self.getLocStr("exportLabel"), command=self.exportTable)
 
         for themeName in THEMES.keys():
-            themeMenu.add_radiobutton(label=themeName, variable=self.themeNameVar, value=themeName, command=self.useTheme)
+            themeMenu.add_radiobutton(
+                label=themeName, variable=self.themeNameVar, value=themeName, command=self.useTheme
+            )
 
         debugMenu.add_checkbutton(label=self.getLocStr("enableLabel"), variable=self.debug, onvalue=1, offvalue=0)
 
@@ -1916,7 +1919,7 @@ class InteriorBallisticsFrame(Frame):
 
             pTrace = self.gunResult.pressureTrace
             # noinspection SpellCheckingInspection
-            cmap = mpl.colormaps["afmhot" + ("_r" if THEMES[self.themeNameVar.get()]  else "")]
+            cmap = mpl.colormaps["afmhot" + ("_r" if THEMES[self.themeNameVar.get()] else "")]
 
             x_max, y_max, T_min, T_max = 0, 0, inf, 0
             for trace in pTrace:
@@ -2183,7 +2186,6 @@ class InteriorBallisticsFrame(Frame):
             self.tv.move(str(-i - 1), str(i + 1), -1)
 
     def updateGuideGraph(self):
-
         style = ttk.Style(self)
         bgc = str(style.lookup("TFrame", "background"))
         fgc = str(style.lookup("TFrame", "foreground"))
@@ -2415,12 +2417,16 @@ class InteriorBallisticsFrame(Frame):
             }
         )
 
-        grays = [f"gray{i}" for i in [90, 80, 70]] if THEMES[self.themeNameVar.get()] else [f"gray{i}" for i in [16, 23, 30]]
+        grays = (
+            [f"gray{i}" for i in [90, 80, 70]]
+            if THEMES[self.themeNameVar.get()]
+            else [f"gray{i}" for i in [10, 20, 30]]
+        )
         self.errorText.tag_configure("gun", background=grays[0])
         self.errorText.tag_configure("recoilless", background=grays[0])
         self.errorText.tag_configure("optimize_gun", background=grays[1])
         self.errorText.tag_configure("optimize_recoilless", background=grays[1])
-        # self.errorText.tag_configure("minimize", background=grays[2])
+        self.errorText.tag_configure("guidegraph", background=grays[2])
 
         try:
             for fig in (self.fig, self.geomFig, self.auxFig, self.guideFig):
@@ -2478,7 +2484,6 @@ class InteriorBallisticsFrame(Frame):
 
 # noinspection PyPep8Naming
 def calculate(jobQueue, progressQueue, logQueue, kwargs):
-    # rootLogger = logging.getLogger()
     rootLogger.addHandler(QueueHandler(logQueue))
     rootLogger.info("calculation started.")
 
