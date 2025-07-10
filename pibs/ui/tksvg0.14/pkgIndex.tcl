@@ -6,9 +6,9 @@
 # Note, that multiple Tk packages with different versions may be available.
 # The right Tk should be loaded before package require tksvg anyway.
 
-package ifneeded tksvg 0.12 \
+package ifneeded tksvg 0.14 \
 	"if {\[package vcompare 8.7a0 \[package require Tk\]\] == 1} {
-		[list load [file join $dir tksvg012t.dll] [string totitle tksvg]]
+		[list load [file join $dir tksvg014t.dll] [string totitle tksvg]]
 	} else {
-		package provide tksvg 0.12
+		package provide tksvg 0.14
 	}"

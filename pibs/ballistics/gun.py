@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 minTol = 1e-6  # based on experience
 
 
+# noinspection PyPep8Naming
 @dataclass
 class GenericEntry:
     def getRawLine(self):
@@ -87,6 +88,7 @@ class OutlineEntry(GenericEntry):
     r_ex: float
 
 
+# noinspection PyPep8Naming
 @dataclass
 class GenericResult:
     gun: Gun
@@ -163,42 +165,43 @@ def pidduck(wpm, k, tol):
     if k < 1:
         raise ValueError("Invalid adiabatic index passed", k)
 
-    def f(Omega, x):
+    def f(omega, x):
         if k == 1:
-            return exp(-Omega * x**2)
+            return exp(-omega * x ** 2)
         else:
-            return (1 - Omega * x**2) ** (1 / (k - 1))
+            return (1 - omega * x ** 2) ** (1 / (k - 1))
 
-    def g(Omega, x):
-        return f(Omega, x) * x**2
+    def g(omega, x):
+        return f(omega, x) * x**2
 
-    def f_Omega(Omega):
-        if Omega == 0:
+    def f_omega(omega):
+        if omega == 0:
             return -inf
 
-        I, _ = intg(lambda x: f(Omega, x), 0, 1, tol)
+        I, _ = intg(lambda x: f(omega, x), 0, 1, tol)
 
         if k == 1:
-            return I - 0.5 * wpm * exp(-Omega) / Omega
+            return I - 0.5 * wpm * exp(-omega) / omega
         else:
-            return I - 0.5 * ((k - 1) / k) * wpm * ((1 - Omega) ** (k / (k - 1)) / Omega)
+            return I - 0.5 * ((k - 1) / k) * wpm * ((1 - omega) ** (k / (k - 1)) / omega)
 
-    a, b = dekker(f_Omega, 0, 1, tol, y_abs_tol=tol)
-    Omega = 0.5 * (a + b)
+    a, b = dekker(f_omega, 0, 1, tol, y_abs_tol=tol)
+    omega = 0.5 * (a + b)
 
     if k == 1:
-        labda_1 = (exp(Omega) - 1) / wpm
+        labda_1 = (exp(omega) - 1) / wpm
     else:
-        labda_1 = ((1 - Omega) ** (k / (1 - k)) - 1) / wpm
+        labda_1 = ((1 - omega) ** (k / (1 - k)) - 1) / wpm
 
     # Pidduck's solution
-    I_u, _ = intg(lambda x: g(Omega, x), 0, 1, tol)
-    I_l, _ = intg(lambda x: f(Omega, x), 0, 1, tol)
+    I_u, _ = intg(lambda x: g(omega, x), 0, 1, tol)
+    I_l, _ = intg(lambda x: f(omega, x), 0, 1, tol)
     labda_2 = I_u / I_l
 
     return labda_1, labda_2
 
 
+# noinspection PyPep8Naming,PyShadowingNames
 class Gun:
     def __init__(
         self,
@@ -811,7 +814,7 @@ class Gun:
                 elif tag == POINT_PEAK_BREECH:
                     return Pb / pScale
                 else:
-                    raise ValueError("tag unhandled.")
+                    raise ValueError("tag not handled.")
 
         for i, peak in enumerate([POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH]):
             findPeak(lambda x: g(x, peak), peak)
@@ -830,12 +833,7 @@ class Gun:
             for j in range(step):
                 t_bar_k = t_bar_e / (step + 1) * (j + 1)
                 (_, (Z_j, l_bar_j, v_bar_j), (Z_err, l_bar_err, v_bar_err)) = RKF78(
-                    self.ode_t,
-                    (Z_j, l_bar_j, v_bar_j),
-                    t_bar_j,
-                    t_bar_k,
-                    relTol=tol,
-                    absTol=tol**2,
+                    self.ode_t, (Z_j, l_bar_j, v_bar_j), t_bar_j, t_bar_k, relTol=tol, absTol=tol**2
                 )
                 t_bar_j = t_bar_k
 
@@ -865,17 +863,8 @@ class Gun:
             for j in range(step):
                 l_bar_k = l_g_bar / (step + 1) * (j + 1)
 
-                (
-                    _,
-                    (t_bar_j, Z_j, v_bar_j),
-                    (t_bar_err, Z_err, v_bar_err),
-                ) = RKF78(
-                    self.ode_l,
-                    (t_bar_j, Z_j, v_bar_j),
-                    l_bar_j,
-                    l_bar_k,
-                    relTol=tol,
-                    absTol=tol**2,
+                (_, (t_bar_j, Z_j, v_bar_j), (t_bar_err, Z_err, v_bar_err)) = RKF78(
+                    self.ode_l, (t_bar_j, Z_j, v_bar_j), l_bar_j, l_bar_k, relTol=tol, absTol=tol**2
                 )
                 l_bar_j = l_bar_k
 
@@ -890,6 +879,8 @@ class Gun:
                     Z_err=Z_err,
                     v_bar_err=v_bar_err,
                 )
+        else:
+            raise ValueError("dom not handled.")
 
         logger.info("sampling completed.")
 
@@ -903,11 +894,12 @@ class Gun:
         data = []
         error = []
         p_trace = []
+        traceSteps = max(step, 1)
 
         for bar_dataLine, bar_errorLine in zip(bar_data, bar_err):
             dtag, t_bar, l_bar, Z, v_bar, p_bar = bar_dataLine
 
-            (_, t_bar_err, l_bar_err, Z_err, v_bar_err, p_bar_err) = bar_errorLine
+            _, t_bar_err, l_bar_err, Z_err, v_bar_err, p_bar_err = bar_errorLine
 
             t, t_err = t_bar * tScale, t_bar_err * tScale
             l, l_err = l_bar * self.l_0, l_bar_err * self.l_0
@@ -918,8 +910,8 @@ class Gun:
             T = self.T(psi, l, p)
 
             p_line = []
-            for i in range(step):
-                x = i / step * (l + self.l_c)
+            for i in range(traceSteps):
+                x = i / traceSteps* (l + self.l_c)
                 p_x, _ = self.toPxU(l, ps, pb, v, x)
                 pp = PressureProbePoint(x, p_x)
                 p_line.append(pp)
@@ -948,8 +940,8 @@ class Gun:
             T = self.T(psi, l, p)
 
             p_line = []
-            for i in range(step):
-                x = i / step * (l + self.l_c)
+            for i in range(traceSteps):
+                x = i / traceSteps * (l + self.l_c)
                 p_x, _ = self.toPxU(l, ps, pb, v, x)
                 pp = PressureProbePoint(x, p_x)
                 p_line.append(pp)
@@ -1046,6 +1038,7 @@ class Gun:
 
     def getStructural(self, gunResult: GunResult, step: int, tol: float):
         logger.info("commencing structural calculation")
+        step = max(step, 1)
         # step 1. calculate the barrel mass
         r = 0.5 * self.caliber
         l_c = self.l_c
@@ -1055,7 +1048,7 @@ class Gun:
         S = self.S
 
         r_b = r * chi_k**0.5  # radius of breech
-        S_b = S * chi_k  # area of breech
+        # S_b = S * chi_k  # area of breech
 
         x_probes = (
             [i / step * l_c for i in range(step)]

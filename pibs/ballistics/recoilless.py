@@ -76,6 +76,7 @@ class RecoillessResult(GenericResult):
     errorData: List[RecoillessErrorEntry]
 
 
+# noinspection PyPep8Naming,GrazieInspection,PyShadowingNames
 class Recoilless:
     def __init__(
         self,
@@ -304,9 +305,7 @@ class Recoilless:
         dt_bar = (2 * self.B / self.theta) ** 0.5 * p_bar**-self.n
         dl_bar = v_bar * dt_bar
         dv_bar = 0.5 * self.theta * (p_bar - p_d_bar) * dt_bar
-
         deta = self.C_A * self.S_j_bar * p_bar * tau**-0.5 * dt_bar  # deta / dZ
-
         dtau = ((1 - tau) * dpsi - 2 * v_bar * dv_bar - self.theta * tau * deta) / (psi - eta)
 
         return dt_bar, dl_bar, dv_bar, deta, dtau
@@ -481,7 +480,7 @@ class Recoilless:
                     raise e  # unknown issues
 
             if l_bar_j >= l_g_bar:
-                if abs(l_bar_i - l_g_bar) / (l_g_bar) > tol or l_bar_i == 0:
+                if abs(l_bar_i - l_g_bar) / l_g_bar > tol or l_bar_i == 0:
                     N *= 2
                     Z_j = Z_i + Delta_Z / N
                 else:
@@ -817,19 +816,19 @@ class Recoilless:
         sort the data points
         """
 
-        data = []
-        error = []
-        p_trace = []
+        data, error, p_trace = [], [], []
         l_c = self.l_c
         # l_g = self.l_g
+
+        traceStep = max(step, 1)
 
         for bar_dataLine, bar_errorLine in zip(bar_data, bar_err):
             dtag, t_bar, l_bar, Z, v_bar, p_bar, eta, tau = bar_dataLine
             (etag, t_bar_err, l_bar_err, Z_err, v_bar_err, p_bar_err, eta_err, tau_err) = bar_errorLine
 
-            t, t_err = (t_bar * tScale, t_bar_err * tScale)
-            l, l_err = (l_bar * self.l_0, l_bar_err * self.l_0)
-            psi, psi_err = (self.f_psi_Z(Z), abs(self.f_sigma_Z(Z) * Z_err))
+            t, t_err = t_bar * tScale, t_bar_err * tScale
+            l, l_err = l_bar * self.l_0, l_bar_err * self.l_0
+            psi, psi_err = self.f_psi_Z(Z), abs(self.f_sigma_Z(Z) * Z_err)
             v, v_err = v_bar * self.v_j, v_bar_err * self.v_j
 
             p, p_err = p_bar * pScale, (p_bar_err if isinstance(p_bar_err, str) else p_bar_err * pScale)
@@ -839,8 +838,8 @@ class Recoilless:
             ps, p0, pb, vb = self.toPsP0PbVb(l, v, p, tau, eta)
 
             p_line = []
-            for i in range(step):  # 0....step -1
-                x = i / step * (l + l_c)
+            for i in range(traceStep):  # 0....step -1
+                x = i / traceStep* (l + l_c)
                 px = self.toPx(l, v, vb, ps, eta, x)
 
                 p_line.append(PressureProbePoint(x, px))
@@ -862,8 +861,8 @@ class Recoilless:
             ps, p0, pb, vb = self.toPsP0PbVb(l, v, p, tau, eta)
 
             p_line = []
-            for i in range(step):  # 0....step -1
-                x = i / step * (l + l_c)
+            for i in range(traceStep):  # 0....step -1
+                x = i / traceStep * (l + l_c)
                 px = self.toPx(l, v, vb, ps, eta, x)
                 pp = PressureProbePoint(x, px)
                 p_line.append(pp)
@@ -901,13 +900,13 @@ class Recoilless:
     def toPsP0PbVb(self, l, v, p, tau, eta):
         """
         Diagrammatic explanation of the calculated values:
-            ----\___     __________________
+            ----\\___     __________________
                     |---|                  |_________________________________
                        ==                                       |        \
            Nozzle Breech|    Chamber                  Barrel    |  Shot  |>
                        ==                   ____________________|________/____
                  ___|---|__________________|
-            ----/
+            ----//
         Cross-section of the breech face:
            _
          *- -*
@@ -986,6 +985,7 @@ class Recoilless:
 
     def getStructural(self, recoillessResult: RecoillessResult, step: int, tol: float):
         logger.info("commencing structural calculation")
+        step = max(step, 1)
         l_c = self.l_c
         l_g = self.l_g
         chi_k = self.chi_k
@@ -1013,7 +1013,7 @@ class Recoilless:
             v = recoillessTableEntry.velocity
             vb = recoillessTableEntry.outflowVelocity
             ps = recoillessTableEntry.shotPressure
-            T = recoillessTableEntry.temperature
+            # T = recoillessTableEntry.temperature
             eta = recoillessTableEntry.outflowFraction
 
             for i, x in enumerate(x_probes):

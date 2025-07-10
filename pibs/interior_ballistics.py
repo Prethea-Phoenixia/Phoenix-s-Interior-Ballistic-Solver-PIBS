@@ -49,7 +49,6 @@ from .ballistics import (
     POINT_PEAK_STAG,
     POINT_START,
     RECOILLESS,
-    SAMPLE,
     SOL_LAGRANGE,
     SOL_MAMONTOV,
     SOL_PIDDUCK,
@@ -120,6 +119,10 @@ CONTEXT = {
 }
 
 
+# {theme_name: is_dark}
+THEMES = {"awdark": 0, "awlight": 1}
+
+
 def grid_configure_recursive(widget, **kwargs):
     stack = list(widget.winfo_children())
     while stack:
@@ -147,6 +150,7 @@ class TextHandler(logging.Handler):
         def append():
             self.text.configure(state="normal")
 
+            # use record name as tags
             tags = record.name.split(".")
             self.text.insert("end", msg.strip("\n") + "\n", [record.levelno, *tags])
             self.text.configure(state="disabled")
@@ -157,7 +161,7 @@ class TextHandler(logging.Handler):
         self.text.after(33, append)
 
 
-# noinspection PyAttributeOutsideInit
+# noinspection PyAttributeOutsideInit,PyPep8Naming
 class InteriorBallisticsFrame(Frame):
 
     def __init__(self, parent, root, menubar, dpi, defaultLang=None):
@@ -201,7 +205,7 @@ class InteriorBallisticsFrame(Frame):
         self.themeMenu = themeMenu
         self.debugMenu = debugMenu
 
-        self.themeRadio = IntVar(value=0)
+        self.themeNameVar = StringVar(value=list(THEMES.keys())[0])
 
         self.debug = IntVar(value=0)
 
@@ -209,41 +213,23 @@ class InteriorBallisticsFrame(Frame):
         fileMenu.add_command(label=self.getLocStr("loadLabel"), command=self.load, underline=0)
         fileMenu.add_separator()
 
-        fileMenu.add_command(
-            label=self.getLocStr("exportMain"), command=lambda: self.exportGraph(save="main"), underline=0
-        )
-        fileMenu.add_command(
-            label=self.getLocStr("exportAux"), command=lambda: self.exportGraph(save="aux"), underline=0
-        )
-        fileMenu.add_command(
-            label=self.getLocStr("exportGeom"), command=lambda: self.exportGraph(save="geom"), underline=0
-        )
-        fileMenu.add_command(
-            label=self.getLocStr("exportGuide"), command=lambda: self.exportGraph(save="guide"), underline=0
-        )
+        fileMenu.add_command(label=self.getLocStr("exportMain"), command=lambda: self.exportGraph(save="main"))
+        fileMenu.add_command(label=self.getLocStr("exportAux"), command=lambda: self.exportGraph(save="aux"))
+        fileMenu.add_command(label=self.getLocStr("exportGeom"), command=lambda: self.exportGraph(save="geom"))
+        fileMenu.add_command(label=self.getLocStr("exportGuide"), command=lambda: self.exportGraph(save="guide"))
 
         fileMenu.add_separator()
-        fileMenu.add_command(label=self.getLocStr("exportLabel"), command=self.exportTable, underline=0)
+        fileMenu.add_command(label=self.getLocStr("exportLabel"), command=self.exportTable)
 
-        themeMenu.add_radiobutton(
-            label=self.getLocStr("darkLabel"), variable=self.themeRadio, value=0, command=self.useTheme, underline=0
-        )
-        themeMenu.add_radiobutton(
-            label=self.getLocStr("lightLabel"), variable=self.themeRadio, value=1, command=self.useTheme, underline=0
-        )
+        for themeName in THEMES.keys():
+            themeMenu.add_radiobutton(label=themeName, variable=self.themeNameVar, value=themeName, command=self.useTheme)
 
-        debugMenu.add_checkbutton(
-            label=self.getLocStr("enableLabel"), variable=self.debug, onvalue=1, offvalue=0, underline=0
-        )
+        debugMenu.add_checkbutton(label=self.getLocStr("enableLabel"), variable=self.debug, onvalue=1, offvalue=0)
 
         for lang in STRING.keys():
-            langMenu.add_radiobutton(
-                label=lang, variable=self.langVar, value=lang, command=self.changeLang, underline=0
-            )
+            langMenu.add_radiobutton(label=lang, variable=self.langVar, value=lang, command=self.changeLang)
 
-        self.prop = None
-        self.gun = None
-        self.guide = None
+        self.prop, self.gun, self.guide = None, None, None
 
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
@@ -367,7 +353,6 @@ class InteriorBallisticsFrame(Frame):
             title=self.getLocStr("loadLabel"), filetypes=(("JSON File", "*.json"),), defaultextension=".json"
         )
         if fileName == "":
-            # messagebox.showinfo("Exception Loading Design", "No File Selected")
             messagebox.showinfo(self.getLocStr("excTitle"), self.getLocStr("cancelMsg"))
             return
 
@@ -442,8 +427,6 @@ class InteriorBallisticsFrame(Frame):
 
         self.fileMenu.entryconfig(8, label=self.getLocStr("exportLabel"))
 
-        self.themeMenu.entryconfig(0, label=self.getLocStr("darkLabel"))
-        self.themeMenu.entryconfig(1, label=self.getLocStr("lightLabel"))
         self.debugMenu.entryconfig(0, label=self.getLocStr("enableLabel"))
 
         self.calcButtonTip.set(self.getLocStr("calcButtonText"))
@@ -1694,8 +1677,6 @@ class InteriorBallisticsFrame(Frame):
         for check in checks:
             check.trace_add("write", self.updateFigPlot)
 
-        # self.locs.extend(checks) # this prevents user plotting setting from being saved.
-
         plotFrm.columnconfigure(0, weight=1)
         plotFrm.rowconfigure(0, weight=1)
 
@@ -1746,8 +1727,6 @@ class InteriorBallisticsFrame(Frame):
 
         for check in auxChecks:
             check.trace_add("write", self.updateAuxPlot)
-
-        # self.locs.extend(auxChecks) # this prevents user plot settings from being saved
 
         auxFrm.columnconfigure(0, weight=1)
         auxFrm.rowconfigure(0, weight=1)
@@ -1937,7 +1916,7 @@ class InteriorBallisticsFrame(Frame):
 
             pTrace = self.gunResult.pressureTrace
             # noinspection SpellCheckingInspection
-            cmap = mpl.colormaps["afmhot"]
+            cmap = mpl.colormaps["afmhot" + ("_r" if THEMES[self.themeNameVar.get()]  else "")]
 
             x_max, y_max, T_min, T_max = 0, 0, inf, 0
             for trace in pTrace:
@@ -1949,22 +1928,15 @@ class InteriorBallisticsFrame(Frame):
                     T_min = trace.T
 
             for pressureTraceEntry in pTrace[::-1]:
-
                 tag, T, trace = pressureTraceEntry.tag, pressureTraceEntry.T, pressureTraceEntry.pressureTrace
 
-                if tag == SAMPLE:
-                    if T:
-                        v = (T - T_min) / (T_max - T_min)
-                        color = cmap(1 - v if self.themeRadio.get() else v)
-                    else:
-                        color = cmap(0.5)
-                    linestyle = None
-                    alpha = None
-
-                elif tag != SAMPLE:
-                    color = "black" if self.themeRadio.get() else "white"
-                    linestyle = "dotted"
-                    alpha = 0.1
+                if T:
+                    v = (T - T_min) / (T_max - T_min)
+                    color = cmap(v)
+                else:
+                    color = cmap(0.5)
+                linestyle = None
+                alpha = None
 
                 x, y = zip(*[(ppp.x, ppp.p) for ppp in trace])
                 y = [v * 1e-6 for v in y]
@@ -2247,7 +2219,7 @@ class InteriorBallisticsFrame(Frame):
                         chargeMasses,
                         values,
                         shading="nearest",
-                        cmap="afmhot" + ("" if self.themeRadio.get() else "_r"),
+                        cmap="afmhot" + ("" if THEMES[self.themeNameVar.get()] else "_r"),
                         vmin=minVal,
                         vmax=maxVal,
                     )
@@ -2406,13 +2378,7 @@ class InteriorBallisticsFrame(Frame):
 
     def useTheme(self):
         style = ttk.Style(self)
-        choice = self.themeRadio.get()
-        if choice == 0:
-            style.theme_use("awdark")
-            pass
-        elif choice == 1:
-            style.theme_use("awlight")
-            pass
+        style.theme_use(self.themeNameVar.get())
 
         """ensure that the treeview rows are roughly the same height
         regardless of dpi. on Windows, default is Segoe UI at 9 points
@@ -2425,13 +2391,6 @@ class InteriorBallisticsFrame(Frame):
         style.configure("SubLabelFrame.TLabelframe.Label", font=(FONTNAME, FONTSIZE + 2))
         style.configure("TCheckbutton", font=(FONTNAME, FONTSIZE))
         style.configure("TNotebook.Tab", font=(FONTNAME, FONTSIZE + 1, "bold"))
-
-        grays = [f"gray{i}" for i in [90, 80, 70]] if self.themeRadio.get() else [f"gray{i}" for i in [16, 23, 30]]
-
-        self.errorText.tag_configure("integrate", background=grays[0])
-        self.errorText.tag_configure("structure", background=grays[0])
-        self.errorText.tag_configure("solve", background=grays[1])
-        self.errorText.tag_configure("minimize", background=grays[2])
 
         style = ttk.Style(self)
         bgc = str(style.lookup("TFrame", "background"))
@@ -2456,6 +2415,13 @@ class InteriorBallisticsFrame(Frame):
             }
         )
 
+        grays = [f"gray{i}" for i in [90, 80, 70]] if THEMES[self.themeNameVar.get()] else [f"gray{i}" for i in [16, 23, 30]]
+        self.errorText.tag_configure("gun", background=grays[0])
+        self.errorText.tag_configure("recoilless", background=grays[0])
+        self.errorText.tag_configure("optimize_gun", background=grays[1])
+        self.errorText.tag_configure("optimize_recoilless", background=grays[1])
+        # self.errorText.tag_configure("minimize", background=grays[2])
+
         try:
             for fig in (self.fig, self.geomFig, self.auxFig, self.guideFig):
                 fig.set_facecolor(bgc)
@@ -2477,6 +2443,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.update_idletasks()
 
+    # noinspection PyPep8Naming
     def exportGraph(self, save: Literal["main", "aux", "guide", "geom"]):
         fileName = filedialog.asksaveasfilename(
             title=self.getLocStr("exportGraphLabel"),
@@ -2509,6 +2476,7 @@ class InteriorBallisticsFrame(Frame):
             messagebox.showinfo(self.getLocStr("excTitle"), str(e))
 
 
+# noinspection PyPep8Naming
 def calculate(jobQueue, progressQueue, logQueue, kwargs):
     # rootLogger = logging.getLogger()
     rootLogger.addHandler(QueueHandler(logQueue))
@@ -2621,8 +2589,8 @@ def main(loc: str = None):
     dpi = root.winfo_fpixels("1i")
     # Tk was originally developed for a dpi of 72
     root.tk.call("tk", "scaling", 1.0 * dpi / 72.0)
+    root.tk.call("lappend", "auto_path", resolvepath("ui/tksvg0.14"))
     root.tk.call("lappend", "auto_path", resolvepath("ui/awthemes-10.4.0"))
-    root.tk.call("lappend", "auto_path", resolvepath("ui/tksvg0.12"))
 
     root.title("PIBS v" + __version__)
     menubar = Menu(root)
@@ -2636,5 +2604,4 @@ def main(loc: str = None):
 
 
 if __name__ == "__main__":
-    # print(__name__)
     main()
