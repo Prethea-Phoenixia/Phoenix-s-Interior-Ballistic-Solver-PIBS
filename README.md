@@ -6,7 +6,7 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
 ### Calculation from Parameters (Forward Calculation) 
 * 0 dimensional interior ballistic SoE in the M.E. Serebryakov formulation.
     
-    The interior ballistic problem is formulated in the orhtodox, traditional method as is taught in the Soviet Union and in China. The calculation is done in the reduced form for conventional and recoiless guns, and the expanded form for high-low launcher. 
+    The interior ballistic problem is formulated in the orthodox, traditional method as is taught in the Soviet Union and in China. The calculation is done in the reduced form for conventional and recoilless guns.
 
 * Efficient Integration
 
@@ -14,7 +14,7 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
 
 * Supports Shaped Propellant
 
-    Baked shapes includes sphere, strip, cylinder, and multi-perforated cylinder/prism/rosette.
+    Includes sphere, strip, cylinder, and multi-perforated cylinder/prism/rosette.
 
 * Pre-defined Propellant Presets
 
@@ -22,21 +22,20 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
 
 
 ### Constrained Design/Optimization (Backward Calculation):
-* Constrained Design conforming to Performance Characterstics
+* Constrained Design conforming to Performance Characteristics
 
-    The required web to achieve a desired peak pressure point can be solved either alone, with option `Lock Gun Length` in the GUI or passing `known_bore=True`, or with desired muzzle velocity, with option `Constrain Design`, in which case the required gun length will be solved simultaneousely, for both conventional and recoiless gun.
+    The required web to achieve a desired peak pressure point can be solved either alone, with option `Lock Gun Length` in the GUI or passing `known_bore=True`, or with desired muzzle velocity, with option `Constrain Design`, in which case the required gun length will be solved simultaneously, for both conventional and recoilless gun.
 
 * Optimization conforming to Performance Characteristics
 
-    From a desired system performance specification, the optimum loading fraction is searched and the one that minimizes total bore volume (the sum of chamber and bore volume) is found via varying the load fraction, with option `Minimize Tube Volume`, for both conventional and recoiless gun.
+    From a desired system performance specification, the optimum loading fraction is searched and the one that minimizes total bore volume (the sum of chamber and bore volume) is found via varying the load fraction, with option `Minimize Tube Volume`, for both conventional and recoilless gun.
 
 ## How-To
 - Use the calculator:
     - download the latest executable at [latest release](https://github.com/octo-org/octo-repo/releases/latest)
 - Development setup:
-    - Install Python (Developed and tested on 3.8.18, for Windows 7 compatibility)
-    - Install packages via pip: `matplotlib`, `matplotlib-label-lines`
-    - entry point is IB.py in `/src`
+    - Install Python (>3.8)
+    - `pip install .[dev]`
 
 ## Resources Used
 * tcl/tk themes used include "awdark" & "awlight" from awthemes: https://wiki.tcl-lang.org/page/awthemes
@@ -49,9 +48,9 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
 
 ## 功能特性
 ### 由参数正算
-* 谢列别梁可夫体系下的0维弹道学
+* 实现谢列别梁可夫体系下的0维弹道学
     
-    本程序编写紧密参照了我国教科书（如张小兵，金志明《枪炮内弹道学》（2014版，2003版）等），对于常规火炮实现了谢列别梁可夫内弹道体系下，以归一化参数所列内弹道学方程组的解算，并在拉格朗日解的基础上，补充毕杜克（Pidduck）与马蒙陀夫（Mamontov）其他两种0维气动力学梯度，还对于缩膛效应进行了平均补偿与修正。对无座力炮，实现了在金志明拉格朗日解下，以归一化参数所列的无坐力内弹道方程组的解算。对于高低压发射器，实现了以带量纲的形式所列的串联式无后喷口高低压发射器内弹道方程组的解算。
+    本程序编写紧密参照了我国教科书（如张小兵，金志明《枪炮内弹道学》（2014版，2003版）等），对于常规火炮实现了谢列别梁可夫内弹道体系下，以归一化参数所列内弹道学方程组的解算，并在拉格朗日解的基础上，补充毕杜克（Pidduck）与马蒙陀夫（Mamontov）其他两种0维气动力学梯度，还对于缩膛效应进行了平均补偿与修正。对无座力炮，实现了在金志明拉格朗日解下，以归一化参数所列的无坐力内弹道方程组的解算。
 
 * 高效的积分及求解方法
     
@@ -77,16 +76,12 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
 ## 使用说明
 - 下载预先打包为Windows可执行文件的Python代码及运行环境
     - 从[Github发行版直接下载](https://github.com/octo-org/octo-repo/releases/latest)单文件`PIBSva.b.c.d.exe`。
-    - 在[Gitee发行版](https://gitee.com/phoenixZix/pibs/release/latest)，选择对应的版本下载。
+  
+    该版本打包Python运行环境及其它依赖库，无法添加火药。单文件为自解压压缩包，每次运行时会解压在系统临时目录，大小约为50MB。
 
-    该版本打包Python 3.8.18运行环境及其它脚本依赖库，以及脚本全部内容。目前无法添加火药。单文件为自解压压缩包，每次运行时会解压在系统临时目录，大小约为50MB。
+- 在本地Python环境运行代码，或对代码进行再开发
+    - 安装[Python运行环境](https://www.python.org/downloads/)。
 
-- 在本地Python环境运行代码或对代码进行再开发
-    - 安装[Python运行环境](https://www.python.org/downloads/)。 
-    - 从pip安装依赖库`matplotlib`, `matplotlib-label-lines`。
-    - 从[Github仓库下载代码](https://codeload.github.com/Prethea-Phoenixia/Phoenix-s-Interior-Ballistic-Solver-PIBS/zip/refs/heads/main)后打开`pibs/`文件夹。
-    - 或从[Gitee镜像代码仓库下载](https://gitee.com/phoenixZix/pibs/repository/archive/main.zip)后打开`pibs/`文件夹。
-
-    本程序在Python 3.8.18环境下开发以兼容Windows7，在更高版本下运行由于tkinter版本不同可能有一些显示问题。
+   
     
  

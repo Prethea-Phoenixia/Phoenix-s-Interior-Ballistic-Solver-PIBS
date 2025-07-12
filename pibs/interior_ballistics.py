@@ -677,7 +677,6 @@ class InteriorBallisticsFrame(Frame):
         opFrm.grid(row=4, column=0, sticky="nsew")
         opFrm.columnconfigure(0, weight=1)
 
-
         self.solve_W_Lg = LocLabelCheck(
             parent=opFrm,
             row=i,
