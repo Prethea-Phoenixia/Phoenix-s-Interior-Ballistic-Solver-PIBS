@@ -7,7 +7,7 @@
     },
     {
       "optionDest": "filenames",
-      "value": "scripts/run_pibs.py"
+      "value": "run_pibs.py"
     },
     {
       "optionDest": "onefile",

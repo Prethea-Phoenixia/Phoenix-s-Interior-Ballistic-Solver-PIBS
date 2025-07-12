@@ -1,2 +1,2 @@
-auto-py-to-exe -c "singlefile.json"
+auto-py-to-exe -db -c "singlefile.json"
 pause

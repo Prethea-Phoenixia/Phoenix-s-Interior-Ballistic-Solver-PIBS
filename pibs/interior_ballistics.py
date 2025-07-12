@@ -677,6 +677,21 @@ class InteriorBallisticsFrame(Frame):
         opFrm.grid(row=4, column=0, sticky="nsew")
         opFrm.columnconfigure(0, weight=1)
 
+
+        self.solve_W_Lg = LocLabelCheck(
+            parent=opFrm,
+            row=i,
+            col=0,
+            columnspan=3,
+            default=0,
+            labelLocKey="consButton",
+            tooltipLocKey="useConsText",
+            locFunc=self.getLocStr,
+            allLC=self.locs,
+        )
+        self.solve_W_Lg.trace_add("write", self.ctrlCallback)
+        i += 1
+
         consFrm = LocLabelFrame(
             opFrm,
             locKey="consFrmLabel",
@@ -689,21 +704,6 @@ class InteriorBallisticsFrame(Frame):
         i += 1
 
         j = 0
-        self.solve_W_Lg = LocLabelCheck(
-            parent=consFrm,
-            row=j,
-            col=0,
-            columnspan=3,
-            default=0,
-            labelLocKey="consButton",
-            tooltipLocKey="useConsText",
-            locFunc=self.getLocStr,
-            allLC=self.locs,
-        )
-
-        self.solve_W_Lg.trace_add("write", self.ctrlCallback)
-
-        j += 1
 
         self.lock_Lg = LocLabelCheck(
             parent=consFrm,
