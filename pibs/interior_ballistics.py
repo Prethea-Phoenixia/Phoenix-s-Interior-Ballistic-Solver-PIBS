@@ -1018,9 +1018,7 @@ class InteriorBallisticsFrame(Frame):
             rootLogger.error("exception when dispatching calculation:")
             rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
-            self.gun = None
-            self.gunResult = None
-
+            self.gun, self.gunResult = None, None
             self.updateTable()
             self.updateFigPlot()
             self.updateAuxPlot()
@@ -1358,7 +1356,7 @@ class InteriorBallisticsFrame(Frame):
         # noinspection SpellCheckingInspection
         self.useCv = LocDropdown(
             parent=specFrm,
-            strObjDict={USE_LF: USE_LF, USE_CV: USE_CV},
+            strObjDict={USE_CV: USE_CV, USE_LF: USE_LF},
             locFunc=self.getLocStr,
             dropdowns=self.locs,
             descLabelKey="cvlfLabel",

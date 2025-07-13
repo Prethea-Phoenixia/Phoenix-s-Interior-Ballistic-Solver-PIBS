@@ -40,7 +40,7 @@
 	"Steps": "100",
 	"Structural Material": "30SiMn2MoVA",
 	"Structural Temperature": "293 K",
-	"Travel (mm)": "3090.0",
+	"Travel (mm)": "3300.0",
 	"Velocity Target (m/s)": "250.0",
 	"Volume Constraint": "USE_CV",
 	"Web (mm)": "0.29817"
