@@ -13,7 +13,7 @@
 	"Constrain Design": "1",
 	"Constrain Travel": "1",
 	"Density (kg/m³)": "1.204",
-	"Description": "Ballistics of 30x165mm percussion primed ammunition 3UOF8 (HE-I SD), 3UOR6 (HE-T SD), and 3UBR6, 3UBR10 (APBC-T) fired from 2A42, 2A72. The same ammo, with electric primer, is fired from 2A38(M) (for the Tunguska and Pantsir self-propelled anti-aircraft gun) and GSh-30K (on the Mi-24P). These weapon came with a 2416-2418mm barrel. \nCanonical performance is 389(±1) gram projectile loaded with 118(±1) gram of P-5BPfl propellant in 6/7 grains (web ~0.66 mm), developing 960(±15) m/s.",
+	"Description": "Ballistics of 30x165mm percussion primed ammunition 3UOF8 (HE-I SD), 3UOR6 (HE-T SD), and 3UBR6, 3UBR10 (APBC-T) fired from 2A42, 2A72. The same ammo, with electric primer, is fired from 2A38(M) (for the Tunguska and Pantsir self-propelled anti-aircraft gun) and GSh-30K (on the Mi-24P). These weapon came with a 2416-2418mm barrel. \nCanonical performance is 389(±1) gram projectile loaded with 118(±1) gram of P-5BPfl propellant in 6/7 grains (web ~0.66 mm), developing 960(±15) m/s. Exact cartridge dimensions are not available, a rough match with the published cartridge length is performed.",
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "SEVEN_PERF_CYLINDER",
 	"Gun Type": "CONVENTIONAL",

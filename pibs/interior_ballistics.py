@@ -83,6 +83,7 @@ from .misc import (
     validateCE,
     validateNN,
     validatePI,
+    unloadfont,
 )
 from .tip import CreateToolTip
 
@@ -1200,7 +1201,7 @@ class InteriorBallisticsFrame(Frame):
             row=i,
             labelLocKey="shtLabel",
             unitText="kg",
-            default="1.0",
+            default="2.0",
             validation=validationNN,
             locFunc=self.getLocStr,
             allInputs=self.locs,
@@ -1381,7 +1382,7 @@ class InteriorBallisticsFrame(Frame):
             row=i,
             labelLocKey="cvLabel",
             unitText="L",
-            default="20.0",
+            default="1.0",
             validation=validationNN,
             locFunc=self.getLocStr,
             allInputs=self.locs,
@@ -2568,7 +2569,7 @@ def main(loc: str = None):
 
     # this tells windows that our program will handle scaling ourselves
     winRelease = platform.release()
-    if winRelease in ("8", "10"):
+    if winRelease in ("8", "10", "11"):
         windll.shcore.SetProcessDpiAwareness(1)
     elif winRelease in ("7", "Vista"):
         windll.user32.SetProcessDPIAware()
@@ -2581,7 +2582,7 @@ def main(loc: str = None):
     # this allows us to set our own taskbar icon
     windll.shell32.SetCurrentProcessExplicitAppUserModelID("Phoenix.Interior.Ballistics.Solver")
 
-    loadfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"), False, True)
+    loadfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"), True, True)
     font_manager.fontManager.addfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"))
 
     root = Tk()
@@ -2603,6 +2604,8 @@ def main(loc: str = None):
     InteriorBallisticsFrame(root, root, menubar, dpi, defaultLang="English" if loc != "zh_CN" else "中文")
     root.minsize(root.winfo_width(), root.winfo_height())  # set minimum size
     root.mainloop()
+    # explicitly unload the font at the end of program.
+    unloadfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"), True, True)
 
 
 if __name__ == "__main__":

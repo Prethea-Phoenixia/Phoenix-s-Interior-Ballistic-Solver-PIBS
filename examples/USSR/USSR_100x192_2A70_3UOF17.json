@@ -5,7 +5,7 @@
 	"Adiabatic Index": "1.400",
 	"Aerodynamic Drag": "1",
 	"Autofrettage": "1",
-	"Calibre (mm)": "100.0",
+	"Calibre (mm)": "103.0",
 	"Chamber Volume (L)": "0.75",
 	"Chambrage Ratio (x)": "1.025",
 	"Charge Mass (kg)": "0.255",
@@ -13,7 +13,7 @@
 	"Constrain Design": "1",
 	"Constrain Travel": "1",
 	"Density (kg/m³)": "1.204",
-	"Description": "Ballistic of 3UOF17 (OF32 HE-Frag shell) fired low pressure rifle 2A70. Projectile is deeply seated within the cartridge, travel approximated with length of rifling. Canonical performance is 250(±)5 m/s from 255 grams of 4/1 grains (diameter 0.87 mm, web 0.37 mm, perforation diameter 0.2 mm, length of 5.97 mm) of pyroxylin propellant, developing 183MPa peak breech pressure. Large auxiliary work factor is required due to light barrel relative to projectile. ",
+	"Description": "Ballistic of 3UOF17 (OF32 HE-Frag shell) fired 100mm low pressure rifle 2A70. Projectile is deeply seated within the cartridge, travel approximated with length of rifling. Canonical performance is 250(±)5 m/s from 255 grams of 4/1 grains (diameter 0.87 mm, web 0.37 mm, perforation diameter 0.2 mm, length of 5.97 mm) of pyroxylin propellant, developing 183MPa peak breech pressure. Large auxiliary work factor is required due to light barrel relative to projectile.",
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "SEVEN_PERF_CYLINDER",
 	"Gun Type": "CONVENTIONAL",
@@ -32,7 +32,7 @@
 	"Pressure Constraint": "PEAK_BREECH_P",
 	"Pressure Target (MPa)": "193.8",
 	"Propellant": "Pyroxylin 单基发射药",
-	"Resistance Factor (%)": "17.0",
+	"Resistance Factor (%)": "17.5",
 	"Safety Fact.": "1.35",
 	"Sampling Points": "DOMAIN_TIME",
 	"Shot Mass (kg)": "15.6",
@@ -43,5 +43,5 @@
 	"Travel (mm)": "3300.0",
 	"Velocity Target (m/s)": "250.0",
 	"Volume Constraint": "USE_CV",
-	"Web (mm)": "0.29817"
+	"Web (mm)": "0.28189"
 }

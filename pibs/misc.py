@@ -41,21 +41,24 @@ def resolvepath(path):
     return resolved_path
 
 
+FR_PRIVATE = 0x10
+FR_NOT_ENUM = 0x20
+
+
 def loadfont(fontpath, private=True, enumerable=False):
-    # Makes fonts located in file `fontpath` available to the font system.
-    # `private`     if True, other processes cannot see this font, and this
-    #               font will be unloaded when the process dies
-    # `enumerable`  if True, this font will appear when enumerating fonts
-    #
-    # See https://msdn.microsoft.com/en-us/library/dd183327(VS.85).aspx
+    """
+    Makes fonts located in file `fontpath` available to the font system.
+        `private`     if True, other processes cannot see this font, and this
+                      font will be unloaded when the process dies
+        `enumerable`  if True, this font will appear when enumerating fonts
 
-    # This function was taken from
-    # https://github.com/ifwe/digsby/blob/f5fe00244744aa131e07f09348d10563f3d8fa99/digsby/src/gui/native/win/winfonts.py#L15
-    # This function is written for Python 2.x. For 3.x, you
-    # have to convert the isinstance checks to bytes and str
+    See https://msdn.microsoft.com/en-us/library/dd183327(VS.85).aspx
 
-    FR_PRIVATE = 0x10
-    FR_NOT_ENUM = 0x20
+    This function was taken from
+    https://github.com/ifwe/digsby/blob/f5fe00244744aa131e07f09348d10563f3d8fa99/digsby/src/gui/native/win/winfonts.py#L15
+    This function is written for Python 2.x. For 3.x, you
+    have to convert the isinstance checks to bytes and str
+    """
     if isinstance(fontpath, bytes):
         pathbuf = create_string_buffer(fontpath)
         AddFontResourceEx = windll.gdi32.AddFontResourceExA
@@ -69,6 +72,25 @@ def loadfont(fontpath, private=True, enumerable=False):
     flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
     numFontsAdded = AddFontResourceEx(byref(pathbuf), flags, 0)
     return bool(numFontsAdded)
+
+
+def unloadfont(fontpath, private=True, enumerable=False):
+    """
+    Unloads the fonts in the specified file.
+
+    see http://msdn2.microsoft.com/en-us/library/ms533925.aspx
+    """
+    if isinstance(fontpath, bytes):
+        pathbuf = create_string_buffer(fontpath)
+        RemoveFontResourceEx = windll.gdi32.RemoveFontResourceExA
+    elif isinstance(fontpath, str):
+        pathbuf = create_unicode_buffer(fontpath)
+        RemoveFontResourceEx = windll.gdi32.RemoveFontResourceExW
+    else:
+        raise TypeError("fontpath must be a str or unicode")
+
+    flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
+    return bool(RemoveFontResourceEx(byref(pathbuf), flags, 0))
 
 
 def toSI(v, dec=4, unit=None, useSN=False):
