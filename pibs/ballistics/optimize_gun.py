@@ -128,7 +128,6 @@ class Constrained:
         labda = self.labda
         mu = self.mu
         S = self.S
-        maxLF = self.maxLF
         phi_1 = self.phi_1
         p_0 = self.p_0
         v_d = self.v_d
@@ -141,9 +140,6 @@ class Constrained:
         f_psi_Z = self.f_psi_Z
 
         tol = self.tol
-
-        if loadFraction > maxLF:
-            raise ValueError("Specified Load Fraction Violates Geometrical Constraint")
 
         omega = m * chargeMassRatio
         V_0 = omega / (rho_p * loadFraction)

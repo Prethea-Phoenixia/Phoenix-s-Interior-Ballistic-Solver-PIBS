@@ -26,6 +26,7 @@ from pibs.ballistics import (
     Points,
     Solutions,
 )
+from pibs.ballistics.material import Material
 
 from .num import RKF78, cubic, dekker, gss, intg, secant
 from .prop import GrainComp, Propellant
@@ -206,18 +207,18 @@ class Gun:
     def __init__(
         self,
         caliber,
-        shotMass,
-        propellant,
-        grainSize,
-        chargeMass,
-        chamberVolume,
-        startPressure,
-        lengthGun,
-        chambrage,
-        structuralMaterial=None,
-        structuralSafetyFactor=1.1,
-        dragCoefficient=0.0,
-        autofrettage=True,
+        shotMass: float,
+        propellant: Propellant,
+        grainSize: float,
+        chargeMass: float,
+        chamberVolume: float,
+        startPressure: float,
+        lengthGun: float,
+        chambrage: float,
+        structuralMaterial: Material | None = None,
+        structuralSafetyFactor: float = 1.1,
+        dragCoefficient: float = 0.0,
+        autofrettage: bool = True,
         **_,
     ):
 
@@ -238,8 +239,8 @@ class Gun:
         ):
             raise ValueError("Invalid gun parameters")
 
-        if chargeMass > (propellant.maxLF * propellant.rho_p * chamberVolume):
-            raise ValueError("Specified Load Fraction Violates Geometrical Constraint")
+        # if chargeMass > (propellant.maxLF * propellant.rho_p * chamberVolume):
+        #     raise ValueError("Specified Load Fraction Violates Geometrical Constraint")
 
         self.propellant = propellant
         self.caliber = caliber

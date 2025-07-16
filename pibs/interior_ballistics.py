@@ -2347,7 +2347,7 @@ class InteriorBallisticsFrame(Frame):
             if self.useCv.getObj() == USE_CV:  # use Cv
                 cv = float(self.cvL.get()) / 1e3
                 w = float(self.chgkg.get())
-                rho = self.prop.rho_p
+                rho = self.prop.composition.rho_p
                 self.ldf.set(roundSig(w / cv / rho * 100, n=sigfig))
 
             else:  # using load fraction

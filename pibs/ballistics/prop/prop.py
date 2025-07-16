@@ -13,25 +13,53 @@ from math import pi
 class MultPerfGeometry(Enum):
     """table 1-4 from ref[1] page 33"""
 
-    def __init__(self, desc, A, B, C, rhoDiv, nHole):
+    def __init__(
+        self,
+        desc: str,
+        a: float,
+        b: float,
+        c: float,
+        rho_div: float,
+        n_hole: int,
+        a_factors: tuple[float, float],
+        b_factors: tuple[float, float],
+    ):
         self.desc = desc
-        self.A = A
-        self.B = B
-        self.C = C
-        self.rhoDiv = rhoDiv  # rho divided by (e_1+d_0/2)
-        self.nHole = nHole
-        self.useAR = False
+        self.a = a
+        self.b = b
+        self.c = c
+        self.rho_div = rho_div  # rho divided by (e_1+d_0/2)
+        self.n_hole = n_hole
+        self.a_factors = a_factors
+        self.b_factors = b_factors
 
     def __str__(self):
         return self.desc
 
-    SEVEN_PERF_CYLINDER = ("SEVEN_PERF_CYLINDER", 1, 7, 0, 0.2956, 7)
-
-    SEVEN_PERF_ROSETTE = ("SEVEN_PERF_ROSETTE", 2, 8, 12 * 3**0.5 / pi, 0.1547, 7)
-    FOURTEEN_PERF_ROSETTE = ("FOURTEEN_PERF_ROSETTE", 8 / 3, 47 / 3, 26 * 3**0.5 / pi, 0.1547, 14)
-    NINETEEN_PERF_ROSETTE = ("NINETEEN_PERF_ROSETTE", 3, 21, 36 * 3**0.5 / pi, 0.1547, 19)  # rosette prism
-    NINETEEN_PERF_CYLINDER = ("NINETEEN_PERF_CYLINDER", 1, 19, 0, 0.3559, 19)
-    NINETEEN_PERF_HEXAGON = ("NINETEEN_PERF_HEXAGON", 18 / pi, 19, 18 * (3 * 3**0.5 - 1) / pi, 0.1864, 19)
+    SEVEN_PERF_CYLINDER = ("SEVEN_PERF_CYLINDER", 1, 7, 0, 0.2956, 7, (0, 0), (3, 8))
+    SEVEN_PERF_ROSETTE = ("SEVEN_PERF_ROSETTE", 2, 8, 12 * 3**0.5 / pi, 0.1547, 7, (1, 2), (1, 4))
+    FOURTEEN_PERF_ROSETTE = ("FOURTEEN_PERF_ROSETTE", 8 / 3, 47 / 3, 26 * 3**0.5 / pi, 0.1547, 14, (1, 2), (1, 4))
+    NINETEEN_PERF_ROSETTE = (
+        "NINETEEN_PERF_ROSETTE",
+        3,
+        21,
+        36 * 3**0.5 / pi,
+        0.1547,
+        19,
+        (1, 2),
+        (1, 4),
+    )  # rosette prism
+    NINETEEN_PERF_CYLINDER = ("NINETEEN_PERF_CYLINDER", 1, 19, 0, 0.3559, 19, (0, 0), (5, 12))
+    NINETEEN_PERF_HEXAGON = (
+        "NINETEEN_PERF_HEXAGON",
+        18 / pi,
+        19,
+        18 * (3 * 3**0.5 - 1) / pi,
+        0.1864,
+        19,
+        (1, 2),
+        (1, 2),
+    )
 
     NINETEEN_PERF_ROUNDED_HEXAGON = (
         "NINETEEN_PERF_ROUNDED_HEXAGON",
@@ -40,6 +68,8 @@ class MultPerfGeometry(Enum):
         3 - 3**0.5 + 12 * (4 * 3**0.5 - 1) / pi,
         0.1977,
         19,
+        (1, 2),
+        (1, 2),
     )
 
 
@@ -77,19 +107,19 @@ class GrainComp:
 
     def __init__(
         self,
-        name,
-        desc,
-        propellantForce,
-        covolume,
-        density,
-        redAdbIndex,
-        burnVel,
-        pressureExp,
-        flameTemp=None,
+        name: str,
+        desc: str,
+        force: float,
+        covolume: float,
+        density: float,
+        adiabatic_index: float,
+        burn_rate_coefficient: float,
+        pressure_exponent: float,
+        adiabatic_flame_temperature: float = 0,
     ):
         self.name = name
         self.desc = desc
-        self.f = propellantForce
+        self.f = force
         """
         Propellant force is related to the flame temperature
         by:
@@ -102,11 +132,10 @@ class GrainComp:
         """
         self.alpha = covolume
         self.rho_p = density
-        self.theta = redAdbIndex
-        self.u_1 = burnVel
-        self.n = pressureExp
-        self.T_v = flameTemp  # isochoric (const volume) adiabatic temperature
-        # self.R = self.f / self.T_v
+        self.theta = adiabatic_index
+        self.u_1 = burn_rate_coefficient
+        self.n = pressure_exponent
+        self.T_v = adiabatic_flame_temperature  # isochoric (const volume) adiabatic temperature
 
     def __str__(self):
         return self.name
@@ -128,17 +157,7 @@ class GrainComp:
                 if skipFirstLine:
                     skipFirstLine = False
                     continue
-                (
-                    name,
-                    desc,
-                    adb,
-                    density,
-                    propellantForce,
-                    covolume,
-                    pressureExp,
-                    burnRateCoe,
-                    flameTemp,
-                ) = prop
+                (name, desc, adb, density, propellantForce, covolume, pressureExp, burnRateCoe, flameTemp) = prop
 
                 redAdbIndex = float(adb) - 1
 
@@ -213,33 +232,32 @@ class GrainComp:
 
 
 class Propellant:
-    # assumed to be multi-holed propellants
-    def __init__(self, composition, propGeom, R1, R2, fudge=0):
+    def __init__(
+        self,
+        composition: GrainComp,
+        main_geom,
+        main_r1: float,
+        main_r2: float,
+        aux_geom=None,
+        aux_r1: float = 0,
+        aux_r2: float = 0,
+    ):
         """
         given e_1 as the maximum burn depth.
         R1: ratio w.r.t arc thickness
             interpreted as 1/alpha:
-                Perf diameter to arc thickness ratio
-                for perforated cylinders, d_0/(2*e_1)
+                Perf diameter to arc thickness ratio for perforated cylinders, d_0/(2*e_1)
 
                 Single perf cylinder, d_0/(2*e_1)
 
-                Secondary length to primary length ratio
-                for rectangular rod shape (2*b)/(2*e_1)
+                Secondary length to primary length ratio for rectangular rod shape (2*b)/(2*e_1)
 
         R2: ratio w.r.t arc thickness
             interpreted as 1/beta:
-                Length to "effective diameter" ratio
-                for perforated cylinders, 2*c/(2*e_1)
+                Length to "effective diameter" ratio for perforated cylinders, 2*c/(2*e_1)
 
-                tertiary length to primary length ratio
-                for rectangular rod shapes, 2*c/(2*e_1)
+                tertiary length to primary length ratio for rectangular rod shapes, 2*c/(2*e_1)
 
-        fudge: burn rate modifier, used to match experiment.
-
-
-        Required attributes:
-        .maxLF, geometrical volume fraction
 
         for geometries where burning is single phase
         (Z: 0->1, phi: 0->1)
@@ -255,58 +273,28 @@ class Propellant:
         .labda_s
 
         """
-        self.R1 = R1
-        self.R2 = R2
-
-        self.fudge = fudge
-
-        if any((R1 < 0 if R1 is not None else False, R2 < 0 if R1 is not None else False)):
+        if any((main_r1 and main_r1 < 0, main_r2 and main_r2 < 0)):
             raise ValueError("Geometry is impossible")
 
         self.composition = composition
-        self.geometry = propGeom
+        self.geometry = main_geom
 
         if self.geometry in MultPerfGeometry:
-            arcThick, PR, LR = 1, R1, R2
+            arcThick, PR, LR = 1, main_r1, main_r2
 
             e_1 = 0.5 * arcThick
             d_0 = arcThick * PR
+            a = sum(p * q for p, q in zip(main_geom.a_factors, (d_0, e_1)))
+            b = sum(p * q for p, q in zip(main_geom.b_factors, (d_0, e_1)))
 
-            if propGeom == MultPerfGeometry.SEVEN_PERF_CYLINDER:
-                b, a = 3 * d_0 + 8 * e_1, 0
-
-            elif propGeom == MultPerfGeometry.SEVEN_PERF_ROSETTE:
-                b, a = d_0 + 4 * e_1, d_0 + 2 * e_1
-
-            elif propGeom == MultPerfGeometry.FOURTEEN_PERF_ROSETTE:
-                b, a = d_0 + 4 * e_1, d_0 + 2 * e_1
-
-            elif propGeom == MultPerfGeometry.NINETEEN_PERF_ROSETTE:
-                b, a = d_0 + 4 * e_1, d_0 + 2 * e_1
-
-            elif propGeom == MultPerfGeometry.NINETEEN_PERF_CYLINDER:
-                b, a = 5 * d_0 + 12 * e_1, 0
-
-            elif propGeom == MultPerfGeometry.NINETEEN_PERF_HEXAGON:
-                b, a = d_0 + 2 * e_1, d_0 + 2 * e_1
-
-            elif propGeom == MultPerfGeometry.NINETEEN_PERF_ROUNDED_HEXAGON:
-                b, a = d_0 + 2 * e_1, d_0 + 2 * e_1
-
-            else:
-                raise ValueError("unhandled propellant geometry {}".format(propGeom))
-
-            A, B, C, n = propGeom.A, propGeom.B, propGeom.C, propGeom.nHole
-            S_T = 0.25 * pi * (C * a**2 + A * b**2 - B * d_0**2)
-            self.maxLF = S_T / (S_T + n * pi * 0.25 * d_0**2)
-
+            A, B, C, n = main_geom.a, main_geom.b, main_geom.c, main_geom.n_hole
             D_0 = (C * a**2 + A * b**2 + (n - B) * d_0**2) ** 0.5
             # effective diameter, equals to diameter for perforated cylinders
-            grainLength = LR * D_0
+            grain_length = LR * D_0
             # derive length based on "mean"/"effective" diameter
-            c = 0.5 * grainLength
+            c = 0.5 * grain_length
 
-            rho = propGeom.rhoDiv * (e_1 + d_0 / 2)
+            rho = main_geom.rho_div * (e_1 + d_0 / 2)
 
             Pi_1 = (A * b + B * d_0) / (2 * c)
             Q_1 = (C * a**2 + A * b**2 - B * d_0**2) / (2 * c) ** 2
@@ -341,71 +329,52 @@ class Propellant:
             self.Z_b = 1  # this will prevent the running of post fracture code
 
             if self.geometry == SimpleGeometry.SPHERE:
-                self.maxLF = 1
                 self.chi = 3
                 self.labda = -1
                 self.mu = 1 / 3
 
             elif self.geometry == SimpleGeometry.CYLINDER:
-                self.maxLF = 1
-
-                beta = 1 / R2
-
+                beta = 1 / main_r2
                 self.chi = 2 + beta
                 self.labda = -(1 + 2 * beta) / self.chi
                 self.mu = beta / self.chi
 
             elif self.geometry == SimpleGeometry.TUBE:
-                beta = 1 / R2
-
-                self.maxLF = 4 * (R1 + 1) / (R1 + 2) ** 2
-
+                beta = 1 / main_r2
                 self.chi = 1 + beta
                 self.labda = -beta / (1 + beta)
                 self.mu = 0
 
             elif self.geometry == SimpleGeometry.ROD:
-                self.maxLF = 1
-                beta, alpha = sorted((1 / R1, 1 / R2))  # ensure that alpha > beta, ascending order
-
+                beta, alpha = sorted((1 / main_r1, 1 / main_r2))  # ensure that alpha > beta, ascending order
                 self.chi = 1 + alpha + beta
                 self.labda = -(alpha + beta + alpha * beta) / self.chi
                 self.mu = alpha * beta / self.chi
 
         else:
-            raise ValueError("unhandled propellant geometry {}".format(propGeom))
+            raise ValueError("unhandled propellant geometry {}".format(main_geom))
 
-    def __getattr__(self, attrName):
-        if "composition" in vars(self) and not (attrName.startswith("__") and attrName.endswith("__")):
-            try:
-                if attrName == "u_1":
-                    return getattr(self.composition, attrName) * (1 + self.fudge)
-                else:
-                    return getattr(self.composition, attrName)
-            except AttributeError:
-                raise AttributeError("%r object has no attribute %r" % (self.__class__.__name__, attrName))
-        else:
-            raise AttributeError
+    def __getattr__(self, attr_name):
+        if not (attr_name.startswith("__") and attr_name.endswith("__")):
+            return getattr(self.composition, attr_name)
+        raise AttributeError("%r object has no attribute %r" % (self.__class__.__name__, attr_name))
 
-    def f_sigma_Z(self, Z):
+    def f_sigma_Z(self, z) -> float:
         # is the first derivative of psi(Z)
-        if Z <= 1.0:
-            return self.chi * (1 + 2 * self.labda * Z + 3 * self.mu * Z**2)
-        elif Z <= self.Z_b:
-            return 1 + 2 * self.labda_s * Z
+        if z <= 1.0:
+            return self.chi * (1 + 2 * self.labda * z + 3 * self.mu * z**2)
+        elif z <= self.Z_b:
+            return 1 + 2 * self.labda_s * z
         else:
             return 0
 
-    def f_ullim(self):
+    def f_ullim(self) -> tuple[float, float]:
         if self.Z_b > 1:
-            return (
-                self.chi * (1 + 2 * self.labda + 3 * self.mu),
-                1 + 2 * self.labda_s,
-            )
+            return self.chi * (1 + 2 * self.labda + 3 * self.mu), 1 + 2 * self.labda_s
         else:
-            return 0
+            return 0, 0
 
-    def f_psi_Z(self, Z):
+    def f_psi_Z(self, Z) -> float:
         if Z <= 1.0:
             return self.chi * Z * (1 + self.labda * Z + self.mu * Z**2)
         elif Z <= self.Z_b:

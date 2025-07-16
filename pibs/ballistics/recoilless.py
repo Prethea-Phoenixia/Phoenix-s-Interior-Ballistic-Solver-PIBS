@@ -118,9 +118,6 @@ class Recoilless:
         ):
             raise ValueError("Invalid gun parameters")
 
-        if chargeMass > (propellant.maxLF * propellant.rho_p * chamberVolume):
-            raise ValueError("Specified Load Fraction Violates Geometrical Constraint")
-
         self.propellant = propellant
         self.caliber = caliber
 
