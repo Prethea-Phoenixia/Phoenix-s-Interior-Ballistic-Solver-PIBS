@@ -706,7 +706,7 @@ class ConstrainedRecoilless:
 if __name__ == "__main__":
     from prop import GrainComp, MultPerfGeometry, SimpleGeometry
 
-    compositions = GrainComp.readFile("data/propellants.csv")
+    compositions = GrainComp.read_file("data/propellants.csv")
     S22 = compositions["ATK PRD(S)22"]
     M8 = compositions["M8"]
     M1 = compositions["M1"]

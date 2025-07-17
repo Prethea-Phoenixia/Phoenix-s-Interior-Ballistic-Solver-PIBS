@@ -2,7 +2,7 @@ from pibs.ballistics import POINT_PEAK_AVG, GrainComp, Propellant, SimpleGeometr
 from pibs.guidegraph import guideGraph
 
 if __name__ == "__main__":
-    compositions = GrainComp.readFile("../pibs/ballistics/resource/propellants.csv")
+    compositions = GrainComp.read_file("../pibs/ballistics/resource/propellants.csv")
     pyroxylin = compositions["Pyroxylin 单基发射药"]
 
     guideGraph(

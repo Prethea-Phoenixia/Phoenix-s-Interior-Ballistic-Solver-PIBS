@@ -1243,7 +1243,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.dropProp = LocDropdown(
             parent=propFrm,
-            strObjDict=GrainComp.readFile(
+            strObjDict=GrainComp.read_file(
                 resolvepath("ballistics/resource/propellants.csv")
             ),  # dict of composition.name (string) -> composition (object),
             locFunc=self.getLocStr,
@@ -2070,9 +2070,9 @@ class InteriorBallisticsFrame(Frame):
             self.grlR.reLocalize("", "")
             self.grdR.reLocalize("", "")
 
-        elif geom == SimpleGeometry.ROD:
+        elif geom == SimpleGeometry.STRIP:
             self.arcmm.reLocalize("widthLabel", "widthText")
-            self.grlR.reLocalize("ltwLabel", "rodRText")
+            self.grlR.reLocalize("ltwLabel", "stripRText")
             self.grdR.reLocalize("htwLabel", "heightRText")
 
         elif geom == SimpleGeometry.CYLINDER:
