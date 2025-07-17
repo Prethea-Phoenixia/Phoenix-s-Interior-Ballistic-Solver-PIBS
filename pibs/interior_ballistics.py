@@ -2095,12 +2095,8 @@ class InteriorBallisticsFrame(Frame):
             Zb = prop.Z_b
             self.geomAx.cla()
             if prop is not None:
-                xs = [i / N for i in range(N)]
+                xs = [i / N for i in range(N + 1)]
                 ys = [prop.f_sigma_Z(x) for x in xs]
-
-                if Zb > 1:
-                    xs.extend((1, 1))
-                    ys.extend(prop.f_ullim())
 
                 xs.append(Zb)
                 ys.append(prop.f_sigma_Z(Zb))

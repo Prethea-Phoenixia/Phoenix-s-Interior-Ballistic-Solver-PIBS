@@ -11,6 +11,8 @@ from math import pi
 from abc import ABC, ABCMeta, abstractmethod
 
 GEOMETRIES = {}
+
+
 class Geometry(ABC):
 
     def __init__(self, desc: str):
@@ -260,40 +262,22 @@ class Propellant:
         main_geom: Geometry,
         main_r1: float,
         main_r2: float,
-        aux_geom=None,
-        aux_r1: float = 0,
-        aux_r2: float = 0,
+        aux_geom: Geometry = SimpleGeometry.SPHERE,
+        aux_r1: float = 1,
+        aux_r2: float = 1,
+        web_ratio: float = 1,  # e1_2 / e1_1
+        mass_ratio: float = 0,  # w_2 / w_1
     ):
         """
-        given e_1 as the maximum burn depth.
-        R1: ratio w.r.t arc thickness
-            interpreted as 1/alpha:
-                Perf diameter to arc thickness ratio for perforated cylinders, d_0/(2*e_1)
+        for propellant i = 1, 2:
+            Z_i = e_i / e_1i
+            psi_i = ff_i(Z_i)
+            dZ_i / dt = u_1i p ^ n_i / e_1i
 
-                Single perf cylinder, d_0/(2*e_1)
-
-                Secondary length to primary length ratio for rectangular rod shape (2*b)/(2*e_1)
-
-        R2: ratio w.r.t arc thickness
-            interpreted as 1/beta:
-                Length to "effective diameter" ratio for perforated cylinders, 2*c/(2*e_1)
-
-                tertiary length to primary length ratio for rectangular rod shapes, 2*c/(2*e_1)
-
-
-        for geometries where burning is single phase
-        (Z: 0->1, phi: 0->1)
-        .Z_b = 1.0
-        .chi
-        .labda
-        .mu
-
-        for multi-perf propellants:
-        (Z: 0->Z_b, phi: 0->1)
-        .Z_b > 1.0
-        .chi_s
-        .labda_s
-
+        In sum:
+                        n
+            psi = (1/w) Σ ff_i(Z_i) w_i
+                       i=1
         """
         if any((main_r1 and main_r1 < 0, main_r2 and main_r2 < 0)):
             raise ValueError("Geometry is impossible")
@@ -301,33 +285,45 @@ class Propellant:
         self.composition = composition
         self.geometry = main_geom
 
-        main_params = main_geom.get_form_function_coefficients(r1=main_r1, r2=main_r2)
-        self.chi, self.labda, self.mu, self.chi_s, self.labda_s, self.Z_b = main_params
+        self.main_params = main_geom.get_form_function_coefficients(r1=main_r1, r2=main_r2)
+        self.aux_params = aux_geom.get_form_function_coefficients(r1=aux_r1, r2=aux_r2)
+
+        self.chi, self.labda, self.mu, self.chi_s, self.labda_s, self.Z_b = self.main_params
+
+        self.web_ratio, self.mass_ratio = web_ratio, mass_ratio
 
     def __getattr__(self, attr_name):
         if not (attr_name.startswith("__") and attr_name.endswith("__")):
             return getattr(self.composition, attr_name)
         raise AttributeError("%r object has no attribute %r" % (self.__class__.__name__, attr_name))
 
-    def f_sigma_Z(self, z) -> float:
-        # is the first derivative of psi(Z)
-        if z <= 1.0:
-            return self.chi * (1 + 2 * self.labda * z + 3 * self.mu * z**2)
-        elif z <= self.Z_b:
-            return 1 + 2 * self.labda_s * z
+    @staticmethod
+    def f_sigma(Z_i: float, params: tuple[float, float, float, float, float, float]) -> float:
+        chi, labda, mu, chi_s, labda_s, Z_b = params
+        if Z_i <= 1.0:
+            return chi * (1 + 2 * labda * Z_i + 3 * mu * Z_i**2)
+        elif Z_i <= Z_b:
+            return 1 + 2 * labda_s * Z_i
         else:
-            return 0
+            return 0.0
 
-    def f_ullim(self) -> tuple[float, float]:
-        if self.Z_b > 1:
-            return self.chi * (1 + 2 * self.labda + 3 * self.mu), 1 + 2 * self.labda_s
-        else:
-            return 0, 0
-
-    def f_psi_Z(self, Z) -> float:
-        if Z <= 1.0:
-            return self.chi * Z * (1 + self.labda * Z + self.mu * Z**2)
-        elif Z <= self.Z_b:
-            return self.chi_s * Z * (1 + self.labda_s * Z)
+    @staticmethod
+    def f_psi(Z_i: float, params: tuple[float, float, float, float, float, float]) -> float:
+        chi, labda, mu, chi_s, labda_s, Z_b = params
+        if Z_i <= 1.0:
+            return chi * Z_i * (1 + labda * Z_i + mu * Z_i**2)
+        elif Z_i <= Z_b:
+            return chi_s * Z_i * (1 + labda_s * Z_i)
         else:
             return 1.0
+
+    def f_sigma_Z(self, Z: float) -> float:
+        Z_main, Z_aux = Z, Z / self.web_ratio
+        sigma_main, sigma_aux = self.f_sigma(Z_main, self.main_params), self.f_sigma(Z_aux, self.aux_params)
+        return sigma_main / (self.mass_ratio + 1) + sigma_aux * self.mass_ratio / (self.mass_ratio + 1)
+
+    def f_psi_Z(self, Z: float) -> float:
+        Z_main, Z_aux = Z, Z / self.web_ratio
+        psi_main, psi_aux = self.f_psi(Z_main, self.main_params), self.f_psi(Z_aux, self.aux_params)
+
+        return psi_main / (self.mass_ratio + 1) + psi_aux * self.mass_ratio / (self.mass_ratio + 1)
