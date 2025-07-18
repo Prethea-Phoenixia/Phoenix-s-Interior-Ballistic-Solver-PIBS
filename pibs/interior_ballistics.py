@@ -605,7 +605,6 @@ class InteriorBallisticsFrame(Frame):
             parent=envFrm,
             labelLocKey="atmosLabel",
             row=j,
-            col=0,
             locFunc=self.getLocStr,
             allLC=self.locs,
             columnspan=3,
@@ -616,7 +615,6 @@ class InteriorBallisticsFrame(Frame):
         self.ambP = Loc3Input(
             parent=envFrm,
             row=j,
-            col=0,
             labelLocKey="ambPresLabel",
             unitText="kPa",
             default="101.325",
@@ -628,7 +626,6 @@ class InteriorBallisticsFrame(Frame):
         self.ambRho = Loc3Input(
             parent=envFrm,
             row=j,
-            col=0,
             labelLocKey="ambRhoLabel",
             unitText="kg/m³",
             default="1.204",
@@ -641,7 +638,6 @@ class InteriorBallisticsFrame(Frame):
         self.ambGam = Loc3Input(
             parent=envFrm,
             row=j,
-            col=0,
             labelLocKey="ambGamLabel",
             default="1.400",
             validation=validationNN,
@@ -929,7 +925,7 @@ class InteriorBallisticsFrame(Frame):
             "caliber": caliber,
             "shotMass": float(self.shtkg.get()),
             "propellant": self.prop,
-            "grainSize": float(self.arcmm.get()) * 1e-3,
+            "grainSize": float(self.webmm.get()) * 1e-3,
             "chargeMass": chargeMass,
             "chargeMassRatio": float(self.chgkg.get()) / float(self.shtkg.get()),
             "chamberVolume": chamberVolume,
@@ -1060,7 +1056,7 @@ class InteriorBallisticsFrame(Frame):
             if constrain:
                 # noinspection SpellCheckingInspection
                 webmm = roundSig(kwargs["grainSize"] * 1e3, n=sigfig)
-                self.arcmm.set(webmm)
+                self.webmm.set(webmm)
 
                 if not lock:
                     # noinspection SpellCheckingInspection
@@ -1260,7 +1256,7 @@ class InteriorBallisticsFrame(Frame):
         self.specs = Text(
             propFrm,
             wrap="word",
-            height=10,
+            height=20,
             width=30,
             yscrollcommand=specScroll.set,
             xscrollcommand=specHScroll.set,
@@ -1272,24 +1268,23 @@ class InteriorBallisticsFrame(Frame):
 
         self.forceUpdOnThemeWidget.append(self.specs)
 
-        grainFrm = LocLabelFrame(
+        self.grainFrm = LocLabelFrame(
             self.propTabParent,
             locKey="grainFrmLabel",
             style="SubLabelFrame.TLabelframe",
             locFunc=self.getLocStr,
             allLLF=self.locs,
         )
-        self.grainFrm = grainFrm
-        grainFrm.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        grainFrm.columnconfigure(0, weight=1)
-        grainFrm.rowconfigure(0, weight=1)
+        self.grainFrm.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.grainFrm.columnconfigure(0, weight=1)
+        self.grainFrm.rowconfigure(0, weight=1)
         self.propTabParent.add(propFrm, text=self.getLocStr("propFrmLabel"))
-        self.propTabParent.add(grainFrm, text=self.getLocStr("grainFrmLabel"))
+        self.propTabParent.add(self.grainFrm, text=self.getLocStr("grainFrmLabel"))
 
         self.propTabParent.enable_traversal()
 
-        geomPlotFrm = LocLabelFrame(
-            grainFrm,
+        self.geomPlotFrm = LocLabelFrame(
+            self.grainFrm,
             locKey="σ(Z)",
             style="SubLabelFrame.TLabelframe",
             tooltipLocKey="geomPlotText",
@@ -1298,23 +1293,22 @@ class InteriorBallisticsFrame(Frame):
         )
 
         j = 0
-        geomPlotFrm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.geomPlotFrm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        j += 1
 
-        self.geomPlotFrm = geomPlotFrm
-        self.dropGeom = LocDropdown(
-            parent=grainFrm,
+        self.geom = LocDropdown(
+            parent=self.grainFrm,
             strObjDict=GEOMETRIES,
             locFunc=self.getLocStr,
             dropdowns=self.locs,
             descLabelKey="grainFrmLabel",
         )
+        self.geom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        j += 1
 
-        j += 1
-        self.dropGeom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        j += 1
         # noinspection SpellCheckingInspection
-        self.arcmm = Loc3Input(
-            parent=grainFrm,
+        self.webmm = Loc3Input(
+            parent=self.grainFrm,
             row=j,
             labelLocKey="",
             descLabelKey="Web",
@@ -1327,11 +1321,9 @@ class InteriorBallisticsFrame(Frame):
         )
         j += 1
 
-        self.grdR = Loc3Input(
-            parent=grainFrm,
+        self.grainR1 = Loc3Input(
+            parent=self.grainFrm,
             row=j,
-            labelLocKey="",
-            descLabelKey="1/α",
             unitText="x",
             default="1.0",
             validation=validationNN,
@@ -1340,11 +1332,84 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         j += 1
-        self.grlR = Loc3Input(
-            parent=grainFrm,
+        self.grainR2 = Loc3Input(
+            parent=self.grainFrm,
             row=j,
-            labelLocKey="",
-            descLabelKey="1/β",
+            unitText="x",
+            default="2.5",
+            validation=validationNN,
+            tooltipLocKey="",
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+        )
+        j += 1
+        self.useAuxGrain = LocLabelCheck(
+            parent=self.grainFrm,
+            labelLocKey="useAuxGrainLabel",
+            row=j,
+            columnspan=3,
+            locFunc=self.getLocStr,
+            allLC=self.locs,
+            default=False,
+        )
+        self.useAuxGrain.trace_add("write", self.ctrlCallback)
+        self.useAuxGrain.trace_add("write", self.callback)
+        j += 1
+
+        self.auxGrainFrm = LocLabelFrame(
+            self.grainFrm, locKey="auxGrainFrmLabel", locFunc=self.getLocStr, allLLF=self.locs
+        )
+        self.auxGrainFrm.grid(row=j, column=0, columnspan=3, sticky="nsew")
+
+        self.auxGrainFrm.columnconfigure(1, weight=1)
+        k = 0
+
+        self.auxGeom = LocDropdown(
+            parent=self.auxGrainFrm,
+            strObjDict=GEOMETRIES,
+            locFunc=self.getLocStr,
+            dropdowns=self.locs,
+        )
+        self.auxGeom.grid(row=k, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        k += 1
+
+        self.auxMassRatio = Loc3Input(
+            parent=self.auxGrainFrm,
+            row=k,
+            labelLocKey="auxMassRatio",
+            default="0.0",
+            validation=validationNN,
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+        )
+
+        k += 1
+        self.auxWebRatio = Loc3Input(
+            parent=self.auxGrainFrm,
+            row=k,
+            labelLocKey="auxWebRatio",
+            default="1.0",
+            validation=validationNN,
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+        )
+
+        k += 1
+        self.auxGrainR1 = Loc3Input(
+            parent=self.auxGrainFrm,
+            row=k,
+            unitText="x",
+            default="1.0",
+            validation=validationNN,
+            tooltipLocKey="",
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+        )
+
+        k += 1
+        self.auxGrainR2 = Loc3Input(
+            parent=self.auxGrainFrm,
+            row=k,
             unitText="x",
             default="2.5",
             validation=validationNN,
@@ -1504,11 +1569,17 @@ class InteriorBallisticsFrame(Frame):
         specFrm.rowconfigure(i, weight=1)
 
         self.dropProp.trace_add("write", self.updateSpec)
-        self.dropGeom.trace_add("write", self.updateGeom)
+        self.geom.trace_add("write", self.updateGeom)
+        self.auxGeom.trace_add("write", self.updateGeom)
 
-        self.grdR.trace_add("write", self.callback)
-        self.grlR.trace_add("write", self.callback)
-        self.arcmm.trace_add("write", self.callback)
+        self.grainR1.trace_add("write", self.callback)
+        self.grainR2.trace_add("write", self.callback)
+        self.webmm.trace_add("write", self.callback)
+
+        self.auxMassRatio.trace_add("write", self.callback)
+        self.auxWebRatio.trace_add("write", self.callback)
+        self.auxGrainR1.trace_add("write", self.callback)
+        self.auxGrainR2.trace_add("write", self.callback)
 
         self.typeOptn.trace_add("write", self.typeCallback)
 
@@ -2052,39 +2123,55 @@ class InteriorBallisticsFrame(Frame):
 
     # noinspection PyUnusedLocal
     def updateGeom(self, *args):
-        geom = self.dropGeom.getObj()
-        if geom == SimpleGeometry.SPHERE:
-            self.grlR.remove()
-            self.grdR.remove()
 
-        elif geom == SimpleGeometry.CYLINDER:
-            self.grlR.restore()
-            self.grdR.remove()
+        for geom, r1, r2 in zip(
+            (self.geom.getObj(), self.auxGeom.getObj()),
+            (self.grainR1, self.auxGrainR1),
+            (self.grainR2, self.auxGrainR2),
+        ):
+            if geom == SimpleGeometry.SPHERE:
+                r1.remove()
+                r2.remove()
+            elif geom == SimpleGeometry.CYLINDER:
+                r1.remove()
+                r2.restore()
+            else:
+                r1.restore()
+                r2.restore()
 
-        else:
-            self.grlR.restore()
-            self.grdR.restore()
+        for geom, web, r1, r2 in zip(
+            (self.geom.getObj(), self.auxGeom.getObj()),
+            (self.webmm, None),
+            (self.grainR1, self.auxGrainR1),
+            (self.grainR2, self.auxGrainR2),
+        ):
 
-        if geom == SimpleGeometry.SPHERE:
-            self.arcmm.reLocalize("diamLabel", "diaText")
-            self.grlR.reLocalize("", "")
-            self.grdR.reLocalize("", "")
+            if geom == SimpleGeometry.SPHERE:
+                if web:
+                    web.reLocalize("diamLabel", "diaText")
+                # r1.reLocalize("", "")
+                # r2.reLocalize("", "")
 
-        elif geom == SimpleGeometry.STRIP:
-            self.arcmm.reLocalize("widthLabel", "widthText")
-            self.grlR.reLocalize("ltwLabel", "stripRText")
-            self.grdR.reLocalize("htwLabel", "heightRText")
+            elif geom == SimpleGeometry.STRIP:
+                if web:
+                    web.reLocalize("widthLabel", "widthText")
+                r1.reLocalize("htwLabel", "heightRText")
+                r2.reLocalize("ltwLabel", "stripRText")
 
-        elif geom == SimpleGeometry.CYLINDER:
-            self.arcmm.reLocalize("diamLabel", "diaText")
-            self.grlR.reLocalize("ltdLabel", "cylLRText")
-            self.grdR.reLocalize("", "")
+            elif geom == SimpleGeometry.CYLINDER:
+                if web:
+                    web.reLocalize("diamLabel", "diaText")
 
-        else:
-            self.arcmm.reLocalize("athLabel", "arcText")
-            self.grlR.reLocalize("ltdLabel", "perfLRText")
-            # noinspection SpellCheckingInspection
-            self.grdR.reLocalize("pdtalLabel", "pDiaRText")
+                # r1.reLocalize("", "")
+                r2.reLocalize("ltdLabel", "cylLRText")
+
+            else:
+                if web:
+                    web.reLocalize("athLabel", "arcText")
+
+                r2.reLocalize("ltdLabel", "perfLRText")
+                # noinspection SpellCheckingInspection
+                r1.reLocalize("pdtalLabel", "pDiaRText")
 
         self.callback()
 
@@ -2252,45 +2339,55 @@ class InteriorBallisticsFrame(Frame):
         updates the propellant object on write to the ratio entry fields
         and, on changing the propellant or geometrical specification.
         """
-        geom = self.dropGeom.getObj()
+        geom = self.geom.getObj()
+        auxGeom = self.auxGeom.getObj()
         compo = self.dropProp.getObj()
 
         try:
-            self.prop = Propellant(compo, geom, float(self.grdR.get()), float(self.grlR.get()))
+            self.prop = Propellant(
+                composition=compo,
+                main_geom=geom,
+                main_r1=float(self.grainR1.get()),
+                main_r2=float(self.grainR2.get()),
+                aux_geom=auxGeom,
+                web_ratio=float(self.auxWebRatio.get()),
+                mass_ratio=float(self.auxMassRatio.get()) if self.useAuxGrain.get() else 0.0,
+                aux_r1=float(self.auxGrainR1.get()),
+                aux_r2=float(self.auxGrainR2.get()),
+            )
             self.updateGeomPlot()
 
         except Exception:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
             self.prop = None
-            rootLogger.error("exception in propellant callback:")
-            rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            rootLogger.error(
+                "exception in propellant callback:\n"
+                + "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            )
 
     # noinspection PyUnusedLocal
     def typeCallback(self, *args):
-        gunType = self.typeOptn.getObj()
 
-        if gunType == CONVENTIONAL:
+        if self.typeOptn.getObj() is CONVENTIONAL:
             self.dropSoln.enable()
-        else:
-            self.dropSoln.setByObj(SOL_LAGRANGE)
-            self.dropSoln.disable()
 
-        if gunType == RECOILLESS:
-            self.nozzExp.restore()
-            self.nozzEff.restore()
-            self.plotNozzleV.restore()
-
-        else:
             self.nozzExp.remove()
             self.nozzEff.remove()
             self.plotNozzleV.remove()
 
-        if gunType == CONVENTIONAL:
             self.plotBreechP.reLocalize("plotBreechP")
             self.plotStagP.remove()
             self.plotEta.remove()
             self.pControl.reset({point: point for point in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH)})
-        elif gunType == RECOILLESS:
+
+        else:
+            self.dropSoln.setByObj(SOL_LAGRANGE)
+            self.dropSoln.disable()
+
+            self.nozzExp.restore()
+            self.nozzEff.restore()
+            self.plotNozzleV.restore()
+
             self.plotBreechP.reLocalize("plotNozzleP")
             self.plotStagP.restore()
             self.plotStagP.reLocalize("plotStagP")
@@ -2299,8 +2396,6 @@ class InteriorBallisticsFrame(Frame):
             self.pControl.reset(
                 {point: point for point in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)}
             )
-        else:
-            raise ValueError("unknown gun type")
 
     # noinspection PyUnusedLocal
     def ctrlCallback(self, *args):
@@ -2335,6 +2430,12 @@ class InteriorBallisticsFrame(Frame):
             self.minWeb.enable()
             self.lgmax.enable()
             self.pControl.enable()
+
+        for entry in [self.auxGrainR1, self.auxGrainR2, self.auxWebRatio, self.auxMassRatio, self.auxGeom]:
+            if self.useAuxGrain.get() == 0:
+                entry.disable()
+            else:
+                entry.enable()
 
     # noinspection PyUnusedLocal, SpellCheckingInspection
     def cvlfConsistencyCallback(self, *args):
