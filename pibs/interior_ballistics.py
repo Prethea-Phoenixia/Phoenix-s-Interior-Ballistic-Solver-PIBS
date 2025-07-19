@@ -1163,6 +1163,7 @@ class InteriorBallisticsFrame(Frame):
             descLabelKey="typeLabel",
         )
         self.typeOptn.grid(row=i, column=0, sticky="nsew", padx=2, pady=2, columnspan=3)
+
         i += 1
         self.calmm = Loc3Input(
             parent=specFrm,
@@ -1292,7 +1293,7 @@ class InteriorBallisticsFrame(Frame):
             strObjDict=GEOMETRIES,
             locFunc=self.getLocStr,
             dropdowns=self.locs,
-            descLabelKey="grainFrmLabel",
+            descLabelKey="Grain Geometry",
         )
         self.geom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         j += 1
@@ -1314,6 +1315,7 @@ class InteriorBallisticsFrame(Frame):
         self.grainR1 = Loc3Input(
             parent=self.grainFrm,
             row=j,
+            descLabelKey="1/α",
             unitText="x",
             default="1.0",
             validation=validationNN,
@@ -1325,6 +1327,7 @@ class InteriorBallisticsFrame(Frame):
         self.grainR2 = Loc3Input(
             parent=self.grainFrm,
             row=j,
+            descLabelKey="1/β",
             unitText="x",
             default="2.5",
             validation=validationNN,
@@ -1335,8 +1338,8 @@ class InteriorBallisticsFrame(Frame):
         j += 1
         self.useAuxGrain = LocLabelCheck(
             parent=self.grainFrm,
-            labelLocKey="useAuxGrainLabel",
             row=j,
+            labelLocKey="useAuxGrainLabel",
             columnspan=3,
             locFunc=self.getLocStr,
             allLC=self.locs,
@@ -1369,6 +1372,7 @@ class InteriorBallisticsFrame(Frame):
         self.auxGeom = LocDropdown(
             parent=self.auxGrainFrm,
             strObjDict=GEOMETRIES,
+            descLabelKey="Auxiliary Grain Geometry",
             locFunc=self.getLocStr,
             dropdowns=self.locs,
         )
@@ -1378,9 +1382,9 @@ class InteriorBallisticsFrame(Frame):
         self.auxWebRatio = Loc3Input(
             parent=self.auxGrainFrm,
             row=k,
-            labelLocKey="auxWebRatio",
             default="1.0",
             unitText="x",
+            labelLocKey="auxWebRatio",
             validation=validationNN,
             locFunc=self.getLocStr,
             allInputs=self.locs,
@@ -1392,6 +1396,7 @@ class InteriorBallisticsFrame(Frame):
             row=k,
             unitText="x",
             default="1.0",
+            descLabelKey="Auxiliary 1/α",
             validation=validationNN,
             tooltipLocKey="",
             locFunc=self.getLocStr,
@@ -1404,6 +1409,7 @@ class InteriorBallisticsFrame(Frame):
             row=k,
             unitText="x",
             default="2.5",
+            descLabelKey="Auxiliary 1/β",
             validation=validationNN,
             tooltipLocKey="",
             locFunc=self.getLocStr,
@@ -1559,8 +1565,11 @@ class InteriorBallisticsFrame(Frame):
         specFrm.rowconfigure(i, weight=5)
 
         self.dropProp.trace_add("write", self.updateSpec)
+
         self.geom.trace_add("write", self.updateGeom)
         self.auxGeom.trace_add("write", self.updateGeom)
+
+        self.typeOptn.trace_add("write", self.typeCallback)
 
         for entry in (
             self.grainR1,
@@ -2103,7 +2112,6 @@ class InteriorBallisticsFrame(Frame):
                 + " @ {:>12}\n".format(toSI(p, unit="Pa", dec=3)),
             )
 
-        # self.specs.insert("end", "-" * width + "\n")
         for line in compo.desc.split(","):
             self.specs.insert("end", line + "\n")
         self.specs.config(state="disabled")
@@ -2360,7 +2368,7 @@ class InteriorBallisticsFrame(Frame):
     # noinspection PyUnusedLocal
     def typeCallback(self, *args):
 
-        if self.typeOptn.getObj() is CONVENTIONAL:
+        if self.typeOptn.getObj() == CONVENTIONAL:
             self.dropSoln.enable()
 
             self.nozzExp.remove()
@@ -2578,10 +2586,9 @@ def calculate(jobQueue, progressQueue, logQueue, kwargs):
     constrain = kwargs["con"]
     optimize = kwargs["opt"]
     lock = kwargs["lock"]
-    # debug = kwargs["deb"]
 
+    gun, gunResult = None, None
     try:
-        gun, gunResult = None, None
         if constrain:
             if gunType == CONVENTIONAL:
                 constrained = Constrained(**kwargs)
@@ -2622,18 +2629,20 @@ def calculate(jobQueue, progressQueue, logQueue, kwargs):
         gunResult = gun.integrate(**kwargs, progressQueue=progressQueue)
         rootLogger.info("calculation concluded successfully.")
 
-    except Exception:
+    except Exception as e:
         gun, gunResult = None, None
-        exc_type, exc_value, exc_traceback = sys.exc_info()
         rootLogger.error("exception while calculating:")
-        rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        if kwargs["deb"]:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        else:
+            rootLogger.error(str(e))
     finally:
-        # noinspection PyUnboundLocalVariable
         jobQueue.put((kwargs, gun, gunResult))
 
 
+# noinspection PyPep8Naming
 def guide(guideJobQueue, progressQueue, logQueue, kwargs):
-    # rootLogger = logging.getLogger()
     rootLogger.addHandler(QueueHandler(logQueue))
     rootLogger.info("guidance diagram calculation started")
 
@@ -2642,13 +2651,16 @@ def guide(guideJobQueue, progressQueue, logQueue, kwargs):
         guideResults = guideGraph(**kwargs)
         rootLogger.info("guidance diagram calculation concluded successfully.")
 
-    except Exception:
+    except Exception as e:
         guideResults = None
-        exc_type, exc_value, exc_traceback = sys.exc_info()
         rootLogger.error("exception while calculating guidance diagram:")
-        rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        if kwargs["deb"]:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        else:
+            rootLogger.error(str(e))
+
     finally:
-        # noinspection PyUnboundLocalVariable
         guideJobQueue.put(guideResults)
 
 
