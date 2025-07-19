@@ -1146,17 +1146,15 @@ class InteriorBallisticsFrame(Frame):
             except AttributeError:
                 pass
 
+    # noinspection SpellCheckingInspection
     def addSpecFrm(self):
         specFrm = LocLabelFrame(self, locKey="specFrmLabel", locFunc=self.getLocStr, allLLF=self.locs)
         specFrm.grid(row=0, column=2, rowspan=2, sticky="nsew")
         specFrm.columnconfigure(0, weight=1)
 
-        # validation
-        validationNN = self.register(validateNN)
-        validationCE = self.register(validateCE)
+        validationNN, validationCE = self.register(validateNN), self.register(validateCE)
 
         i = 0
-        # noinspection SpellCheckingInspection
         self.typeOptn = LocDropdown(
             parent=specFrm,
             strObjDict={gun_type: gun_type for gun_type in (CONVENTIONAL, RECOILLESS)},
@@ -1164,10 +1162,8 @@ class InteriorBallisticsFrame(Frame):
             dropdowns=self.locs,
             descLabelKey="typeLabel",
         )
-
         self.typeOptn.grid(row=i, column=0, sticky="nsew", padx=2, pady=2, columnspan=3)
         i += 1
-        # noinspection SpellCheckingInspection
         self.calmm = Loc3Input(
             parent=specFrm,
             row=i,
@@ -1179,7 +1175,6 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         i += 1
-        # noinspection SpellCheckingInspection
         self.tblmm = Loc3Input(
             parent=specFrm,
             row=i,
@@ -1191,7 +1186,6 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         i += 1
-        # noinspection SpellCheckingInspection
         self.shtkg = Loc3Input(
             parent=specFrm,
             row=i,
@@ -1203,7 +1197,6 @@ class InteriorBallisticsFrame(Frame):
             allInputs=self.locs,
         )
         i += 1
-        # noinspection SpellCheckingInspection
         self.chgkg = Loc3Input(
             parent=specFrm,
             row=i,
@@ -1239,9 +1232,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.dropProp = LocDropdown(
             parent=propFrm,
-            strObjDict=GrainComp.read_file(
-                resolvepath("ballistics/resource/propellants.csv")
-            ),  # dict of composition.name (string) -> composition (object),
+            strObjDict=GrainComp.read_file(resolvepath("ballistics/resource/propellants.csv")),
             locFunc=self.getLocStr,
             dropdowns=self.locs,
             descLabelKey="propFrmLabel",
@@ -1306,7 +1297,6 @@ class InteriorBallisticsFrame(Frame):
         self.geom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         j += 1
 
-        # noinspection SpellCheckingInspection
         self.webmm = Loc3Input(
             parent=self.grainFrm,
             row=j,
@@ -1359,10 +1349,22 @@ class InteriorBallisticsFrame(Frame):
         self.auxGrainFrm = LocLabelFrame(
             self.grainFrm, locKey="auxGrainFrmLabel", locFunc=self.getLocStr, allLLF=self.locs
         )
-        self.auxGrainFrm.grid(row=j, column=0, columnspan=3, sticky="nsew")
+        self.auxGrainFrm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
         self.auxGrainFrm.columnconfigure(1, weight=1)
         k = 0
+
+        self.auxMassRatio = Loc3Input(
+            parent=self.auxGrainFrm,
+            row=k,
+            labelLocKey="auxMassRatio",
+            default="1.0",
+            unitText="x",
+            validation=validationNN,
+            locFunc=self.getLocStr,
+            allInputs=self.locs,
+        )
+        k += 1
 
         self.auxGeom = LocDropdown(
             parent=self.auxGrainFrm,
@@ -1373,22 +1375,12 @@ class InteriorBallisticsFrame(Frame):
         self.auxGeom.grid(row=k, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         k += 1
 
-        self.auxMassRatio = Loc3Input(
-            parent=self.auxGrainFrm,
-            row=k,
-            labelLocKey="auxMassRatio",
-            default="0.0",
-            validation=validationNN,
-            locFunc=self.getLocStr,
-            allInputs=self.locs,
-        )
-
-        k += 1
         self.auxWebRatio = Loc3Input(
             parent=self.auxGrainFrm,
             row=k,
             labelLocKey="auxWebRatio",
             default="1.0",
+            unitText="x",
             validation=validationNN,
             locFunc=self.getLocStr,
             allInputs=self.locs,
@@ -1419,7 +1411,6 @@ class InteriorBallisticsFrame(Frame):
         )
 
         i += 1
-        # noinspection SpellCheckingInspection
         self.useCv = LocDropdown(
             parent=specFrm,
             strObjDict={USE_CV: USE_CV, USE_LF: USE_LF},
@@ -1563,25 +1554,25 @@ class InteriorBallisticsFrame(Frame):
             allLC=self.locs,
             columnspan=2,
         )
-        j += 1
 
         i += 1
-        specFrm.rowconfigure(i, weight=1)
+        specFrm.rowconfigure(i, weight=5)
 
         self.dropProp.trace_add("write", self.updateSpec)
         self.geom.trace_add("write", self.updateGeom)
         self.auxGeom.trace_add("write", self.updateGeom)
 
-        self.grainR1.trace_add("write", self.callback)
-        self.grainR2.trace_add("write", self.callback)
-        self.webmm.trace_add("write", self.callback)
-
-        self.auxMassRatio.trace_add("write", self.callback)
-        self.auxWebRatio.trace_add("write", self.callback)
-        self.auxGrainR1.trace_add("write", self.callback)
-        self.auxGrainR2.trace_add("write", self.callback)
-
-        self.typeOptn.trace_add("write", self.typeCallback)
+        for entry in (
+            self.grainR1,
+            self.grainR2,
+            self.webmm,
+            self.auxMassRatio,
+            self.auxWebRatio,
+            self.auxGrainR1,
+            self.auxGrainR2,
+            self.typeOptn,
+        ):
+            entry.trace_add("write", self.callback)
 
     def addGeomPlot(self):
         with mpl.rc_context(CONTEXT):
@@ -1708,7 +1699,7 @@ class InteriorBallisticsFrame(Frame):
         for i in range(5):
             plotFrm.columnconfigure(i, weight=1)
 
-        checks = []
+        checks = []  # listed LabelChecks are not stored when committing to file.
 
         j = 1
         k = 0
@@ -2178,10 +2169,10 @@ class InteriorBallisticsFrame(Frame):
     def updateGeomPlot(self):
         with mpl.rc_context(CONTEXT):
             N = 10
-            prop = self.prop
-            Zb = prop.Z_b
             self.geomAx.cla()
+            prop = self.prop
             if prop is not None:
+                Zb = prop.Z_b
                 xs = [i / N for i in range(N + 1)]
                 ys = [prop.f_sigma_Z(x) for x in xs]
 
@@ -2355,7 +2346,6 @@ class InteriorBallisticsFrame(Frame):
                 aux_r1=float(self.auxGrainR1.get()),
                 aux_r2=float(self.auxGrainR2.get()),
             )
-            self.updateGeomPlot()
 
         except Exception:
             self.prop = None
@@ -2364,6 +2354,8 @@ class InteriorBallisticsFrame(Frame):
                 "exception in propellant callback:\n"
                 + "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
             )
+
+        self.updateGeomPlot()
 
     # noinspection PyUnusedLocal
     def typeCallback(self, *args):
@@ -2660,6 +2652,7 @@ def guide(guideJobQueue, progressQueue, logQueue, kwargs):
         guideJobQueue.put(guideResults)
 
 
+# noinspection SpellCheckingInspection
 def main(loc: str = None):
     multiprocessing.freeze_support()
     rootLogger.info("Initializing")
