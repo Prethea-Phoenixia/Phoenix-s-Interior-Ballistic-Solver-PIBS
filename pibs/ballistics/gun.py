@@ -267,42 +267,14 @@ class Gun:
                 "Current implementation use exponential burn rate and does not"
                 + " allow for solving the case with 0 shot start pressure."
             )
-        else:
-            self.psi_0 = (1 / self.Delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
-            if self.psi_0 <= 0:
-                raise ValueError(
-                    "Initial burnup fraction is solved to be negative."
-                    + " This indicate an excessively high load density for the"
-                    + " start-pressure target."
-                )
-            elif self.psi_0 >= 1:
-                raise ValueError(
-                    "Initial burnup fraction is solved to be greater than unity."
-                    + " This indicate an excessively low loading density for the"
-                    + " start-pressure target."
-                )
 
-        Zs = cubic(self.chi * self.mu, self.chi * self.labda, self.chi, -self.psi_0)
-        # pick a valid solution between 0 and 1
-        Zs = sorted(
-            Z for Z in Zs if not isinstance(Z, complex) and (0.0 < Z < 1.0)
-        )  # evaluated from left to right, guards against complex >/< float
-        if len(Zs) < 1:
-            raise ValueError(
-                "Propellant either could not develop enough pressure to"
-                + " overcome start pressure, or has burnt to post fracture."
-            )
-
-        self.Z_0 = Zs[0]  # pick the smallest solution
-
-        self.p_a_bar = 0.0
-        self.labda_1 = 0.0
-        self.labda_2 = 0.0
+        self.p_a_bar, self.c_a_bar, self.labda_1, self.labda_2 = 0.0, 0.0, 0.0, 0.0
         self.v_j = 0.0
         self.B = 0.0
         self.phi = 0.0
-        self.c_a_bar = 0.0
         self.k_1 = 0.0
+
+        self.Z_0, self.psi_0 = 0, 0
 
         logger.info("gun object successfully initialized.")
 
@@ -470,6 +442,23 @@ class Gun:
         All solutions assumes gas velocity increasing linearlly from 0
         at breech face and shot velocity at shot base.
         """
+
+        self.psi_0 = (1 / self.Delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
+        if self.psi_0 <= 0:
+            raise ValueError(
+                "Initial burnup fraction is solved to be negative."
+                + " This indicate an excessively high load density for the"
+                + " start-pressure target."
+            )
+        elif self.psi_0 >= 1:
+            raise ValueError(
+                "Initial burnup fraction is solved to be greater than unity."
+                + " This indicate an excessively low loading density for the"
+                + " start-pressure target."
+            )
+        self.Z_0, _ = dekker(
+            lambda Z: self.propellant.f_psi_Z(Z) - self.psi_0, 0, 1, x_tol=tol, y_rel_tol=tol, y_abs_tol=tol**2
+        )
 
         if progressQueue is not None:
             progressQueue.put(1)
@@ -1048,8 +1037,7 @@ class Gun:
         sigma = self.material.Y
         S = self.S
 
-        r_b = r * chi_k**0.5  # radius of breech
-        # S_b = S * chi_k  # area of breech
+        r_b = r * chi_k**0.5
 
         x_probes = (
             [i / step * l_c for i in range(step)]

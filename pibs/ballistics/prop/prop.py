@@ -289,8 +289,12 @@ class Propellant:
         self.aux_params = aux_geom.get_form_function_coefficients(r1=aux_r1, r2=aux_r2)
 
         self.chi, self.labda, self.mu, self.chi_s, self.labda_s, self.Z_b = self.main_params
+        _, _, _, _, _, Z_b2 = self.aux_params
 
         self.web_ratio, self.mass_ratio = web_ratio, mass_ratio
+
+        if self.mass_ratio > 0 and Z_b2 > self.Z_b / self.web_ratio:
+            raise ValueError("Auxiliary grains must complete combustion in advance of the primary grains.")
 
     def __getattr__(self, attr_name):
         if not (attr_name.startswith("__") and attr_name.endswith("__")):

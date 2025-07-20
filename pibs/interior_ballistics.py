@@ -2439,18 +2439,19 @@ class InteriorBallisticsFrame(Frame):
 
     # noinspection PyUnusedLocal, SpellCheckingInspection
     def cvlfConsistencyCallback(self, *args):
+        prop = self.dropProp.get()
         try:
             sigfig = int(self.accExp.get()) + 1
             if self.useCv.getObj() == USE_CV:  # use Cv
                 cv = float(self.cvL.get()) / 1e3
                 w = float(self.chgkg.get())
-                rho = self.prop.composition.rho_p
+                rho = prop.rho_p
                 self.ldf.set(roundSig(w / cv / rho * 100, n=sigfig))
 
             else:  # using load fraction
                 w = float(self.chgkg.get())
                 lf = float(self.ldf.get()) / 100
-                rho = self.prop.rho_p
+                rho = prop.rho_p
                 self.cvL.set(roundSig((w / rho / lf) * 1e3, n=sigfig))
 
         except (ZeroDivisionError, ValueError):

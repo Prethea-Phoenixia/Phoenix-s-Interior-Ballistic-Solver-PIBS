@@ -9,7 +9,7 @@ from . import (
     POINT_PEAK_STAG,
     Points,
 )
-from .num import RKF78, cubic, dekker, gss
+from .num import RKF78, dekker, gss
 from .optimize_gun import MAX_GUESSES
 from .prop import Propellant
 from .recoilless import Recoilless
@@ -188,20 +188,8 @@ class ConstrainedRecoilless:
             )
 
         psi_0 = (1 / Delta - 1 / rho_p) / (f / p_0 + alpha - 1 / rho_p)
-
-        Zs = cubic(a=chi * mu, b=chi * labda, c=chi, d=-psi_0)
-        # pick a valid solution between 0 and 1
-        Zs = tuple(
-            Z for Z in Zs if not isinstance(Z, complex) and (Z > 0.0 and Z < 1.0)
-        )  # evaluated from left to right, guards against complex >/< float
-        if len(Zs) < 1:
-            raise ValueError(
-                "Propellant either could not develop enough pressure to overcome"
-                + " start pressure, or has burnt to post fracture."
-            )
-        Z_0 = Zs[0]
-
-        logger.info("solved shot start burnup for current constraint.")
+        Z_0, _ = dekker(lambda Z: self.propellant.f_psi_Z(Z) - psi_0, 0, 1, x_tol=tol, y_rel_tol=tol, y_abs_tol=tol**2)
+        logger.info("solved starting burnup.")
 
         # p_bar_0 = p_0 / (f * Delta)
 

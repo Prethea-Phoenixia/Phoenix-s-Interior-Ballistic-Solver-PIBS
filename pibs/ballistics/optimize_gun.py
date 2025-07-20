@@ -13,7 +13,7 @@ from . import (
     Solutions,
 )
 from .gun import pidduck
-from .num import RKF78, cubic, dekker, gss
+from .num import RKF78, dekker, gss
 from .prop import Propellant
 
 """
@@ -124,9 +124,6 @@ class Constrained:
         rho_p = self.rho_p
         theta = self.theta
         f = self.f
-        chi = self.chi
-        labda = self.labda
-        mu = self.mu
         S = self.S
         phi_1 = self.phi_1
         p_0 = self.p_0
@@ -138,7 +135,6 @@ class Constrained:
         Z_b = self.Z_b
         chi_k = self.chi_k
         f_psi_Z = self.f_psi_Z
-
         tol = self.tol
 
         omega = m * chargeMassRatio
@@ -185,19 +181,8 @@ class Constrained:
             )
 
         psi_0 = (1 / Delta - 1 / rho_p) / (f / p_0 + alpha - 1 / rho_p)
-        Zs = cubic(a=chi * mu, b=chi * labda, c=chi, d=-psi_0)
-        # pick a valid solution between 0 and 1
-        Zs = tuple(
-            Z for Z in Zs if not isinstance(Z, complex) and (0.0 < Z < 1.0)
-        )  # evaluated from left to right, guards against complex >/< float
-        if len(Zs) < 1:
-            raise ValueError(
-                "Propellant either could not develop enough pressure to "
-                + "overcome start pressure, or has burnt to post fracture."
-            )
-        Z_0 = Zs[0]
-
-        logger.info("solved shot start burnup for current constraint.")
+        Z_0, _ = dekker(lambda Z: self.propellant.f_psi_Z(Z) - psi_0, 0, 1, x_tol=tol, y_rel_tol=tol, y_abs_tol=tol**2)
+        logger.info("solved starting burnup.")
 
         def _f_p_bar(Z, l_bar, v_bar):
             psi = f_psi_Z(Z)

@@ -31,7 +31,7 @@ from .gun import (
     PressureProbePoint,
     PressureTraceEntry,
 )
-from .num import RKF78, cubic, dekker, gss
+from .num import RKF78, dekker, gss
 from .prop import GrainComp, Propellant
 
 logger = logging.getLogger(__name__)
@@ -172,20 +172,6 @@ class Recoilless:
             * (self.f * self.Delta) ** (2 * (1 - self.n))
         )
 
-        Zs = cubic(self.chi * self.mu, self.chi * self.labda, self.chi, -self.psi_0)
-        # pick a valid solution between 0 and 1
-
-        Zs = sorted(
-            Z for Z in Zs if not isinstance(Z, complex) and (0.0 < Z < 1.0)
-        )  # evaluated from left to right, guards against complex >/< float
-        if len(Zs) < 1:
-            raise ValueError(
-                "Propellant either could not develop enough pressure to overcome"
-                + " start pressure, or has burnt to post fracture."
-            )
-
-        self.Z_0 = Zs[0]  # pick the smallest solution
-
         # additional calculation for recoilless weapons:
         gamma = self.theta + 1
         """
@@ -200,12 +186,9 @@ class Recoilless:
             * (2 / (gamma + 1)) ** (0.5 * (gamma + 1) / self.theta)
             * phi_2
         )  # flow rate value
-        self.k_1 = 0.0
-        self.c_a_bar = 0.0
-        self.p_a_bar = 0.0
-        self.S_j = 0.0
-        self.S_j_bar = 0.0
-        self.C_f = 0.0
+
+        self.k_1, self.c_a_bar, self.p_a_bar, self.S_j, self.S_j_bar, self.C_f = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        self.Z_0, self.psi_0 = 0, 0
         logger.info("recoilless successfully initialized.")
 
     def __getattr__(self, attrName):
@@ -331,6 +314,23 @@ class Recoilless:
         usually on the order of 1e-16 - 1e-14 as compared to much larger for component
         errors.
         """
+
+        self.psi_0 = (1 / self.Delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
+        if self.psi_0 <= 0:
+            raise ValueError(
+                "Initial burnup fraction is solved to be negative."
+                + " This indicate an excessively high load density for the"
+                + " start-pressure target."
+            )
+        elif self.psi_0 >= 1:
+            raise ValueError(
+                "Initial burnup fraction is solved to be greater than unity."
+                + " This indicate an excessively low loading density for the"
+                + " start-pressure target."
+            )
+        self.Z_0, _ = dekker(
+            lambda Z: self.propellant.f_psi_Z(Z) - self.psi_0, 0, 1, x_tol=tol, y_rel_tol=tol, y_abs_tol=tol**2
+        )
 
         if progressQueue is not None:
             progressQueue.put(1)
@@ -1227,8 +1227,8 @@ if __name__ == "__main__":
     M1 = compositions["M1"]
     from prop import SimpleGeometry
 
-    M17C = Propellant(M17, SimpleGeometry.CYLINDER, None, 2.5)
-    M1C = Propellant(M1, SimpleGeometry.CYLINDER, None, 10)
+    M17C = Propellant(M17, SimpleGeometry.CYLINDER, 0.0, 2.5)
+    M1C = Propellant(M1, SimpleGeometry.CYLINDER, 0.0, 10)
     lf = 0.6
     print("DELTA/rho:", lf)
     test = Recoilless(
