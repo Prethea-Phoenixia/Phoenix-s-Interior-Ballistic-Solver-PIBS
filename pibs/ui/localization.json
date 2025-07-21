@@ -1,5 +1,7 @@
 {
 	"English": {
+		"mean": "  Mean ",
+		"breech": " Breech",
 		"BURNOUT": "Burnout",
 		"CARTRIDGE": "Conventional Cartridge",
 		"COMPUTE": "Computed",
@@ -242,6 +244,9 @@
 		"widthText": "Specify the width of propellant strip or flake."
 	},
 	"中文": {
+
+		"mean": " 平均",
+		"breech": " 膛底",
 		"BURNOUT": "火药燃尽",
 		"CARTRIDGE": "常规弹药",
 		"COMPUTE": "计算点",

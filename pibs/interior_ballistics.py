@@ -5,7 +5,7 @@ import logging
 import multiprocessing
 import platform
 import sys
-import tkinter.font as tkFont
+import tkinter.font as tk_font
 import traceback
 from ctypes import windll
 from logging.handlers import QueueHandler, QueueListener
@@ -176,7 +176,7 @@ class InteriorBallisticsFrame(Frame):
 
         self.locs = []
 
-        default_font = tkFont.Font(family=FONTNAME, size=FONTSIZE)
+        default_font = tk_font.Font(family=FONTNAME, size=FONTSIZE)
         self.option_add("*Font", default_font)
 
         self.jobQueue = Queue()
@@ -275,6 +275,13 @@ class InteriorBallisticsFrame(Frame):
 
         self.timedLoop()
 
+    def handle_errors(self, exception: Exception, level: Literal[30, 40] = logging.ERROR):
+        if self.debug.get():
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            rootLogger.log(level, "".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        else:
+            rootLogger.log(level, str(exception))
+
     def timedLoop(self):
         # polling function for the calculation subprocess
         try:
@@ -316,10 +323,7 @@ class InteriorBallisticsFrame(Frame):
         if self.gun is None:
             return "N/A"
         else:
-            kwargs = self.kwargs
-            typ = kwargs["typ"]
-            cal = kwargs["caliber"]
-            w = kwargs["shotMass"]
+            typ, cal, w = self.kwargs["typ"], self.kwargs["caliber"], self.kwargs["shotMass"]
             return "{:} {:.0f} mm ".format(
                 "{:.4g} g".format(w * 1e3) if w < 1 else "{:.4g} kg".format(w), cal * 1e3
             ) + self.getLocStr(typ)
@@ -978,12 +982,9 @@ class InteriorBallisticsFrame(Frame):
             )
             self.guideProcess.start()
 
-        except Exception:
+        except Exception as e:
+            self.handle_errors(e)
             self.guide = None
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            rootLogger.error("exception when dispatching calculation:")
-            rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
-
             self.updateGuideGraph()
         else:
             for loc in self.locs:
@@ -1010,10 +1011,8 @@ class InteriorBallisticsFrame(Frame):
 
             self.process.start()
 
-        except Exception:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            rootLogger.error("exception when dispatching calculation:")
-            rootLogger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        except Exception as e:
+            self.handle_errors(e)
 
             self.gun, self.gunResult = None, None
             self.updateTable()
@@ -1102,7 +1101,10 @@ class InteriorBallisticsFrame(Frame):
             peakBreechEntry = self.gunResult.readTableData(POINT_PEAK_BREECH)
 
             self.pp.set(
-                (toSI(peakAverageEntry.avgPressure, unit="Pa"), toSI(peakBreechEntry.breechPressure, unit="Pa"))
+                (
+                    f"{toSI(peakAverageEntry.avgPressure, unit="Pa"):}" + self.getLocStr("mean"),
+                    f"{toSI(peakBreechEntry.breechPressure, unit="Pa"):}" + self.getLocStr("breech"),
+                )
             )
 
             muzzleEntry = self.gunResult.readTableData(POINT_EXIT)
@@ -2083,7 +2085,7 @@ class InteriorBallisticsFrame(Frame):
         self.specs.config(state="normal")
         compo = self.dropProp.getObj()
         self.specs.delete("1.0", "end")
-        t_Font = tkFont.Font(font=self.specs.cget("font"))
+        t_Font = tk_font.Font(font=self.specs.cget("font"))
         width = self.specs.winfo_width() // t_Font.measure("m")
         # noinspection SpellCheckingInspection
         if compo.T_v:
@@ -2242,7 +2244,7 @@ class InteriorBallisticsFrame(Frame):
         self.tv.tag_configure(self.getLocStr(POINT_START), foreground="steel blue")
         self.tv.tag_configure(self.getLocStr(COMPUTE), foreground="tan")
 
-        t_Font = tkFont.Font(family=FONTNAME, size=FONTSIZE)
+        t_Font = tk_font.Font(family=FONTNAME, size=FONTSIZE)
 
         self.tv.tag_configure("monospace", font=t_Font)
         self.tv.tag_configure("error", font=t_Font, foreground="dim gray")
@@ -2355,13 +2357,9 @@ class InteriorBallisticsFrame(Frame):
                 aux_r2=float(self.auxGrainR2.get()),
             )
 
-        except Exception:
+        except Exception as e:
+            self.handle_errors(e, level=30)
             self.prop = None
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            rootLogger.error(
-                "exception in propellant callback:\n"
-                + "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-            )
 
         self.updateGeomPlot()
 

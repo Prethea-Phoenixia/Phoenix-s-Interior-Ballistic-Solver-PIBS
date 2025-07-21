@@ -273,7 +273,7 @@ with open(resolvepath("ui/localization.json"), encoding="utf-8") as file:
 
 
 def filenameize(str: str) -> str:
-    return str.lower().replace(" ", "_")
+    return str.replace(" ", "_")
 
 
 if __name__ == "__main__":
