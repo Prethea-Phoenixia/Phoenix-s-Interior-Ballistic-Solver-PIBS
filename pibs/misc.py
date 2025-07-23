@@ -145,7 +145,7 @@ def toSI(v, dec=4, unit=None, useSN=False):
         )
 
 
-def validateNN(inp):
+def validate_nn(inp):
     """
     validate an input if it results in:
     - result >=0
@@ -169,7 +169,7 @@ def validateNN(inp):
         return False
 
 
-def validatePI(inp):  # validate an input such that the result is a positive integer
+def validate_pi(inp):  # validate an input such that the result is a positive integer
     if inp == "":
         return True  # we will catch this by filling the default value
     try:
@@ -178,11 +178,11 @@ def validatePI(inp):  # validate an input such that the result is a positive int
         return False
 
 
-def validateCE(inp: float) -> float:
-    return validateRange(inp, low=0.0, high=100.0)
+def validate_ce(inp: float) -> float:
+    return validate_range(inp, low=0.0, high=100.0)
 
 
-def validateRange(inp: float, low: float, high: float) -> float:  # validate a range
+def validate_range(inp: float, low: float, high: float) -> float:  # validate a range
     high, low = max((high, low)), min((high, low))
     if inp == "":
         return True
@@ -192,7 +192,7 @@ def validateRange(inp: float, low: float, high: float) -> float:  # validate a r
         return False
 
 
-def validateFLT(inp):  # validate an input such that the result is a float.
+def validate_flt(inp):  # validate an input such that the result is a float.
     if (
         inp == ""
         or inp == "."
@@ -208,7 +208,7 @@ def validateFLT(inp):  # validate an input such that the result is a float.
         return False
 
 
-def formatFloatInput(event, var):
+def format_float_input(event, var):
     # v = event.widget.get()
     v = var.get()
     if v == "" or v == ".":
@@ -217,7 +217,7 @@ def formatFloatInput(event, var):
         var.set(float(v))
 
 
-def formatIntInput(event, var):
+def format_int_input(event, var):
     # v = event.widget.get()
     v = var.get()
     if v == "":
@@ -226,15 +226,15 @@ def formatIntInput(event, var):
         var.set(int(v))
 
 
-def dot_aligned(matrix, units, useSN, stripWS=True):
+def dot_aligned(matrix, units, use_sn, strip_ws=True):
     transposed = []
 
-    for seq, unit, isSN in zip(zip(*matrix), units, useSN):
+    for seq, unit, isSN in zip(zip(*matrix), units, use_sn):
         snums = []
         for n in seq:
             if isinstance(n, int) or isinstance(n, float) or n is None:
                 vstr = toSI(n, unit=unit, useSN=isSN)
-                snums.append(vstr.strip() if stripWS else vstr)
+                snums.append(vstr.strip() if strip_ws else vstr)
             elif isinstance(n, str):
                 snums.append(n)
             else:
@@ -246,11 +246,11 @@ def dot_aligned(matrix, units, useSN, stripWS=True):
     return tuple(zip(*transposed))
 
 
-def roundSig(x, n=4):
+def round_sig(x, n=4):
     return round(x, (n - 1) - int(floor(log10(abs(x)))))
 
 
-def formatMass(m, n=4):
+def format_mass(m, n=4):
     if m:
         if m < 1e-3:
             return "{:.{:}g} mg".format(m * 1e6, n)
@@ -280,4 +280,4 @@ if __name__ == "__main__":
     print(toSI(1e-4).strip())
     from math import pi
 
-    print(roundSig(pi))
+    print(round_sig(pi))
