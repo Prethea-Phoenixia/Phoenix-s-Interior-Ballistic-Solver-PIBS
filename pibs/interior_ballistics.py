@@ -24,7 +24,7 @@ from tkinter import (
 )
 from tkinter.font import Font
 from typing import Literal
-
+from itertools import repeat
 import matplotlib as mpl
 from labellines import labelLines
 from matplotlib import font_manager
@@ -91,6 +91,7 @@ root_logger.addHandler(handler)
 
 USE_LF = "USE_LF"
 USE_CV = "USE_CV"
+USE_LD = "USE_LD"
 
 FONTNAME = "Sarasa Fixed SC"
 FONTSIZE = 8
@@ -206,15 +207,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
         super().__init__(parent, menubar=menubar, default_lang=default_lang, localization_dict=localization_dict)
 
         self.font = font
-
-        self.job_queue = Queue()
-        self.guide_job_queue = Queue()
-        self.log_queue = Queue()
-        self.progress_queue = Queue()
-
-        self.process = None
-        self.guide_process = None
-
+        self.job_queue, self.guide_job_queue, self.log_queue, self.progress_queue = Queue(), Queue(), Queue(), Queue()
+        self.process, self.guide_process, self.kwargs, self.gun_result = None, None, None, None
         self.dpi = dpi
         self.parent = parent
         self.root = root
@@ -234,7 +228,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.debug_menu = debug_menu
 
         self.theme_name_var = StringVar(value=list(THEMES.keys())[0])
-
         self.debug = IntVar(value=0)
 
         file_menu.add_command(label=self.get_loc_str("saveLabel"), command=self.save, underline=0)
@@ -261,245 +254,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
 
-        self.add_name_plate()
-        self.add_left_frm()
-        self.add_center_frm()
-        self.add_right_frm()
-        self.add_spec_frm()
-        self.add_geom_plot()
-        self.add_guide_plot()
-        self.amb_callback()
-        self.cvlf_callback()
-        self.type_callback()
-        self.ctrl_callback()
-
-        self.update_table()
-        self.update_spec()
-        self.update_geom()
-
-        # self.bind("<Configure>", self.resizePlot)
-
-        parent.protocol("WM_DELETE_WINDOW", self.quit)
-
-        self.use_theme()  # <- an update is authorized here
-
-        self.tLid = None
-
-        text_handler = TextHandler(self.error_text)
-        root_logger.addHandler(text_handler)
-        root_logger.info("text handler attached to root logger.")
-
-        console = logging.StreamHandler(sys.stderr)
-        console.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(message)s"))
-        self.listener = QueueListener(self.log_queue, text_handler, console)
-        self.listener.start()
-
-        root_logger.info("text handler attached to subprocess log queue listener.")
-
-        self.timed_loop()
-
-    def handle_errors(self, exception: Exception, level: Literal[30, 40] = logging.ERROR):
-        if self.debug.get():
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            root_logger.log(level, "".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
-        else:
-            root_logger.log(level, str(exception))
-
-    def timed_loop(self):
-        # polling function for the calculation subprocess
-        try:
-            p = None
-            while not self.progress_queue.empty():
-                pg = self.progress_queue.get_nowait()
-                p = pg if p is None else max(p, pg)
-            if p is not None:
-                self.progress.set(p)
-        except Empty:
-            pass
-
-        if self.process:
-            self.get_value()
-
-        if self.guide_process:
-            self.getGuide()
-
-        # noinspection PyTypeChecker
-        self.tLid = self.after(33, self.timed_loop)
-
-    def quit(self):
-        if self.process:
-            self.process.terminate()
-            self.process.kill()
-
-        if self.guide_process:
-            self.guide_process.terminate()
-            self.guide_process.kill()
-
-        self.listener.stop()
-
-        if self.tLid is not None:
-            self.after_cancel(self.tLid)
-
-        super().quit()
-
-    def get_description(self):
-        if self.gun is None:
-            return "N/A"
-        else:
-            typ, cal, w = self.kwargs["typ"], self.kwargs["caliber"], self.kwargs["shotMass"]
-            return "{:} {:.0f} mm ".format(
-                "{:.4g} g".format(w * 1e3) if w < 1 else "{:.4g} kg".format(w), cal * 1e3
-            ) + self.get_loc_str(typ)
-
-    def save(self):
-        gun = self.gun
-        if gun is None:
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("noDataMsg"))
-            return
-
-        file_name = filedialog.asksaveasfilename(
-            title=self.get_loc_str("saveLabel"),
-            filetypes=(("JSON file", "*.json"),),
-            defaultextension=".json",
-            initialfile=filenameize(self.get_description()),
-        )
-
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
-
-        try:
-            loc_val_dict = {
-                loc.get_description(): str(loc.get()) for loc in self.locs if hasattr(loc, "getDescriptive")
-            }
-            kvs = {**loc_val_dict, "Description": self.description.get(1.0, "end").strip("\n")}
-            with open(file_name, "w", encoding="utf-8") as file:
-                json.dump(kvs, file, indent="\t", ensure_ascii=False, sort_keys=True)
-
-            messagebox.showinfo(
-                self.get_loc_str("sucTitle"), self.get_loc_str("savedLocMsg") + " {:}".format(file_name)
-            )
-
-        except Exception as e:
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
-
-    def load(self):
-        file_name = filedialog.askopenfilename(
-            title=self.get_loc_str("loadLabel"), filetypes=(("JSON File", "*.json"),), defaultextension=".json"
-        )
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
-
-        try:
-            loc_dict = {loc.get_description(): loc for loc in self.locs if hasattr(loc, "getDescriptive")}
-            with open(file_name, "r", encoding="utf-8") as file:
-                file_dict = json.load(file)
-
-            for key, value in file_dict.items():
-                try:
-                    loc_dict[key].set(value)
-                except KeyError:
-                    pass
-
-            if DESCRIPTION in file_dict.keys():  # update description from file.
-                self.description.delete(1.0, "end")
-                self.description.insert("end", file_dict[DESCRIPTION].strip("\n"))
-
-        except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-
-            if self.debug.get() == 1:
-                err_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-            else:
-                err_msg = str(e)
-            messagebox.showinfo(self.get_loc_str("excTitle"), err_msg)
-
-        self.on_calculate()
-
-    def export_table(self):
-        gun = self.gun
-        if gun is None:
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("noDataMsg"))
-            return
-
-        file_name = filedialog.asksaveasfilename(
-            title=self.get_loc_str("exportLabel"),
-            filetypes=(("Comma Separated File", "*.csv"),),
-            defaultextension=".csv",
-            initialfile=filenameize(self.get_description()),
-        )
-        gun_type = self.kwargs["typ"]
-        column_list = self.get_loc_str("columnList")[gun_type]
-
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
-        try:
-            with open(file_name, "w", encoding="utf-8", newline="") as csvFile:
-                csv_writer = csv.writer(csvFile, delimiter=",", quoting=csv.QUOTE_MINIMAL)
-                csv_writer.writerow(column_list)
-                for line in self.gun_result.getRawTableData():
-                    csv_writer.writerow(line)
-
-            messagebox.showinfo(
-                self.get_loc_str("sucTitle"), self.get_loc_str("savedLocMsg") + " {:}".format(file_name)
-            )
-
-        except Exception as e:
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
-
-    def change_lang(self):
-
-        self.menubar.entryconfig(0, label=self.get_loc_str("fileLabel"))
-        self.menubar.entryconfig(1, label=self.get_loc_str("themeLabel"))
-        self.menubar.entryconfig(2, label=self.get_loc_str("debugLabel"))
-
-        self.file_menu.entryconfig(0, label=self.get_loc_str("saveLabel"))
-        self.file_menu.entryconfig(1, label=self.get_loc_str("loadLabel"))
-
-        self.file_menu.entryconfig(3, label=self.get_loc_str("exportMain"))
-        self.file_menu.entryconfig(4, label=self.get_loc_str("exportAux"))
-        self.file_menu.entryconfig(5, label=self.get_loc_str("exportGeom"))
-        self.file_menu.entryconfig(6, label=self.get_loc_str("exportGuide"))
-
-        self.file_menu.entryconfig(8, label=self.get_loc_str("exportLabel"))
-
-        self.debug_menu.entryconfig(0, label=self.get_loc_str("enableLabel"))
-
-        self.calc_button_tip.set(self.get_loc_str("calcButtonText"))
-
-        for locWidget in self.locs:
-            locWidget.localize()
-
-        self.calc_button.config(text=self.get_loc_str("calcLabel"))
-        self.guide_button.config(text=self.get_loc_str("guideLabel"))
-
-        self.tabParent.tab(self.plotTab, text=self.get_loc_str("plotTab"))
-        self.tabParent.tab(self.tableTab, text=self.get_loc_str("tableTab"))
-        self.tabParent.tab(self.errorTab, text=self.get_loc_str("errorTab"))
-        self.tabParent.tab(self.guideTab, text=self.get_loc_str("guideTab"))
-
-        self.prop_tab_parent.tab(self.prop_frm, text=self.get_loc_str("propFrmLabel"))
-        self.prop_tab_parent.tab(self.grain_frm, text=self.get_loc_str("grainFrmLabel"))
-
-        self.guidePlotTravel.config(text=self.get_loc_str("guidePlotTravel"))
-        self.guidePlotVolume.config(text=self.get_loc_str("guidePlotVolume"))
-        self.guidePlotBurnout.config(text=self.get_loc_str("guidePlotBurnout"))
-
-        self.update_table()
-        self.update_geom()
-        self.update_spec()
-        self.update_fig_plot()
-        self.update_aux_plot()
-        self.update_guide_graph()
-
-        super().change_lang()
-
-    def add_name_plate(self):
+        ## nameplate
         name_frm = self.add_localized_label_frame(self, label_loc_key="nameFrm")
         name_frm.grid(row=0, column=0, sticky="nsew", columnspan=2)
-
         name_frm.columnconfigure(0, weight=1)
         name_frm.rowconfigure(0, weight=1)
 
@@ -517,11 +274,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.description.grid(row=1, column=0, sticky="nsew")
 
         desc_scroll.config(command=self.description.yview)
-
         self.force_update_on_theme_widget.append(self.description)
 
-    # noinspection SpellCheckingInspection
-    def add_left_frm(self):
+        ## left frame
         left_frm = ttk.Frame(self)
         left_frm.grid(row=1, column=0, sticky="nsew")
         left_frm.columnconfigure(0, weight=1)
@@ -561,11 +316,202 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="peffLabel", tooltip_loc_key="peffText"),
             i + 2,
         )
-        self.ld, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="ldLabel"), i + 2
+        # self.ld, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="ldLabel"), i + 2
         self.pa, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="paLabel"), i + 2
         self.gm, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="gmLabel"), i + 2
 
-    def add_right_frm(self):
+        ## center frame
+        self.tab_parent = ttk.Notebook(self, padding=0)
+        self.tab_parent.grid(row=1, column=1, sticky="nsew")
+
+        self.tab_parent.columnconfigure(0, weight=1)
+        self.tab_parent.rowconfigure(0, weight=1)
+
+        self.plot_tab = Frame(self.tab_parent)
+        self.plot_tab.grid(row=0, column=0, stick="nsew")
+        self.plot_tab.rowconfigure(0, weight=2)
+        self.plot_tab.rowconfigure(1, weight=1)
+        self.plot_tab.columnconfigure(0, weight=1)
+
+        self.table_tab = Frame(self.tab_parent)
+        self.table_tab.grid(row=0, column=0, sticky="nsew")
+        self.table_tab.rowconfigure(0, weight=1)
+        self.table_tab.columnconfigure(0, weight=1)
+
+        self.guide_tab = Frame(self.tab_parent)
+        self.guide_tab.grid(row=0, column=0, sticky="nsew")
+        self.guide_tab.rowconfigure(0, weight=1)
+        self.guide_tab.columnconfigure(0, weight=1)
+
+        self.errorTab = Frame(self.tab_parent)
+        self.errorTab.grid(row=0, column=0, sticky="nsew")
+        self.errorTab.rowconfigure(0, weight=1)
+        self.errorTab.columnconfigure(0, weight=1)
+
+        self.tab_parent.add(self.plot_tab, text=self.get_loc_str("plotTab"))
+        self.tab_parent.add(self.table_tab, text=self.get_loc_str("tableTab"))
+        self.tab_parent.add(self.guide_tab, text=self.get_loc_str("guideTab"))
+        self.tab_parent.add(self.errorTab, text=self.get_loc_str("errorTab"))
+
+        self.tab_parent.enable_traversal()
+
+        ## table frame
+        tbl_frm = self.add_localized_label_frame(self.table_tab, label_loc_key="tblFrmLabel")
+        tbl_frm.grid(row=0, column=0, sticky="nsew")
+
+        tbl_frm.columnconfigure(0, weight=1)
+        tbl_frm.rowconfigure(0, weight=1)
+
+        tbl_place_frm = Frame(tbl_frm)
+        tbl_place_frm.grid(row=0, column=0, sticky="nsew")
+
+        vertscroll = ttk.Scrollbar(tbl_frm, orient="vertical")  # create a scrollbar
+        vertscroll.grid(row=0, rowspan=2, column=1, sticky="nsew")
+
+        horzscroll = ttk.Scrollbar(tbl_frm, orient="horizontal")
+        horzscroll.grid(row=1, column=0, sticky="nsew")
+
+        self.tv = ttk.Treeview(
+            tbl_place_frm, selectmode="browse", yscrollcommand=vertscroll.set, xscrollcommand=horzscroll.set
+        )  # this set the nbr. of values
+        self.tv.place(relwidth=1, relheight=1)
+
+        vertscroll.configure(command=self.tv.yview)  # make it vertical
+        horzscroll.configure(command=self.tv.xview)
+
+        ## error frame
+        error_frm = self.add_localized_label_frame(self.errorTab, label_loc_key="errFrmLabel")
+        error_frm.grid(row=0, column=0, columnspan=3, sticky="nsew")
+        error_frm.columnconfigure(0, weight=1)
+        error_frm.rowconfigure(0, weight=1)
+
+        err_scroll = ttk.Scrollbar(error_frm, orient="vertical")
+        err_scroll.grid(row=0, column=1, sticky="nsew")
+        self.error_text = Text(
+            error_frm,
+            yscrollcommand=err_scroll.set,
+            wrap="word",
+            height=6,
+            width=0,
+            font=(FONTNAME, FONTSIZE),
+            state="disabled",
+        )
+        self.error_text.grid(row=0, column=0, sticky="nsew")
+
+        self.error_text.tag_configure(str(logging.DEBUG), foreground="tan")
+        self.error_text.tag_configure(str(logging.WARNING), foreground="orange")
+        self.error_text.tag_configure(str(logging.ERROR), foreground="orangered")
+        self.error_text.tag_configure(str(logging.CRITICAL), foreground="red")
+
+        err_scroll.config(command=self.error_text.yview)
+        self.force_update_on_theme_widget.append(self.error_text)
+
+        plot_frm = self.add_localized_label_frame(
+            self.plot_tab, label_loc_key="plotFrmLabel", tooltip_loc_key="plotText"
+        )
+        plot_frm.grid(row=0, column=0, sticky="nsew")
+
+        for i in range(5):
+            plot_frm.columnconfigure(i, weight=1)
+
+        j = 1
+        k = 0
+        self.plot_avg_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotAvgP", row=j, col=k)
+        k += 1
+        self.plot_base_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotBaseP", row=j, col=k)
+        k += 1
+        self.plot_breech_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotBreechP", row=j, col=k)
+        k += 1
+        self.plot_stag_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotStagP", row=j, col=k)
+        j += 1
+
+        k = 0
+        self.plot_vel = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotVel", row=j, col=k)
+        k += 1
+        self.plot_nozzle_v = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotNozzleV", row=j, col=k)
+        k += 1
+        self.plot_burnup = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotBurnup", row=j, col=k)
+        k += 1
+        self.plot_eta = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotEta", row=j, col=k)
+
+        for check in (
+            self.plot_avg_p,
+            self.plot_base_p,
+            self.plot_breech_p,
+            self.plot_stag_p,
+            self.plot_vel,
+            self.plot_nozzle_v,
+            self.plot_burnup,
+            self.plot_eta,
+        ):
+            check.trace_add("write", self.update_fig_plot)
+
+        plot_frm.columnconfigure(0, weight=1)
+        plot_frm.rowconfigure(0, weight=1)
+
+        plot_place_frm = Frame(plot_frm)
+        plot_place_frm.grid(row=0, column=0, padx=2, pady=2, sticky="nsew", columnspan=5)
+
+        with mpl.rc_context(CONTEXT):
+            fig = Figure(dpi=96, layout="constrained")
+            axes = fig.add_subplot(111)
+
+            ax = axes
+            ax_p, ax_v = ax.twinx(), ax.twinx()
+
+            ax.yaxis.tick_right()
+            ax_v.yaxis.tick_left()
+
+            ax.set_xlabel(" ")
+            # noinspection PyTypeChecker
+            ax_p.spines.right.set_position(("data", 0.5))
+            ax_p.yaxis.set_ticks(ax_p.get_yticks()[1:-1:])
+
+            self.ax, self.ax_p, self.ax_v, self.fig = ax, ax_p, ax_v, fig
+
+            self.plt_canvas = FigureCanvasTkAgg(fig, master=plot_place_frm)
+            self.plt_canvas.draw_idle()
+            self.plt_canvas.get_tk_widget().place(relheight=1, relwidth=1)
+
+        aux_frm = self.add_localized_label_frame(self.plot_tab, label_loc_key="auxFrmLabel", tooltip_loc_key="auxText")
+        aux_frm.grid(row=1, column=0, sticky="nsew")
+
+        for i in range(2):
+            aux_frm.columnconfigure(i, weight=1)
+
+        j = 1
+        k = 0
+        self.trace_hull, k = (
+            self.add_localized_label_check(parent=aux_frm, row=j, col=k, label_loc_key="traceHull", default=1),
+            k + 1,
+        )
+
+        self.trace_press, k = (
+            self.add_localized_label_check(parent=aux_frm, row=j, col=k, label_loc_key="tracePress"),
+            k + 1,
+        )
+
+        for check in (self.trace_hull, self.trace_press):
+            check.trace_add("write", self.update_aux_plot)
+
+        aux_frm.columnconfigure(0, weight=1)
+        aux_frm.rowconfigure(0, weight=1)
+
+        aux_place_frm = Frame(aux_frm)
+        aux_place_frm.grid(row=0, column=0, padx=2, pady=2, sticky="nsew", columnspan=2)
+
+        with mpl.rc_context(CONTEXT):
+            fig = Figure(dpi=96, layout="constrained")
+
+            self.aux_ax = fig.add_subplot(111)
+            self.aux_ax_h = self.aux_ax.twinx()
+            self.aux_fig = fig
+            self.aux_ax_h.yaxis.tick_right()
+            self.aux_canvas = FigureCanvasTkAgg(fig, master=aux_place_frm)
+            self.aux_canvas.draw_idle()
+            self.aux_canvas.get_tk_widget().place(relwidth=1, relheight=1)
+
+        ## right frame
         right_frm = ttk.Frame(self)
         right_frm.grid(row=0, column=3, rowspan=2, sticky="nsew")
         right_frm.columnconfigure(0, weight=1)
@@ -723,7 +669,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             j + 1,
         )
-        # noinspection SpellCheckingInspection
         self.lg_max, j = (
             self.add_localized_3_input(
                 parent=cons_frm,
@@ -832,267 +777,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         # self.root.bind("<space>", lambda *_: self.onGuide())
         self.guide_button.grid(row=6, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
-    def generate_kwargs(self):
-        constrain = self.solve_W_Lg.get() == 1
-        lock = self.lock_Lg.get() == 1
-        optimize = self.opt_lf.get() == 1
-        debug = self.debug.get() == 1
-        atmosphere = self.in_atmos.get() == 1
-        autofrettage = self.is_af.get() == 1
-
-        gun_type = self.type_optn.get_obj()
-
-        if self.prop is None:
-            raise ValueError("Invalid propellant.")
-
-        if self.use_cv.get_obj() == USE_CV:
-            chamber_volume = float(self.cvL.get()) * 1e-3
-        else:
-            chamber_volume = float(self.chg_kg.get()) / self.prop.rho_p / float(self.ldf.get()) * 100
-
-        chambrage = float(self.clr.get())
-        charge_mass = float(self.chg_kg.get())
-        caliber = float(self.cal_mm.get()) * 1e-3
-
-        gun_length = float(self.tbl_mm.get()) * 1e-3
-        load_fraction = float(self.ldf.get()) * 1e-2
-
-        self.kwargs = {
-            "opt": optimize,
-            "con": constrain,
-            "deb": debug,
-            "lock": lock,
-            "typ": gun_type,
-            "dom": self.drop_domain.get_obj(),
-            "sol": self.drop_soln.get_obj(),
-            "control": self.p_control.get_obj(),
-            "structuralMaterial": self.drop_mat.get_obj().createMaterialAtTemp(self.drop_mat_temp.get_obj()),
-            "structuralSafetyFactor": float(self.ssf.get()),
-            "caliber": caliber,
-            "shotMass": float(self.sht_kg.get()),
-            "propellant": self.prop,
-            "grainSize": float(self.web_mm.get()) * 1e-3,
-            "chargeMass": charge_mass,
-            "chargeMassRatio": float(self.chg_kg.get()) / float(self.sht_kg.get()),
-            "chamberVolume": chamber_volume,
-            "startPressure": float(self.stp_MPa.get()) * 1e6,
-            "lengthGun": gun_length,
-            "chambrage": chambrage,  # chamber expansion
-            "nozzleExpansion": float(self.nozz_exp.get()),  # nozzle expansion
-            "nozzleEfficiency": float(self.nozz_eff.get()) * 1e-2,  # nozzle efficiency
-            "dragCoefficient": float(self.dgc.get()) * 1e-2,  # drag coefficient
-            "designPressure": float(self.p_tgt.get()) * 1e6,  # design pressure
-            "designVelocity": float(self.v_tgt.get()),  # design velocity
-            "tol": 10 ** -int(self.acc_exp.get()),
-            "minWeb": 1e-6 * float(self.min_web.get()),
-            "maxLength": float(self.lg_max.get()),
-            "loadFraction": load_fraction,
-            "step": int(self.step.get()),
-            "autofrettage": autofrettage,
-            "knownBore": lock,
-            "minCMR": float(self.guide_min_cmr.get()),
-            "maxCMR": float(self.guide_max_cmr.get()),
-            "stepCMR": float(self.guide_step_cmr.get()),
-            "minLF": float(self.guide_min_lf.get()) * 1e-2,
-            "maxLF": float(self.guide_max_lf.get()) * 1e-2,
-            "stepLF": float(self.guide_step_lf.get()) * 1e-2,
-        }
-
-        if atmosphere:
-            self.kwargs.update(
-                {
-                    "ambientP": float(self.amb_p.get()) * 1e3,
-                    "ambientRho": float(self.amb_rho.get()),
-                    "ambientGamma": float(self.amb_gamma.get()),
-                }
-            )
-        else:
-            self.kwargs.update({"ambientP": 0, "ambientRho": 0, "ambientGamma": 1})
-
-    def on_guide(self):
-        if self.process or self.guide_process:
-            return
-
-        self.focus()  # remove focus to force widget entry validation
-        self.update()  # and wait for the event to update.
-
-        self.guide_process = None
-        try:
-            self.generate_kwargs()
-            self.guide_process = Process(
-                target=guide, args=(self.guide_job_queue, self.progress_queue, self.log_queue, self.kwargs)
-            )
-            self.guide_process.start()
-
-        except Exception as e:
-            self.handle_errors(e)
-            self.guide = None
-            self.update_guide_graph()
-        else:
-            for loc in self.locs:
-                try:
-                    loc.inhibit()
-                except AttributeError:
-                    pass
-
-            self.calc_button.config(state="disabled")
-            self.guide_button.config(state="disabled")
-
-    def on_calculate(self):
-        if self.process or self.guide_process:
-            return
-        self.focus()  # remove focus to force widget entry validation
-        self.update()  # and wait for the event to update.
-
-        self.process = None
-        try:
-            self.generate_kwargs()
-            self.process = Process(
-                target=calculate, args=(self.job_queue, self.progress_queue, self.log_queue, self.kwargs)
-            )
-
-            self.process.start()
-
-        except Exception as e:
-            self.handle_errors(e)
-
-            self.gun, self.gun_result = None, None
-            self.update_table()
-            self.update_fig_plot()
-            self.update_aux_plot()
-        else:
-            for loc in self.locs:
-                try:
-                    loc.inhibit()
-                except AttributeError:
-                    pass
-
-            self.calc_button.config(state="disabled")
-            self.guide_button.config(state="disabled")
-
-    def get_value(self):
-        try:
-            self.kwargs, self.gun, self.gun_result = self.job_queue.get_nowait()
-        except Empty:
-            return
-
-        self.process = None
-        kwargs = self.kwargs
-
-        constrain = self.kwargs["con"]
-        lock = kwargs["lock"]
-        optimize = kwargs["opt"]
-        # gunType = kwargs["typ"]
-        caliber = kwargs["caliber"]
-        chambrage = kwargs["chambrage"]
-        true_lf = kwargs["loadFraction"]
-
-        bore_s = pi * 0.25 * caliber**2
-        breech_s = bore_s * chambrage
-
-        sigfig = int(-log10(kwargs["tol"])) + 1
-        gun = self.gun
-
-        if gun:
-            if constrain:
-                # noinspection SpellCheckingInspection
-                webmm = round_sig(kwargs["grainSize"] * 1e3, n=sigfig)
-                self.web_mm.set(webmm)
-
-                if not lock:
-                    # noinspection SpellCheckingInspection
-                    lgmm = round_sig(kwargs["lengthGun"] * 1e3, n=sigfig)
-                    self.tbl_mm.set(lgmm)
-
-                if optimize:
-                    if self.use_cv.get_obj() == USE_CV:
-                        self.cvL.set(round_sig(kwargs["chamberVolume"] * 1e3, n=sigfig))
-                    else:
-                        self.ldf.set(
-                            round_sig(kwargs["loadFraction"] * 100, n=sigfig)
-                        )  # corrected "bulk" load fraction
-
-            self.ld.set(toSI(true_lf * self.prop.rho_p, useSN=False, unit="kg/m³"))
-            # true load density
-
-            ps = self.gun_result.readTableData(POINT_PEAK_SHOT).shotPressure
-
-            eta_t, eta_b, eta_p = self.gun_result.getEff()
-
-            self.te.set(str(round(eta_t * 100, 2)) + " %")
-            self.be.set(str(round(eta_b * 100, 2)) + " %")
-            self.pe.set(str(round(eta_p * 100, 2)) + " %")
-
-            self.va.set(toSI(gun.v_j, unit="m/s"))
-
-            cartridge_len = kwargs["chamberVolume"] / breech_s  # is equivalent to chamber length
-
-            self.lx.set(
-                (
-                    toSI(kwargs["lengthGun"] / caliber, unit="Cal"),
-                    toSI((kwargs["lengthGun"] + cartridge_len / kwargs["chambrage"]) / kwargs["caliber"], unit="Cal"),
-                )
-            )
-
-            self.ammo.set(toSI(cartridge_len, unit="m"))
-            self.pa.set(toSI(ps * gun.S / gun.m, unit="m/s²"))
-            self.name.set(self.get_description())
-
-            tube_mass = self.gun_result.tubeMass
-            self.gm.set(format_mass(tube_mass))
-
-            peak_average_entry = self.gun_result.readTableData(POINT_PEAK_AVG)
-            peak_breech_entry = self.gun_result.readTableData(POINT_PEAK_BREECH)
-
-            self.pp.set(
-                (
-                    f"{toSI(peak_average_entry.avgPressure, unit='Pa'):}" + self.get_loc_str("mean"),
-                    f"{toSI(peak_breech_entry.breechPressure, unit='Pa'):}" + self.get_loc_str("breech"),
-                )
-            )
-
-            muzzle_entry = self.gun_result.readTableData(POINT_EXIT)
-
-            self.mv.set(toSI(muzzle_entry.velocity, unit="m/s"))
-
-            # p = self.tabParent.index(self.tabParent.select())  # find the currently active tab
-            # if p == 2 or p == 3:  # if the guidance/logging pane is currently selected.
-            #     self.tabParent.select(0)  # goto the graphing pane
-
-        else:  # calculation results in some error
-            # self.tabParent.select(3)  # goto the error pane
-            pass
-
-        self.update_table()
-        self.update_fig_plot()
-        self.update_aux_plot()
-        self.calc_button.config(state="normal")
-        self.guide_button.config(state="normal")
-
-        for loc in self.locs:
-            try:
-                loc.disinhibit()
-            except AttributeError:
-                pass
-
-    def getGuide(self):
-        try:
-            self.guide = self.guide_job_queue.get_nowait()
-        except Empty:
-            return
-
-        self.guide_process = None
-        self.update_guide_graph()
-        self.calc_button.config(state="normal")
-        self.guide_button.config(state="normal")
-
-        for loc in self.locs:
-            try:
-                loc.disinhibit()
-            except AttributeError:
-                pass
-
-    def add_spec_frm(self):
+        ## spec frame
         spec_frm = self.add_localized_label_frame(self, label_loc_key="specFrmLabel")
         spec_frm.grid(row=0, column=2, rowspan=2, sticky="nsew")
         spec_frm.columnconfigure(0, weight=1)
@@ -1340,23 +1025,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
 
         self.use_cv = self.add_localized_dropdown(
-            parent=spec_frm, str_obj_dict={USE_CV: USE_CV, USE_LF: USE_LF}, desc_label_key="cvlfLabel"
+            parent=spec_frm, str_obj_dict={USE_CV: USE_CV, USE_LD: USE_LD, USE_LF: USE_LF}, desc_label_key="cvlfLabel"
         )
         self.use_cv.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         i += 1
-
-        self.ldf, i = (
-            self.add_localized_3_input(
-                parent=spec_frm,
-                row=i,
-                label_loc_key="ldfLabel",
-                unit_text="%",
-                default="50.0",
-                validation=validation_ce,
-                tooltip_loc_key="ldfText",
-            ),
-            i + 1,
-        )
 
         self.cvL, i = (
             self.add_localized_3_input(
@@ -1365,9 +1037,34 @@ class InteriorBallisticsFrame(LocalizedFrame):
             i + 1,
         )
 
-        self.use_cv.trace_add("write", self.cvlf_callback)
-        for widget in (self.cvL, self.ldf, self.chg_kg, self.acc_exp):
-            widget.trace_add("write", self.cvlf_consistency_callback)
+        self.ld, i = (
+            self.add_localized_3_input(
+                parent=spec_frm,
+                row=i,
+                label_loc_key="ldLabel",
+                unit_text="kg/m³",
+                default="1.0",
+                validation=validation_nn,
+            ),
+            i + 1,
+        )
+
+        self.lf, i = (
+            self.add_localized_3_input(
+                parent=spec_frm,
+                row=i,
+                label_loc_key="ldfLabel",
+                unit_text="%",
+                default="1.0",
+                validation=validation_ce,
+                tooltip_loc_key="ldfText",
+            ),
+            i + 1,
+        )
+
+        self.use_cv.trace_add("write", self.cvldlf_callback)
+        for widget in (self.cvL, self.lf, self.ld, self.chg_kg, self.acc_exp):
+            widget.trace_add("write", self.cvldlf_consistency_callback)
 
         self.clr, i = (
             self.add_localized_3_input(
@@ -1490,18 +1187,18 @@ class InteriorBallisticsFrame(LocalizedFrame):
         ):
             entry.trace_add("write", self.callback)
 
-    def add_geom_plot(self):
+        ## geom plot
         with mpl.rc_context(CONTEXT):
             fig = Figure(dpi=96, layout="constrained")
-            self.geomFig = fig
-            self.geomAx = fig.add_subplot(111)
+            self.geom_fig = fig
+            self.geom_ax = fig.add_subplot(111)
 
-            self.geomCanvas = FigureCanvasTkAgg(fig, master=self.geom_plot_frm)
-            self.geomCanvas.draw_idle()
-            self.geomCanvas.get_tk_widget().place(relheight=1, relwidth=1)
+            self.geom_canvas = FigureCanvasTkAgg(fig, master=self.geom_plot_frm)
+            self.geom_canvas.draw_idle()
+            self.geom_canvas.get_tk_widget().place(relheight=1, relwidth=1)
 
-    def add_guide_plot(self):
-        plot_frm = self.add_localized_label_frame(self.guideTab, label_loc_key="guideFrmLabel")
+        ## guide plot
+        plot_frm = self.add_localized_label_frame(self.guide_tab, label_loc_key="guideFrmLabel")
         plot_frm.grid(row=0, column=0, sticky="nsew")
 
         with mpl.rc_context(CONTEXT):
@@ -1512,7 +1209,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.guide_canvas.draw_idle()
             self.guide_canvas.get_tk_widget().place(relheight=1, relwidth=1)
 
-        control_frm = Frame(self.guideTab)
+        control_frm = Frame(self.guide_tab)
         control_frm.grid(row=1, column=0, sticky="nsew")
 
         self.guide_index = IntVar(value=3)
@@ -1520,194 +1217,534 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         for i in range(3):
             control_frm.columnconfigure(i, weight=1)
-        self.guidePlotTravel = ttk.Radiobutton(
+        self.guide_plot_travel = ttk.Radiobutton(
             control_frm, text=self.get_loc_str("guidePlotTravel"), variable=self.guide_index, value=3
         )
-        self.guidePlotTravel.grid(row=0, column=0, sticky="nsew")
+        self.guide_plot_travel.grid(row=0, column=0, sticky="nsew")
 
-        self.guidePlotVolume = ttk.Radiobutton(
+        self.guide_plot_volume = ttk.Radiobutton(
             control_frm, text=self.get_loc_str("guidePlotVolume"), variable=self.guide_index, value=4
         )
-        self.guidePlotVolume.grid(row=0, column=1, sticky="nsew")
+        self.guide_plot_volume.grid(row=0, column=1, sticky="nsew")
 
-        self.guidePlotBurnout = ttk.Radiobutton(
+        self.guide_plot_burnout = ttk.Radiobutton(
             control_frm, text=self.get_loc_str("guidePlotBurnout"), variable=self.guide_index, value=5
         )
-        self.guidePlotBurnout.grid(row=0, column=2, sticky="nsew")
+        self.guide_plot_burnout.grid(row=0, column=2, sticky="nsew")
 
-    def add_center_frm(self):
-        self.tabParent = ttk.Notebook(self, padding=0)
-        self.tabParent.grid(row=1, column=1, sticky="nsew")
+        self.amb_callback()
+        self.cvldlf_callback()
+        self.type_callback()
+        self.ctrl_callback()
 
-        self.tabParent.columnconfigure(0, weight=1)
-        self.tabParent.rowconfigure(0, weight=1)
+        self.update_stats()
+        self.update_table()
+        self.update_spec()
+        self.update_geom()
 
-        self.plotTab = Frame(self.tabParent)
-        self.plotTab.grid(row=0, column=0, stick="nsew")
-        self.plotTab.rowconfigure(0, weight=2)
-        self.plotTab.rowconfigure(1, weight=1)
-        self.plotTab.columnconfigure(0, weight=1)
+        # self.bind("<Configure>", self.resizePlot)
 
-        self.tableTab = Frame(self.tabParent)
-        self.tableTab.grid(row=0, column=0, sticky="nsew")
-        self.tableTab.rowconfigure(0, weight=1)
-        self.tableTab.columnconfigure(0, weight=1)
+        parent.protocol("WM_DELETE_WINDOW", self.quit)
 
-        self.guideTab = Frame(self.tabParent)
-        self.guideTab.grid(row=0, column=0, sticky="nsew")
-        self.guideTab.rowconfigure(0, weight=1)
-        self.guideTab.columnconfigure(0, weight=1)
+        self.use_theme()  # <- an update is authorized here
 
-        self.errorTab = Frame(self.tabParent)
-        self.errorTab.grid(row=0, column=0, sticky="nsew")
-        self.errorTab.rowconfigure(0, weight=1)
-        self.errorTab.columnconfigure(0, weight=1)
+        self.tLid = None
 
-        self.tabParent.add(self.plotTab, text=self.get_loc_str("plotTab"))
-        self.tabParent.add(self.tableTab, text=self.get_loc_str("tableTab"))
-        self.tabParent.add(self.guideTab, text=self.get_loc_str("guideTab"))
-        self.tabParent.add(self.errorTab, text=self.get_loc_str("errorTab"))
+        text_handler = TextHandler(self.error_text)
+        root_logger.addHandler(text_handler)
+        root_logger.info("text handler attached to root logger.")
 
-        self.tabParent.enable_traversal()
+        console = logging.StreamHandler(sys.stderr)
+        console.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(message)s"))
+        self.listener = QueueListener(self.log_queue, text_handler, console)
+        self.listener.start()
 
-        self.add_tbl_frm()
-        self.add_err_frm()
+        root_logger.info("text handler attached to subprocess log queue listener.")
 
-        self.add_fig_plot()
+        self.timed_loop()
 
-    def add_err_frm(self):
-        error_frm = self.add_localized_label_frame(self.errorTab, label_loc_key="errFrmLabel")
-        error_frm.grid(row=0, column=0, columnspan=3, sticky="nsew")
-        error_frm.columnconfigure(0, weight=1)
-        error_frm.rowconfigure(0, weight=1)
+    def handle_errors(self, exception: Exception, level: Literal[30, 40] = logging.ERROR):
+        if self.debug.get():
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            root_logger.log(level, "".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        else:
+            root_logger.log(level, str(exception))
 
-        err_scroll = ttk.Scrollbar(error_frm, orient="vertical")
-        err_scroll.grid(row=0, column=1, sticky="nsew")
-        self.error_text = Text(
-            error_frm,
-            yscrollcommand=err_scroll.set,
-            wrap="word",
-            height=6,
-            width=0,
-            font=(FONTNAME, FONTSIZE),
-            state="disabled",
+    def timed_loop(self):
+        # polling function for the calculation subprocess
+        try:
+            p = None
+            while not self.progress_queue.empty():
+                pg = self.progress_queue.get_nowait()
+                p = pg if p is None else max(p, pg)
+            if p is not None:
+                self.progress.set(p)
+        except Empty:
+            pass
+
+        if self.process:
+            self.get_value()
+
+        if self.guide_process:
+            self.get_guide()
+
+        # noinspection PyTypeChecker
+        self.tLid = self.after(33, self.timed_loop)
+
+    def quit(self):
+        if self.process:
+            self.process.terminate()
+            self.process.kill()
+
+        if self.guide_process:
+            self.guide_process.terminate()
+            self.guide_process.kill()
+
+        self.listener.stop()
+
+        if self.tLid is not None:
+            self.after_cancel(self.tLid)
+
+        super().quit()
+
+    def get_description(self):
+        if self.gun is None:
+            return "N/A"
+        else:
+            typ, cal, w = self.kwargs["typ"], self.kwargs["caliber"], self.kwargs["shotMass"]
+            return "{:} {:.0f} mm ".format(
+                "{:.4g} g".format(w * 1e3) if w < 1 else "{:.4g} kg".format(w), cal * 1e3
+            ) + self.get_loc_str(typ)
+
+    def save(self):
+        gun = self.gun
+        if gun is None:
+            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("noDataMsg"))
+            return
+
+        file_name = filedialog.asksaveasfilename(
+            title=self.get_loc_str("saveLabel"),
+            filetypes=(("JSON file", "*.json"),),
+            defaultextension=".json",
+            initialfile=filenameize(self.get_description()),
         )
-        self.error_text.grid(row=0, column=0, sticky="nsew")
 
-        self.error_text.tag_configure(str(logging.DEBUG), foreground="tan")
-        self.error_text.tag_configure(str(logging.WARNING), foreground="orange")
-        self.error_text.tag_configure(str(logging.ERROR), foreground="orangered")
-        self.error_text.tag_configure(str(logging.CRITICAL), foreground="red")
+        if file_name == "":
+            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
+            return
 
-        err_scroll.config(command=self.error_text.yview)
-        self.force_update_on_theme_widget.append(self.error_text)
+        try:
+            loc_val_dict = {
+                loc.get_description(): str(loc.get()) for loc in self.locs if hasattr(loc, "getDescriptive")
+            }
+            kvs = {**loc_val_dict, "Description": self.description.get(1.0, "end").strip("\n")}
+            with open(file_name, "w", encoding="utf-8") as file:
+                json.dump(kvs, file, indent="\t", ensure_ascii=False, sort_keys=True)
 
-    def add_fig_plot(self):
-        plot_frm = self.add_localized_label_frame(
-            self.plotTab, label_loc_key="plotFrmLabel", tooltip_loc_key="plotText"
+            messagebox.showinfo(
+                self.get_loc_str("sucTitle"), self.get_loc_str("savedLocMsg") + " {:}".format(file_name)
+            )
+
+        except Exception as e:
+            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+
+    def load(self):
+        file_name = filedialog.askopenfilename(
+            title=self.get_loc_str("loadLabel"), filetypes=(("JSON File", "*.json"),), defaultextension=".json"
         )
-        plot_frm.grid(row=0, column=0, sticky="nsew")
+        if file_name == "":
+            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
+            return
 
-        for i in range(5):
-            plot_frm.columnconfigure(i, weight=1)
+        try:
+            loc_dict = {loc.get_description(): loc for loc in self.locs if hasattr(loc, "getDescriptive")}
+            with open(file_name, "r", encoding="utf-8") as file:
+                file_dict = json.load(file)
 
-        j = 1
-        k = 0
-        self.plot_avg_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotAvgP", row=j, col=k)
-        k += 1
-        self.plot_base_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotBaseP", row=j, col=k)
-        k += 1
-        self.plot_breech_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotBreechP", row=j, col=k)
-        k += 1
-        self.plot_stag_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotStagP", row=j, col=k)
-        j += 1
+            for key, value in file_dict.items():
+                try:
+                    loc_dict[key].set(value)
+                except KeyError:
+                    pass
 
-        k = 0
-        self.plot_vel = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotVel", row=j, col=k)
-        k += 1
-        self.plot_nozzle_v = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotNozzleV", row=j, col=k)
-        k += 1
-        self.plot_burnup = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotBurnup", row=j, col=k)
-        k += 1
-        self.plot_eta = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotEta", row=j, col=k)
+            if DESCRIPTION in file_dict.keys():  # update description from file.
+                self.description.delete(1.0, "end")
+                self.description.insert("end", file_dict[DESCRIPTION].strip("\n"))
 
-        for check in (
-            self.plot_avg_p,
-            self.plot_base_p,
-            self.plot_breech_p,
-            self.plot_stag_p,
-            self.plot_vel,
-            self.plot_nozzle_v,
-            self.plot_burnup,
-            self.plot_eta,
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+
+            if self.debug.get() == 1:
+                err_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            else:
+                err_msg = str(e)
+            messagebox.showinfo(self.get_loc_str("excTitle"), err_msg)
+
+        self.on_calculate()
+
+    def export_table(self):
+        gun = self.gun
+        if gun is None:
+            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("noDataMsg"))
+            return
+
+        file_name = filedialog.asksaveasfilename(
+            title=self.get_loc_str("exportLabel"),
+            filetypes=(("Comma Separated File", "*.csv"),),
+            defaultextension=".csv",
+            initialfile=filenameize(self.get_description()),
+        )
+        gun_type = self.kwargs["typ"]
+        column_list = self.get_loc_str("columnList")[gun_type]
+
+        if file_name == "":
+            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
+            return
+        try:
+            with open(file_name, "w", encoding="utf-8", newline="") as csvFile:
+                csv_writer = csv.writer(csvFile, delimiter=",", quoting=csv.QUOTE_MINIMAL)
+                csv_writer.writerow(column_list)
+                for line in self.gun_result.getRawTableData():
+                    csv_writer.writerow(line)
+
+            messagebox.showinfo(
+                self.get_loc_str("sucTitle"), self.get_loc_str("savedLocMsg") + " {:}".format(file_name)
+            )
+
+        except Exception as e:
+            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+
+    def change_lang(self):
+
+        self.menubar.entryconfig(0, label=self.get_loc_str("fileLabel"))
+        self.menubar.entryconfig(1, label=self.get_loc_str("themeLabel"))
+        self.menubar.entryconfig(2, label=self.get_loc_str("debugLabel"))
+
+        self.file_menu.entryconfig(0, label=self.get_loc_str("saveLabel"))
+        self.file_menu.entryconfig(1, label=self.get_loc_str("loadLabel"))
+
+        self.file_menu.entryconfig(3, label=self.get_loc_str("exportMain"))
+        self.file_menu.entryconfig(4, label=self.get_loc_str("exportAux"))
+        self.file_menu.entryconfig(5, label=self.get_loc_str("exportGeom"))
+        self.file_menu.entryconfig(6, label=self.get_loc_str("exportGuide"))
+
+        self.file_menu.entryconfig(8, label=self.get_loc_str("exportLabel"))
+
+        self.debug_menu.entryconfig(0, label=self.get_loc_str("enableLabel"))
+
+        self.calc_button_tip.set(self.get_loc_str("calcButtonText"))
+
+        for loc_widget in self.locs:
+            loc_widget.localize()
+
+        self.calc_button.config(text=self.get_loc_str("calcLabel"))
+        self.guide_button.config(text=self.get_loc_str("guideLabel"))
+
+        self.tab_parent.tab(self.plot_tab, text=self.get_loc_str("plotTab"))
+        self.tab_parent.tab(self.table_tab, text=self.get_loc_str("tableTab"))
+        self.tab_parent.tab(self.errorTab, text=self.get_loc_str("errorTab"))
+        self.tab_parent.tab(self.guide_tab, text=self.get_loc_str("guideTab"))
+
+        self.prop_tab_parent.tab(self.prop_frm, text=self.get_loc_str("propFrmLabel"))
+        self.prop_tab_parent.tab(self.grain_frm, text=self.get_loc_str("grainFrmLabel"))
+
+        self.guide_plot_travel.config(text=self.get_loc_str("guidePlotTravel"))
+        self.guide_plot_volume.config(text=self.get_loc_str("guidePlotVolume"))
+        self.guide_plot_burnout.config(text=self.get_loc_str("guidePlotBurnout"))
+
+        self.update_stats()
+        self.update_table()
+        self.update_geom()
+        self.update_spec()
+        self.update_fig_plot()
+        self.update_aux_plot()
+        self.update_guide_graph()
+
+        super().change_lang()
+
+    def generate_kwargs(self):
+        constrain = self.solve_W_Lg.get() == 1
+        lock = self.lock_Lg.get() == 1
+        optimize = self.opt_lf.get() == 1
+        debug = self.debug.get() == 1
+        atmosphere = self.in_atmos.get() == 1
+        autofrettage = self.is_af.get() == 1
+
+        gun_type = self.type_optn.get_obj()
+
+        if self.prop is None:
+            raise ValueError("Invalid propellant.")
+
+        use_cv = self.use_cv.get_obj()
+
+        if use_cv == USE_CV:
+            chamber_volume = float(self.cvL.get()) * 1e-3
+        elif use_cv == USE_LF:
+            chamber_volume = float(self.chg_kg.get()) / self.prop.rho_p / float(self.lf.get()) * 100
+        elif use_cv == USE_LD:
+            chamber_volume = float(self.chg_kg.get()) / float(self.ld.get())
+        else:
+            raise ValueError("Invalid use_cv.")
+
+        chambrage = float(self.clr.get())
+        charge_mass = float(self.chg_kg.get())
+        caliber = float(self.cal_mm.get()) * 1e-3
+
+        gun_length = float(self.tbl_mm.get()) * 1e-3
+        load_fraction = float(self.lf.get()) * 1e-2
+
+        self.kwargs = {
+            "opt": optimize,
+            "con": constrain,
+            "deb": debug,
+            "lock": lock,
+            "typ": gun_type,
+            "dom": self.drop_domain.get_obj(),
+            "sol": self.drop_soln.get_obj(),
+            "control": self.p_control.get_obj(),
+            "structuralMaterial": self.drop_mat.get_obj().createMaterialAtTemp(self.drop_mat_temp.get_obj()),
+            "structuralSafetyFactor": float(self.ssf.get()),
+            "caliber": caliber,
+            "shotMass": float(self.sht_kg.get()),
+            "propellant": self.prop,
+            "grainSize": float(self.web_mm.get()) * 1e-3,
+            "chargeMass": charge_mass,
+            "chargeMassRatio": float(self.chg_kg.get()) / float(self.sht_kg.get()),
+            "chamberVolume": chamber_volume,
+            "startPressure": float(self.stp_MPa.get()) * 1e6,
+            "lengthGun": gun_length,
+            "chambrage": chambrage,  # chamber expansion
+            "nozzleExpansion": float(self.nozz_exp.get()),  # nozzle expansion
+            "nozzleEfficiency": float(self.nozz_eff.get()) * 1e-2,  # nozzle efficiency
+            "dragCoefficient": float(self.dgc.get()) * 1e-2,  # drag coefficient
+            "designPressure": float(self.p_tgt.get()) * 1e6,  # design pressure
+            "designVelocity": float(self.v_tgt.get()),  # design velocity
+            "tol": 10 ** -int(self.acc_exp.get()),
+            "minWeb": 1e-6 * float(self.min_web.get()),
+            "maxLength": float(self.lg_max.get()),
+            "loadFraction": load_fraction,
+            "step": int(self.step.get()),
+            "autofrettage": autofrettage,
+            "knownBore": lock,
+            "minCMR": float(self.guide_min_cmr.get()),
+            "maxCMR": float(self.guide_max_cmr.get()),
+            "stepCMR": float(self.guide_step_cmr.get()),
+            "minLF": float(self.guide_min_lf.get()) * 1e-2,
+            "maxLF": float(self.guide_max_lf.get()) * 1e-2,
+            "stepLF": float(self.guide_step_lf.get()) * 1e-2,
+        }
+
+        if atmosphere:
+            self.kwargs.update(
+                {
+                    "ambientP": float(self.amb_p.get()) * 1e3,
+                    "ambientRho": float(self.amb_rho.get()),
+                    "ambientGamma": float(self.amb_gamma.get()),
+                }
+            )
+        else:
+            self.kwargs.update({"ambientP": 0, "ambientRho": 0, "ambientGamma": 1})
+
+    def on_guide(self):
+        if self.process or self.guide_process:
+            return
+
+        self.focus()  # remove focus to force widget entry validation
+        self.update()  # and wait for the event to update.
+
+        self.guide_process = None
+        try:
+            self.generate_kwargs()
+            self.guide_process = Process(
+                target=guide, args=(self.guide_job_queue, self.progress_queue, self.log_queue, self.kwargs)
+            )
+            self.guide_process.start()
+
+        except Exception as e:
+            self.handle_errors(e)
+            self.guide = None
+            self.update_guide_graph()
+        else:
+            for loc in self.locs:
+                try:
+                    loc.inhibit()
+                except AttributeError:
+                    pass
+
+            self.calc_button.config(state="disabled")
+            self.guide_button.config(state="disabled")
+
+    def on_calculate(self):
+        if self.process or self.guide_process:
+            return
+        self.focus()  # remove focus to force widget entry validation
+        self.update()  # and wait for the event to update.
+
+        self.process = None
+        try:
+            self.generate_kwargs()
+            self.process = Process(
+                target=calculate, args=(self.job_queue, self.progress_queue, self.log_queue, self.kwargs)
+            )
+
+            self.process.start()
+
+        except Exception as e:
+            self.handle_errors(e)
+
+            self.gun, self.gun_result = None, None
+            self.update_table()
+            self.update_fig_plot()
+            self.update_aux_plot()
+        else:
+            for loc in self.locs:
+                try:
+                    loc.inhibit()
+                except AttributeError:
+                    pass
+
+            self.calc_button.config(state="disabled")
+            self.guide_button.config(state="disabled")
+
+    def get_value(self):
+        try:
+            self.kwargs, self.gun, self.gun_result = self.job_queue.get_nowait()
+        except Empty:
+            return
+
+        self.process = None
+        kwargs = self.kwargs
+
+        constrain = self.kwargs["con"]
+        lock = kwargs["lock"]
+        optimize = kwargs["opt"]
+        caliber = kwargs["caliber"]
+        chambrage = kwargs["chambrage"]
+
+        bore_s = pi * 0.25 * caliber**2
+
+        sigfig = int(-log10(kwargs["tol"])) + 1
+        gun = self.gun
+
+        if gun:
+            if constrain:
+                # noinspection SpellCheckingInspection
+                webmm = round_sig(kwargs["grainSize"] * 1e3, n=sigfig)
+                self.web_mm.set(webmm)
+
+                if not lock:
+                    # noinspection SpellCheckingInspection
+                    lgmm = round_sig(kwargs["lengthGun"] * 1e3, n=sigfig)
+                    self.tbl_mm.set(lgmm)
+
+                if optimize:
+                    if self.use_cv.get_obj() == USE_CV:
+                        self.cvL.set(round_sig(kwargs["chamberVolume"] * 1e3, n=sigfig))
+                    else:
+                        self.lf.set(round_sig(kwargs["loadFraction"] * 100, n=sigfig))  # corrected "bulk" load fraction
+
+            # p = self.tabParent.index(self.tabParent.select())  # find the currently active tab
+            # if p == 2 or p == 3:  # if the guidance/logging pane is currently selected.
+            #     self.tabParent.select(0)  # goto the graphing pane
+
+        else:  # calculation results in some error
+            # self.tabParent.select(3)  # goto the error pane
+            pass
+
+        self.update_stats()
+        self.update_table()
+        self.update_fig_plot()
+        self.update_aux_plot()
+        self.calc_button.config(state="normal")
+        self.guide_button.config(state="normal")
+
+        for loc in self.locs:
+            try:
+                loc.disinhibit()
+            except AttributeError:
+                pass
+
+    def update_stats(self, *_):
+
+        self.name.set(self.get_description())  # this would always work
+
+        for entry in (
+            self.te,
+            self.be,
+            self.pe,
+            self.va,
+            self.lx,
+            self.ammo,
+            self.pa,
+            self.gm,
+            self.pp,
+            self.mv,
         ):
-            check.trace_add("write", self.update_fig_plot)
+            entry.reset()
+        try:
+            caliber = self.kwargs["caliber"]
+            chambrage = self.kwargs["chambrage"]
+            travel = self.kwargs["lengthGun"]
 
-        plot_frm.columnconfigure(0, weight=1)
-        plot_frm.rowconfigure(0, weight=1)
+            bore_s = pi * 0.25 * caliber**2
+            breech_s = bore_s * chambrage
 
-        plotPlaceFrm = Frame(plot_frm)
-        plotPlaceFrm.grid(row=0, column=0, padx=2, pady=2, sticky="nsew", columnspan=5)
+            ps = self.gun_result.readTableData(POINT_PEAK_SHOT).shotPressure
 
-        with mpl.rc_context(CONTEXT):
-            fig = Figure(dpi=96, layout="constrained")
-            axes = fig.add_subplot(111)
+            eta_t, eta_b, eta_p = self.gun_result.getEff()
 
-            ax = axes
-            ax_p = ax.twinx()
-            ax_v = ax.twinx()
+            self.te.set(str(round(eta_t * 100, 2)) + " %")
+            self.be.set(str(round(eta_b * 100, 2)) + " %")
+            self.pe.set(str(round(eta_p * 100, 2)) + " %")
 
-            ax.yaxis.tick_right()
-            ax_v.yaxis.tick_left()
+            self.va.set(toSI(self.gun.v_j, unit="m/s"))
 
-            ax.set_xlabel(" ")
-            # noinspection PyTypeChecker
-            ax_p.spines.right.set_position(("data", 0.5))
-            ax_p.yaxis.set_ticks(ax_p.get_yticks()[1:-1:])
+            cartridge_len = self.kwargs["chamberVolume"] / breech_s  # is equivalent to chamber length
 
-            self.ax, self.ax_p, self.ax_v, self.fig = ax, ax_p, ax_v, fig
+            self.lx.set(
+                (
+                    toSI(travel / caliber, unit="Cal"),
+                    toSI(
+                        (travel + cartridge_len / chambrage) / caliber,
+                        unit="Cal",
+                    ),
+                )
+            )
 
-            self.pltCanvas = FigureCanvasTkAgg(fig, master=plotPlaceFrm)
-            self.pltCanvas.draw_idle()
-            self.pltCanvas.get_tk_widget().place(relheight=1, relwidth=1)
+            self.ammo.set(toSI(cartridge_len, unit="m"))
+            self.pa.set(toSI(ps * self.gun.S / self.gun.m, unit="m/s²"))
+            tube_mass = self.gun_result.tubeMass
+            self.gm.set(format_mass(tube_mass))
+            peak_average_entry = self.gun_result.readTableData(POINT_PEAK_AVG)
+            peak_breech_entry = self.gun_result.readTableData(POINT_PEAK_BREECH)
+            self.pp.set(
+                (
+                    f"{toSI(peak_average_entry.avgPressure, unit='Pa'):}" + self.get_loc_str("mean"),
+                    f"{toSI(peak_breech_entry.breechPressure, unit='Pa'):}" + self.get_loc_str("breech"),
+                )
+            )
+            muzzle_entry = self.gun_result.readTableData(POINT_EXIT)
+            self.mv.set(toSI(muzzle_entry.velocity, unit="m/s"))
 
-        aux_frm = self.add_localized_label_frame(self.plotTab, label_loc_key="auxFrmLabel", tooltip_loc_key="auxText")
-        aux_frm.grid(row=1, column=0, sticky="nsew")
+        except Exception:
+            pass
 
-        for i in range(2):
-            aux_frm.columnconfigure(i, weight=1)
+    def get_guide(self):
+        try:
+            self.guide = self.guide_job_queue.get_nowait()
+        except Empty:
+            return
 
-        j = 1
-        k = 0
-        self.trace_hull, k = (
-            self.add_localized_label_check(parent=aux_frm, row=j, col=k, label_loc_key="traceHull", default=1),
-            k + 1,
-        )
+        self.guide_process = None
+        self.update_guide_graph()
+        self.calc_button.config(state="normal")
+        self.guide_button.config(state="normal")
 
-        self.trace_press, k = (
-            self.add_localized_label_check(parent=aux_frm, row=j, col=k, label_loc_key="tracePress"),
-            k + 1,
-        )
-
-        for check in (self.trace_hull, self.trace_press):
-            check.trace_add("write", self.update_aux_plot)
-
-        aux_frm.columnconfigure(0, weight=1)
-        aux_frm.rowconfigure(0, weight=1)
-
-        aux_place_frm = Frame(aux_frm)
-        aux_place_frm.grid(row=0, column=0, padx=2, pady=2, sticky="nsew", columnspan=2)
-
-        with mpl.rc_context(CONTEXT):
-            fig = Figure(dpi=96, layout="constrained")
-
-            self.aux_ax = fig.add_subplot(111)
-            self.aux_ax_h = self.aux_ax.twinx()
-            self.aux_fig = fig
-            self.aux_ax_h.yaxis.tick_right()
-            self.aux_canvas = FigureCanvasTkAgg(fig, master=aux_place_frm)
-            self.aux_canvas.draw_idle()
-            self.aux_canvas.get_tk_widget().place(relwidth=1, relheight=1)
+        for loc in self.locs:
+            try:
+                loc.disinhibit()
+            except AttributeError:
+                pass
 
     def update_fig_plot(self, *_):
         with mpl.rc_context(CONTEXT):
@@ -1720,56 +1757,34 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 gun_type = self.kwargs["typ"]
                 dom = self.kwargs["dom"]
 
-                xs, vs = [], []
+                xs, vs, vxs, pas, pss, pbs, p0s, psis, etas = [], [], [], [], [], [], [], [], []
 
-                pas, pss, pbs, p0s = [], [], [], []
-                psis, etas = [], []
-                vxs = []
+                for entry in self.gun_result.getRawTableData():
+                    tag, (time, l, psi, v, pb, p, ps, temp, vx, px, p0, eta) = "", repeat(0.0, 12)
 
-                if gun_type == CONVENTIONAL:
-                    for tag, t, l, psi, v, Pb, P, Ps, T in self.gun_result.getRawTableData():
-                        if tag == POINT_PEAK_AVG:
-                            if dom == DOMAIN_TIME:
-                                x_peak = t * 1e3
-                            elif dom == DOMAIN_LEN:
-                                x_peak = l
+                    if gun_type == CONVENTIONAL:
+                        tag, time, l, psi, v, pb, p, ps, temp = entry
+                    elif gun_type == RECOILLESS:
+                        tag, time, l, psi, v, vx, px, p0, p, ps, temp, eta = entry
 
-                        if dom == DOMAIN_TIME:
-                            xs.append(t * 1000)
-                        elif dom == DOMAIN_LEN:
-                            xs.append(l)
+                    if tag == self.p_control.get():
+                        x_peak = (time * 1e3) if dom == DOMAIN_TIME else l
+                        # noinspection PyTypeChecker
+                        self.ax_p.spines.left.set_position(("data", x_peak))
 
-                        vs.append(v)
-                        pas.append(P / 1e6)
-                        pss.append(Ps / 1e6)
-                        pbs.append(Pb / 1e6)
-                        psis.append(psi)
+                    if dom == DOMAIN_TIME:
+                        xs.append(time * 1000)
+                    elif dom == DOMAIN_LEN:
+                        xs.append(l)
 
-                elif gun_type == RECOILLESS:
-                    for tag, t, l, psi, v, vx, Px, P0, P, Ps, T, eta in self.gun_result.getRawTableData():
-                        if tag == POINT_PEAK_AVG:
-                            if dom == DOMAIN_TIME:
-                                x_peak = t * 1e3
-                            elif dom == DOMAIN_LEN:
-                                x_peak = l
-
-                        if dom == DOMAIN_TIME:
-                            xs.append(t * 1000)
-                        elif dom == DOMAIN_LEN:
-                            xs.append(l)
-
-                        # Fr = P * gun.S * (1 - gun.C_f * gun.S_j_bar)
-                        vs.append(v)
-                        vxs.append(vx)
-                        pas.append(P / 1e6)
-                        pss.append(Ps / 1e6)
-                        pbs.append(Px / 1e6)
-                        p0s.append(P0 / 1e6)
-                        # Frs.append(Fr / 1e6)
-                        psis.append(psi)
-                        etas.append(eta)
-
-                self.ax_p.spines.left.set_position(("data", x_peak))
+                    vs.append(v)
+                    vxs.append(vx)
+                    pas.append(p / 1e6)
+                    pss.append(ps / 1e6)
+                    pbs.append(max(px / 1e6, pb / 1e6))
+                    p0s.append(p0 / 1e6)
+                    psis.append(psi)
+                    etas.append(eta)
 
                 if self.plot_breech_p.get():
                     self.ax_p.plot(
@@ -1779,11 +1794,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                         label=(
                             self.get_loc_str("figBreech")
                             if gun_type == CONVENTIONAL
-                            else (
-                                self.get_loc_str("figNozzleP")
-                                if gun_type == RECOILLESS
-                                else self.get_loc_str("figBleedP")
-                            )
+                            else self.get_loc_str("figNozzleP")
                         ),
                     )
 
@@ -1859,10 +1870,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
             else:
                 pass
 
-            self.pltCanvas.draw_idle()
+            self.plt_canvas.draw_idle()
 
-    # noinspection PyUnusedLocal
-    def update_aux_plot(self, *args):
+    def update_aux_plot(self, *_):
         if self.gun is None:
             with mpl.rc_context(CONTEXT):
                 self.aux_ax.cla()
@@ -1942,36 +1952,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_ax_h.set_ylim(bottom=0)
             self.aux_canvas.draw_idle()
 
-    def add_tbl_frm(self):
-        tbl_frm = self.add_localized_label_frame(self.tableTab, label_loc_key="tblFrmLabel")
-        tbl_frm.grid(row=0, column=0, sticky="nsew")
-
-        tbl_frm.columnconfigure(0, weight=1)
-        tbl_frm.rowconfigure(0, weight=1)
-
-        tbl_place_frm = Frame(tbl_frm)
-        tbl_place_frm.grid(row=0, column=0, sticky="nsew")
-
-        vertscroll = ttk.Scrollbar(tbl_frm, orient="vertical")  # create a scrollbar
-        vertscroll.grid(row=0, rowspan=2, column=1, sticky="nsew")
-
-        horzscroll = ttk.Scrollbar(tbl_frm, orient="horizontal")
-        horzscroll.grid(row=1, column=0, sticky="nsew")
-
-        self.tv = ttk.Treeview(
-            tbl_place_frm, selectmode="browse", yscrollcommand=vertscroll.set, xscrollcommand=horzscroll.set
-        )  # this set the nbr. of values
-        self.tv.place(relwidth=1, relheight=1)
-
-        vertscroll.configure(command=self.tv.yview)  # make it vertical
-        horzscroll.configure(command=self.tv.xview)
-
     def update_spec(self, *_):
         self.specs.config(state="normal")
         compo = self.drop_prop.get_obj()
         self.specs.delete("1.0", "end")
-        # width = self.specs.winfo_width() // self.font.measure("m")
-        # noinspection SpellCheckingInspection
+
         if compo.T_v:
             self.specs.insert(
                 "end",
@@ -2001,10 +1986,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
         for line in compo.desc.split(","):
             self.specs.insert("end", line + "\n")
         self.specs.config(state="disabled")
-        # this updates the specification description
 
         self.callback()
-        self.cvlf_consistency_callback()  # update the chamber volume / load fraction with current data
+        self.cvldlf_consistency_callback()  # update the chamber volume / load fraction with current data
 
     def update_geom(self, *_):
 
@@ -2060,7 +2044,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
     def update_geom_plot(self):
         with mpl.rc_context(CONTEXT):
             n = 10
-            self.geomAx.cla()
+            self.geom_ax.cla()
             prop = self.prop
             if prop is not None:
                 zb = prop.Z_b
@@ -2073,15 +2057,15 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 xs.append(xs[-1])
                 ys.append(0)
 
-                self.geomAx.plot(xs, ys)
-                self.geomAx.grid(which="major", color="grey", linestyle="dotted")
-                self.geomAx.minorticks_on()
-                self.geomAx.set_xlim(left=0, right=min(prop.Z_b, 2))
-                self.geomAx.xaxis.set_ticks([i * 0.5 for i in range(ceil(min(prop.Z_b, 2) / 0.5) + 1)])
-                self.geomAx.set_ylim(bottom=0, top=max(ys))
-                self.geomAx.yaxis.set_ticks([i * 0.25 for i in range(ceil(max(ys) / 0.25) + 1)])
+                self.geom_ax.plot(xs, ys)
+                self.geom_ax.grid(which="major", color="grey", linestyle="dotted")
+                self.geom_ax.minorticks_on()
+                self.geom_ax.set_xlim(left=0, right=min(prop.Z_b, 2))
+                self.geom_ax.xaxis.set_ticks([i * 0.5 for i in range(ceil(min(prop.Z_b, 2) / 0.5) + 1)])
+                self.geom_ax.set_ylim(bottom=0, top=max(ys))
+                self.geom_ax.yaxis.set_ticks([i * 0.25 for i in range(ceil(max(ys) / 0.25) + 1)])
 
-            self.geomCanvas.draw_idle()
+            self.geom_canvas.draw_idle()
 
     def update_table(self):
         self.tv.delete(*self.tv.get_children())
@@ -2305,27 +2289,28 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.lg_max.enable()
             self.p_control.enable()
 
-        for entry in [self.aux_grain_r1, self.aux_grain_r2, self.aux_web_ratio, self.aux_mass_ratio, self.aux_geom]:
-            if self.use_aux_grain.get() == 0:
-                entry.disable()
-            else:
-                entry.enable()
+        for entry in (self.aux_grain_r1, self.aux_grain_r2, self.aux_web_ratio, self.aux_mass_ratio, self.aux_geom):
+            entry.disable() if self.use_aux_grain.get() == 0 else entry.enable()
 
-    def cvlf_consistency_callback(self, *_):
+    def cvldlf_consistency_callback(self, *_):
         prop = self.drop_prop.get()
         try:
             sigfig = int(self.acc_exp.get()) + 1
-            if self.use_cv.get_obj() == USE_CV:  # use Cv
-                cv = float(self.cvL.get()) / 1e3
-                w = float(self.chg_kg.get())
-                rho = prop.rho_p
-                self.ldf.set(round_sig(w / cv / rho * 100, n=sigfig))
+            w = float(self.chg_kg.get())
+            cv = float(self.cvL.get())
+            lf = float(self.lf.get())
+            ld = float(self.ld.get())
+            rho = prop.rho_p
 
-            else:  # using load fraction
-                w = float(self.chg_kg.get())
-                lf = float(self.ldf.get()) / 100
-                rho = prop.rho_p
-                self.cvL.set(round_sig((w / rho / lf) * 1e3, n=sigfig))
+            if self.use_cv.get_obj() == USE_CV:  # use chamber volume
+                self.lf.set(round_sig(w / cv / rho * 1e5, n=sigfig))
+                self.ld.set(round_sig(w / cv * 1e3, n=sigfig))
+            elif self.use_cv.get_obj() == USE_LF:  # using load fraction
+                self.cvL.set(round_sig(w / rho / lf * 1e5, n=sigfig))
+                self.ld.set(round_sig(lf * rho * 1e-2, n=sigfig))
+            elif self.use_cv.get_obj() == USE_LD:
+                self.lf.set(round_sig(ld / rho * 1e2, n=sigfig))
+                self.cvL.set(round_sig(w / ld * 1e3, n=sigfig))
 
         except (ZeroDivisionError, ValueError):
             return
@@ -2335,11 +2320,18 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.amb_rho.enable() if self.in_atmos.get() else self.amb_rho.disable()
         self.amb_gamma.enable() if self.in_atmos.get() else self.amb_gamma.disable()
 
-    def cvlf_callback(self, *_):
-        use_cv = self.use_cv.get_obj() == USE_CV
+    def cvldlf_callback(self, *_):
+        use_cv = self.use_cv.get_obj()
+        self.cvL.disable()
+        self.lf.disable()
+        self.ld.disable()
 
-        self.ldf.disable() if use_cv else self.ldf.enable()
-        self.cvL.enable() if use_cv else self.cvL.disable()
+        if use_cv == USE_CV:
+            self.cvL.enable()
+        elif use_cv == USE_LF:
+            self.lf.enable()
+        elif use_cv == USE_LD:
+            self.ld.enable()
 
     def guide_callback(self, *_):
         self.update_guide_graph()
@@ -2395,10 +2387,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.error_text.tag_configure("guidegraph", background=grays[2])
 
         try:
-            for fig in (self.fig, self.geomFig, self.aux_fig, self.guide_fig):
+            for fig in (self.fig, self.geom_fig, self.aux_fig, self.guide_fig):
                 fig.set_facecolor(bgc)
 
-            for ax in (self.ax, self.ax_v, self.ax_p, self.geomAx, self.aux_ax, self.aux_ax_h, self.guide_ax):
+            for ax in (self.ax, self.ax_v, self.ax_p, self.geom_ax, self.aux_ax, self.aux_ax_h, self.guide_ax):
                 ax.set_facecolor(fbgc)
                 for place in ("top", "bottom", "left", "right"):
                     ax.spines[place].set_color(fgc)
@@ -2434,7 +2426,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             elif save == "guide":
                 fig = self.guide_fig
             elif save == "geom":
-                fig = self.geomFig
+                fig = self.geom_fig
             else:
                 raise ValueError("unknown save destination")
 
@@ -2532,7 +2524,6 @@ def guide(guide_job_queue, progress_queue, log_queue, kwargs):
         guide_job_queue.put(guide_results)
 
 
-# noinspection SpellCheckingInspection
 def main(loc: str = None):
     multiprocessing.freeze_support()
     root_logger.info("Initializing")

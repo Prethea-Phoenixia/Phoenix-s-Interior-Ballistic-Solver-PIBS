@@ -56,7 +56,7 @@ class Loc12Disp(LocalizableWidget):
         lb = ttk.Label(parent, text=loc_func(label_loc_key))
         lb.grid(row=row, column=col, columnspan=2, sticky="nsew", padx=2, pady=2)
         e = StringVar(parent)
-        e.default = default
+
         e.set(default)
         parent.rowconfigure(row, weight=0)
         en = ttk.Entry(parent, textvariable=e, width=entry_width, state="disabled", justify=justify)
@@ -80,7 +80,9 @@ class Loc12Disp(LocalizableWidget):
         self.entry_var = e
         self.entry_widget = en
 
-    def localize(self, new_loc_key=None, new_tooltip_key=None):
+        self.default = default
+
+    def localize(self, new_loc_key: str = "", new_tooltip_key: str = "") -> None:
         if new_loc_key:
             self.label_loc_key = new_loc_key
         self.label_widget.config(text=self.loc_func(self.label_loc_key))
@@ -90,8 +92,11 @@ class Loc12Disp(LocalizableWidget):
                 self.tooltip_loc_key = new_tooltip_key
             self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
-    def set(self, val):
+    def set(self, val) -> None:
         self.entry_var.set(val)
+
+    def reset(self) -> None:
+        self.entry_var.set(self.default)
 
 
 class Loc122Disp(Loc12Disp):
@@ -128,7 +133,6 @@ class Loc122Disp(Loc12Disp):
             all_localized=all_localized,
         )
         e2 = StringVar(parent)
-        e2.default = default_dn
         e2.set(default_dn)
         parent.rowconfigure(row, weight=0)
         en2 = ttk.Entry(parent, textvariable=e2, width=entry_width, state="disabled", justify=justify_dn)
@@ -137,13 +141,18 @@ class Loc122Disp(Loc12Disp):
             row=row + 2, column=col + (0 if reverse else 1), sticky="nsew", padx=2, pady=2
         )
 
-        self.auxEntryVar = e2
-        self.auxEntryWidget = en2
+        self.aux_entry_var = e2
+        self.aux_entry_widget = en2
+        self.aux_default = default_dn
 
     def set(self, val):
         val_1, val_2 = val
         self.entry_var.set(val_1)
-        self.auxEntryVar.set(val_2)
+        self.aux_entry_var.set(val_2)
+
+    def reset(self):
+        self.aux_entry_var.set(self.aux_default)
+        super().reset()
 
 
 class Loc2Input(LocalizableWidget, Descriptive):
