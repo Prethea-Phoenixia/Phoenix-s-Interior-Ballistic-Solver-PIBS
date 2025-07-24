@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from functools import wraps
-from tkinter import IntVar, StringVar, ttk, Menu, Frame
-from typing import Literal, Callable, Any
+from tkinter import Frame, IntVar, Menu, StringVar, ttk
+from typing import Any, Callable, Literal
 
 from .misc import format_float_input
 from .tip import CreateToolTip

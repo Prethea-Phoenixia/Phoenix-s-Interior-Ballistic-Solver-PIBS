@@ -1,4 +1,10 @@
-from pibs.ballistics import POINT_PEAK_AVG, GrainComp, Propellant, SimpleGeometry
+from pibs.ballistics import (
+    CONVENTIONAL,
+    POINT_PEAK_AVG,
+    GrainComp,
+    Propellant,
+    SimpleGeometry,
+)
 from pibs.guidegraph import guideGraph
 
 if __name__ == "__main__":
@@ -22,4 +28,5 @@ if __name__ == "__main__":
         minLF=0.1,
         maxLF=0.9,
         stepLF=0.033,
+        typ=CONVENTIONAL,
     )

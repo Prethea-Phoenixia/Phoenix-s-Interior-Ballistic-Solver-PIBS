@@ -1,10 +1,27 @@
-import csv, json, locale, logging, multiprocessing, platform, sys, traceback
+import csv
+import json
+import locale
+import logging
+import multiprocessing
+import platform
+import sys
+import traceback
 from ctypes import windll
 from logging.handlers import QueueHandler, QueueListener
 from math import ceil, inf, log10, pi
 from multiprocessing import Process, Queue
 from queue import Empty
-from tkinter import Frame, IntVar, Menu, StringVar, Text, Tk, filedialog, messagebox, ttk
+from tkinter import (
+    Frame,
+    IntVar,
+    Menu,
+    StringVar,
+    Text,
+    Tk,
+    filedialog,
+    messagebox,
+    ttk,
+)
 from tkinter.font import Font
 from typing import Literal
 
@@ -55,10 +72,10 @@ from .misc import (
     resolvepath,
     round_sig,
     toSI,
+    unloadfont,
     validate_ce,
     validate_nn,
     validate_pi,
-    unloadfont,
 )
 from .tip import CreateToolTip
 
@@ -756,7 +773,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 row=i,
                 col=0,
                 label_loc_key="-log10(ε)",
-                default="3",
+                default="6",
                 validation=validation_pi,
                 formatter=format_int_input,
                 color="red",
