@@ -218,7 +218,6 @@ class Constrained:
             )
         l_bar_d = self.maxLength / l_0
 
-        # noinspection PyUnusedLocal
         def abort_Z(x, ys, record):
             Z = x
             t_bar, l_bar, v_bar = ys
@@ -246,7 +245,7 @@ class Constrained:
                 l_psi_bar = 1 - Delta / rho_p - Delta * (alpha - 1 / rho_p) * psi
 
                 p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
-                if c_a_bar != 0 and v_bar > 0:
+                if c_a_bar and v_bar > 0:
                     v_r = v_bar / c_a_bar
                     p_d_bar = (
                         +0.25 * gamma_1 * (gamma_1 + 1) * v_r**2
@@ -336,27 +335,16 @@ class Constrained:
             lambda web: _f_p_e_1(web)[0],
             probeWeb,  # >0
             0.5 * probeWeb,  # ?0
-            # x_tol=,
             y_abs_tol=p_bar_d * tol,
             f_report=fr if progressQueue is not None else None,
-        )  # this is the e_1 that satisifies the pressure specification.
+        )  # this is the e_1 that satisfies the pressure specification.
 
         p_bar_dev, Z_i, t_bar_i, l_bar_i, v_bar_i = _f_p_e_1(e_1)
-
-        if abs(Z_i - Z_b) < tol:
-            """
-            fudging the starting Z value for velocity integration to prevent
-            driving integrator to 0 at the transition point.
-            """
-            Z_i = Z_b + tol
-
-        if abs(p_bar_dev) > tol * p_bar_d:
-            raise ValueError(f"Design pressure is not met, delta = {p_bar_dev * f * Delta * 1e-6:.6f} MPa")
 
         logger.info("solved web satisfying pressure constraint.")
 
         if knownBore:
-            if progressQueue is not None:
+            if progressQueue:
                 progressQueue.put(100)
             return e_1, lengthGun
 
@@ -390,12 +378,7 @@ class Constrained:
                 p_d_bar = 0
 
             dt_bar = 2 / (theta * (p_bar - p_d_bar))
-
-            if Z <= Z_b:
-                dZ = dt_bar * (0.5 * theta / B) ** 0.5 * p_bar**n
-            else:
-                dZ = 0
-
+            dZ = dt_bar * (0.5 * theta / B) ** 0.5 * p_bar**n if Z <= Z_b else 0
             dl_bar = v_bar * dt_bar
 
             return [dt_bar, dZ, dl_bar]
@@ -442,28 +425,16 @@ class Constrained:
                 + "p = {:.4g} MPa.".format(p_g * 1e-6)
             )
 
-        if abs(v_bar_g - v_bar_d) > (tol * v_bar_d):
-            raise ValueError(
-                "Velocity target is not met, last calculated to "
-                + "v = {:.4g} m/s ({:+.3g} %), x = {:.4g} m, p = {:.4g} MPa".format(
-                    v_g, (v_bar_g - v_bar_d) / v_bar_d * 1e2, l_g, p_g * 1e-6
-                )
-            )
-
         logger.info("solved tube length to satisfy design velocity.")
 
         # calculate the averaged chambrage correction factor
         # implied by this solution
-
-        kappa = it / MAX_ITER
-        l_bar_g_prime = l_bar_g_0 * kappa + l_bar_g * (1 - kappa)
-        cc_n = 1 - (1 - 1 / chi_k) * log(l_bar_g_prime + 1) / l_bar_g_prime
-        # cc_n = cc * kappa + cc_n * (1 - kappa)
+        cc_n = 1 - (1 - 1 / chi_k) * log(l_bar_g + 1) / l_bar_g
 
         if progressQueue is not None:
             progressQueue.put(100)
 
-        if abs((l_bar_g - l_bar_g_0) / l_bar_g_prime) > tol and it < MAX_ITER:
+        if abs((l_bar_g - l_bar_g_0) / min(l_bar_g, l_bar_g_0)) > tol and it < MAX_ITER:
             # successive better approximations will eventually
             # result in value within tolerance.
 

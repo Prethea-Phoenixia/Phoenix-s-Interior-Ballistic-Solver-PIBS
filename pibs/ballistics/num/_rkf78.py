@@ -236,7 +236,7 @@ def RKF78(
             """
             the generated relative error estimation for each component is to take
             the extrapolated global error (see above), divide by the least of
-            current and future estimate (in aboslute terms), or the absolute tolerance
+            current and future estimate (in absolute terms), or the absolute tolerance
             supplied, whichever is greater. This gives the "most lenient"
             interpretation of the two. This is intended to guard against cases
             where the integrated values approaches 0, such that a relative error
@@ -247,7 +247,7 @@ def RKF78(
             by zero in the case of a both a supplied absolute tolerance of zero
             and an integrand at zero point.
             """
-            Ry = abs(r) / (minTol + max((relTol * min(abs(y1), abs(y2))), absTol))
+            Ry = abs(r) / (max((relTol * min(abs(y1), abs(y2))), absTol, minTol))
             if adapt:
                 R = max(R, Ry)
             else:

@@ -6,9 +6,9 @@ GEOMETRIES:
 """
 
 import csv
+from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumType
 from math import pi
-from abc import ABC, ABCMeta, abstractmethod
 
 GEOMETRIES = {}
 

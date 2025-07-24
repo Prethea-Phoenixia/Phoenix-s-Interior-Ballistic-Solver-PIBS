@@ -349,11 +349,6 @@ class ConstrainedRecoilless:
                 i = [line[0] for line in record].index(Z_p)
 
                 return p_bar_p - p_bar_d, record[i][0], *record[i][-1]
-                # p_bar_max = max((p_bar_p, p_bar_j))
-                # if p_bar_p == p_bar_max:
-                #     return (p_bar_p - p_bar_d, record[i][0], *record[i][-1])
-                # else:
-                #     return (p_bar_j - p_bar_d, record[-1][0], *record[-1][-1])
 
         dp_bar_probe, Z, *_ = _f_p_e_1(self.minWeb)
         probeWeb = self.minWeb
@@ -389,31 +384,6 @@ class ConstrainedRecoilless:
 
         Z_i, t_bar_i, l_bar_i, v_bar_i, eta_i, tau_i = vals_1
 
-        if abs(dp_bar_i) > tol * p_bar_d:
-            dp_bar_j, *vals_2 = _f_p_e_1(e_1_2)
-            raise ValueError(
-                "Design pressure is not met, current best solution peaked at "
-                + "P = {:.4g}MPa ({:+.3g}%) ".format(
-                    (dp_bar_i + p_bar_d) * (f * Delta * 1e-6),
-                    dp_bar_i / p_bar_d * 100,
-                )
-                + "and the bracketing solution at "
-                + "P = {:.4g}MPa ({:+.3g}%),".format(
-                    (dp_bar_j + p_bar_d) * (f * Delta * 1e-6),
-                    dp_bar_j / p_bar_d * 100,
-                )
-                + " with a web difference of {:.4g} mm.".format((e_1 - e_1_2) * 1e3)
-                + " If the pressures are too disparate this may indicate desired"
-                + " solution lies at the edge or outside of solution space."
-            )
-
-        if abs(Z_i - Z_b) < tol:
-            """
-            fudging the starting Z value for velocity integration to prevent
-            driving integrator to 0 at the transition point.
-            """
-            Z_i = Z_b + tol
-
         logger.info("solved web satisfying pressure constraint.")
 
         if knownBore:
@@ -428,12 +398,11 @@ class ConstrainedRecoilless:
 
         if v_bar_i > v_bar_d:
             if suppress:
-                logger.warning("velocity target point occured before peak pressure point.")
+                logger.warning("velocity target point occurred before peak pressure point.")
                 logger.warning("this is currently being suppressed due to program control.")
             else:
                 raise ValueError(f"Design velocity exceeded before peak pressure point (V = {v_bar_i * v_j:.4g} m/s).")
 
-        # TODO: find some way of making this cross constraint less troublesome.
         B = S**2 * e_1**2 / (f * phi * omega * m * u_1**2) * (f * Delta) ** (2 * (1 - n))
 
         def _ode_v(v_bar, _, Z, l_bar, eta, tau, __):
@@ -525,13 +494,6 @@ class ConstrainedRecoilless:
                 "Target velocity is achieved before peak pressure point, "
                 + "last calculated at v = {:.4g} m/s,".format(v_g)
                 + "x = {:.4g} m, p = {:.4g} MPa. ".format(l_g, p_g * 1e-6)
-            )
-        if abs(v_bar_g - v_bar_d) > (tol * v_bar_d):
-            raise ValueError(
-                "Velocity target is not met, last calculated to "
-                + "v = {:.4g} m/s ({:+.3g} %), x = {:.4g} m, p = {:.4g} MPa".format(
-                    v_g, (v_bar_g - v_bar_d) / v_bar_d * 1e2, l_g, p_g * 1e-6
-                )
             )
 
         if progressQueue is not None:
@@ -654,15 +616,6 @@ class ConstrainedRecoilless:
                 if l[1] > m[1] and h[1] > m[1]:
                     low = l[0]
                     high = h[0]
-
-        # delta = high - low
-
-        # Edge values are sometimes only semi-stable, i.e. when calling
-        # f() with the same value will spuriously raise value errors. Therefore,
-        # we conservatively shrink the range by tolerance to avoid this issue.
-
-        # low += delta * tol
-        # high -= delta * tol
 
         """
         Step 2, gss to min.

@@ -659,7 +659,7 @@ if __name__ == "__main__":
                 "{:>2} : {:^6} {:<6.1%}".format(i, name, mass) + "{:>10,.2f}".format(num * 1e6)
                 for i, (name, mass, num) in enumerate(speciesList)
             ],
-            sep="\n"
+            sep="\n",
         )
         print("covol:", b, "g/cc")
 
