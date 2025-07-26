@@ -1613,35 +1613,29 @@ class InteriorBallisticsFrame(LocalizedFrame):
             return
 
         self.process = None
-        kwargs = self.kwargs
-
         constrain = self.kwargs["con"]
-        lock = kwargs["lock"]
-        optimize = kwargs["opt"]
-        caliber = kwargs["caliber"]
-        chambrage = kwargs["chambrage"]
+        lock = self.kwargs["lock"]
+        optimize = self.kwargs["opt"]
 
-        bore_s = pi * 0.25 * caliber**2
-
-        sigfig = int(-log10(kwargs["tol"])) + 1
+        sigfig = int(-log10(self.kwargs["tol"])) + 1
         gun = self.gun
 
         if gun:
             if constrain:
-                # noinspection SpellCheckingInspection
-                webmm = round_sig(kwargs["grainSize"] * 1e3, n=sigfig)
+                webmm = round_sig(self.kwargs["grainSize"] * 1e3, n=sigfig)
                 self.web_mm.set(webmm)
 
                 if not lock:
-                    # noinspection SpellCheckingInspection
-                    lgmm = round_sig(kwargs["lengthGun"] * 1e3, n=sigfig)
+                    lgmm = round_sig(self.kwargs["lengthGun"] * 1e3, n=sigfig)
                     self.tbl_mm.set(lgmm)
 
                 if optimize:
                     if self.use_cv.get_obj() == USE_CV:
-                        self.cvL.set(round_sig(kwargs["chamberVolume"] * 1e3, n=sigfig))
+                        self.cvL.set(round_sig(self.kwargs["chamberVolume"] * 1e3, n=sigfig))
                     else:
-                        self.lf.set(round_sig(kwargs["loadFraction"] * 100, n=sigfig))  # corrected "bulk" load fraction
+                        self.lf.set(
+                            round_sig(self.kwargs["loadFraction"] * 100, n=sigfig)
+                        )  # corrected "bulk" load fraction
 
             # p = self.tabParent.index(self.tabParent.select())  # find the currently active tab
             # if p == 2 or p == 3:  # if the guidance/logging pane is currently selected.
@@ -1668,18 +1662,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.name.set(self.get_description())  # this would always work
 
-        for entry in (
-            self.te,
-            self.be,
-            self.pe,
-            self.va,
-            self.lx,
-            self.ammo,
-            self.pa,
-            self.gm,
-            self.pp,
-            self.mv,
-        ):
+        for entry in (self.te, self.be, self.pe, self.va, self.lx, self.ammo, self.pa, self.gm, self.pp, self.mv):
             entry.reset()
         try:
             caliber = self.kwargs["caliber"]
