@@ -76,6 +76,7 @@ from .misc import (
     validate_ce,
     validate_nn,
     validate_pi,
+    detect_darkmode_in_windows,
 )
 from .tip import CreateToolTip
 
@@ -114,8 +115,7 @@ CONTEXT = {
 }
 
 
-# {theme_name: is_dark}
-THEMES = {"awdark": 0, "awlight": 1}
+THEMES = {"awlight": 1, "awdark": 0}
 
 
 def grid_configure_recursive(widget, **kwargs):
@@ -181,7 +181,7 @@ class PIBS(Tk):
 
         self.rowconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
-        frame = InteriorBallisticsFrame(
+        self.frame = InteriorBallisticsFrame(
             self,
             self,
             menubar,
@@ -189,11 +189,20 @@ class PIBS(Tk):
             default_lang="English" if loc != "zh_CN" else "中文",
             localization_dict=STRING,
             font=font,
+            os_dark=detect_darkmode_in_windows(),
         )
-        frame.grid(row=0, column=0, sticky="nsew")
+        self.frame.grid(row=0, column=0, sticky="nsew")
 
         self.minsize(self.winfo_width(), self.winfo_height())  # set minimum size
         # self.mainloop()
+
+        self.is_fullscreen = False
+
+        self.bind("<F4>", lambda *_: self.toggle_fullscreen())
+
+    def toggle_fullscreen(self):
+        self.wm_attributes("-fullscreen", self.is_fullscreen)
+        self.is_fullscreen = not self.is_fullscreen
 
     def quit(self):
         # explicitly unload the font at the end of program.
@@ -203,7 +212,7 @@ class PIBS(Tk):
 
 class InteriorBallisticsFrame(LocalizedFrame):
 
-    def __init__(self, parent, root, menubar, dpi, default_lang, localization_dict, font):
+    def __init__(self, parent, root, menubar, dpi, default_lang, localization_dict, font, os_dark: bool):
         super().__init__(parent, menubar=menubar, default_lang=default_lang, localization_dict=localization_dict)
 
         self.font = font
@@ -217,29 +226,44 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.menubar = menubar
 
         file_menu = Menu(menubar)
-        menubar.add_cascade(label=self.get_loc_str("fileLabel"), menu=file_menu, underline=0)
-        theme_menu = Menu(menubar)
-        menubar.add_cascade(label=self.get_loc_str("themeLabel"), menu=theme_menu, underline=0)
-        debug_menu = Menu(menubar)
-        menubar.add_cascade(label=self.get_loc_str("debugLabel"), menu=debug_menu, underline=0)
+        menubar.add_cascade(label=self.get_loc_str("fileLabel"), menu=file_menu)
 
+        design_menu = Menu(menubar)
+        menubar.add_cascade(label=self.get_loc_str("designLabel"), menu=design_menu)
+        theme_menu = Menu(menubar)
+        menubar.add_cascade(label=self.get_loc_str("themeLabel"), menu=theme_menu)
+        debug_menu = Menu(menubar)
+        menubar.add_cascade(label=self.get_loc_str("debugLabel"), menu=debug_menu)
+
+        self.design_menu = design_menu
         self.file_menu = file_menu
         self.theme_menu = theme_menu
         self.debug_menu = debug_menu
 
-        self.theme_name_var = StringVar(value=list(THEMES.keys())[0])
+        self.theme_name_var = StringVar(value="awdark" if os_dark else "awlight")
         self.debug = IntVar(value=0)
 
-        file_menu.add_command(label=self.get_loc_str("saveLabel"), command=self.save, underline=0)
-        file_menu.add_command(label=self.get_loc_str("loadLabel"), command=self.load, underline=0)
-        file_menu.add_separator()
+        design_menu.add_command(label=self.get_loc_str("saveLabel"), command=self.save, accelerator="Ctrl+S")
+        self.parent.bind("<Control-s>", lambda *_: self.save())
+        self.parent.bind("<Control-S>", lambda *_: self.save())
+
+        design_menu.add_command(label=self.get_loc_str("loadLabel"), command=self.load, accelerator="Ctrl+O")
+        self.parent.bind("<Control-o>", lambda *_: self.load())
+        self.parent.bind("<Control-O>", lambda *_: self.load())
+
+        design_menu.add_command(label=self.get_loc_str("calcLabel"), command=self.on_calculate, accelerator="Ctrl+R")
+        self.root.bind("<Control-R>", lambda *_: self.on_calculate())
+        self.root.bind("<Control-r>", lambda *_: self.on_calculate())
+
+        design_menu.add_command(label=self.get_loc_str("guideLabel"), command=self.on_guide, accelerator="Ctrl+G")
+        self.root.bind("<Control-G>", lambda *_: self.on_guide())
+        self.root.bind("<Control-g>", lambda *_: self.on_guide())
 
         file_menu.add_command(label=self.get_loc_str("exportMain"), command=lambda: self.export_graph(save="main"))
         file_menu.add_command(label=self.get_loc_str("exportAux"), command=lambda: self.export_graph(save="aux"))
         file_menu.add_command(label=self.get_loc_str("exportGeom"), command=lambda: self.export_graph(save="geom"))
         file_menu.add_command(label=self.get_loc_str("exportGuide"), command=lambda: self.export_graph(save="guide"))
 
-        file_menu.add_separator()
         file_menu.add_command(label=self.get_loc_str("exportLabel"), command=self.export_table)
 
         for themeName in THEMES.keys():
@@ -718,7 +742,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 row=i,
                 col=0,
                 label_loc_key="-log10(ε)",
-                default="6",
+                default="3",
                 validation=validation_pi,
                 formatter=format_int_input,
                 color="red",
@@ -729,7 +753,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.calc_button = ttk.Button(op_frm, text=self.get_loc_str("calcLabel"), command=self.on_calculate)
         self.calc_button.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        # self.root.bind("<Return>", lambda *_: self.onCalculate())
+
         op_frm.rowconfigure(i, weight=1)
         i += 1
 
@@ -774,7 +798,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             )
         )
         self.guide_button = ttk.Button(ctrl_frm, text=self.get_loc_str("guideLabel"), command=self.on_guide)
-        # self.root.bind("<space>", lambda *_: self.onGuide())
+
         self.guide_button.grid(row=6, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
         ## spec frame
@@ -1335,7 +1359,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         try:
             loc_val_dict = {
-                loc.get_description(): str(loc.get()) for loc in self.locs if hasattr(loc, "getDescriptive")
+                loc.get_descriptive(): str(loc.get()) for loc in self.locs if hasattr(loc, "get_descriptive")
             }
             kvs = {**loc_val_dict, "Description": self.description.get(1.0, "end").strip("\n")}
             with open(file_name, "w", encoding="utf-8") as file:
@@ -1357,7 +1381,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             return
 
         try:
-            loc_dict = {loc.get_description(): loc for loc in self.locs if hasattr(loc, "getDescriptive")}
+            loc_dict = {loc.get_descriptive(): loc for loc in self.locs if hasattr(loc, "get_descriptive")}
             with open(file_name, "r", encoding="utf-8") as file:
                 file_dict = json.load(file)
 
@@ -1372,13 +1396,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 self.description.insert("end", file_dict[DESCRIPTION].strip("\n"))
 
         except Exception as e:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-
-            if self.debug.get() == 1:
-                err_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-            else:
-                err_msg = str(e)
-            messagebox.showinfo(self.get_loc_str("excTitle"), err_msg)
+            self.handle_errors(e)
+            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
 
         self.on_calculate()
 
@@ -1416,19 +1435,21 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
     def change_lang(self):
 
-        self.menubar.entryconfig(0, label=self.get_loc_str("fileLabel"))
-        self.menubar.entryconfig(1, label=self.get_loc_str("themeLabel"))
-        self.menubar.entryconfig(2, label=self.get_loc_str("debugLabel"))
+        self.menubar.entryconfig(1, label=self.get_loc_str("fileLabel"))
+        self.menubar.entryconfig(2, label=self.get_loc_str("designLabel"))
+        self.menubar.entryconfig(3, label=self.get_loc_str("themeLabel"))
+        self.menubar.entryconfig(4, label=self.get_loc_str("debugLabel"))
 
-        self.file_menu.entryconfig(0, label=self.get_loc_str("saveLabel"))
-        self.file_menu.entryconfig(1, label=self.get_loc_str("loadLabel"))
+        self.design_menu.entryconfig(0, label=self.get_loc_str("saveLabel"))
+        self.design_menu.entryconfig(1, label=self.get_loc_str("loadLabel"))
+        self.design_menu.entryconfig(2, label=self.get_loc_str("calcLabel"))
+        self.design_menu.entryconfig(3, label=self.get_loc_str("guideLabel"))
 
-        self.file_menu.entryconfig(3, label=self.get_loc_str("exportMain"))
-        self.file_menu.entryconfig(4, label=self.get_loc_str("exportAux"))
-        self.file_menu.entryconfig(5, label=self.get_loc_str("exportGeom"))
-        self.file_menu.entryconfig(6, label=self.get_loc_str("exportGuide"))
-
-        self.file_menu.entryconfig(8, label=self.get_loc_str("exportLabel"))
+        self.file_menu.entryconfig(0, label=self.get_loc_str("exportMain"))
+        self.file_menu.entryconfig(1, label=self.get_loc_str("exportAux"))
+        self.file_menu.entryconfig(2, label=self.get_loc_str("exportGeom"))
+        self.file_menu.entryconfig(3, label=self.get_loc_str("exportGuide"))
+        self.file_menu.entryconfig(4, label=self.get_loc_str("exportLabel"))
 
         self.debug_menu.entryconfig(0, label=self.get_loc_str("enableLabel"))
 
@@ -1686,11 +1707,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
             self.lx.set(
                 (
-                    toSI(travel / caliber, unit="Cal"),
-                    toSI(
-                        (travel + cartridge_len / chambrage) / caliber,
-                        unit="Cal",
-                    ),
+                    toSI(travel / caliber, unit=self.get_loc_str("calLabel")),
+                    toSI((travel + cartridge_len / chambrage) / caliber, unit=self.get_loc_str("calLabel")),
                 )
             )
 

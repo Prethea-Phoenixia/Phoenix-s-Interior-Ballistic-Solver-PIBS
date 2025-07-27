@@ -188,7 +188,7 @@ class ConstrainedRecoilless:
             )
 
         psi_0 = (1 / Delta - 1 / rho_p) / (f / p_0 + alpha - 1 / rho_p)
-        Z_0, _ = dekker(lambda Z: self.propellant.f_psi_Z(Z) - psi_0, 0, 1, x_tol=tol, y_rel_tol=tol, y_abs_tol=tol**2)
+        Z_0, _ = dekker(lambda Z: self.propellant.f_psi_Z(Z) - psi_0, 0, 1, y_rel_tol=tol, y_abs_tol=tol**2)
         logger.info("solved starting burnup.")
 
         # p_bar_0 = p_0 / (f * Delta)
@@ -339,11 +339,8 @@ class ConstrainedRecoilless:
                     record.sort()
                     return _f_p_bar(Z, l_bar, v_bar, eta, tau)
 
-                Z_1, Z_2 = gss(_f_p_Z, Z_i, Z_j, y_rel_tol=0.5 * tol, findMin=False)
+                Z_1, Z_2 = gss(_f_p_Z, Z_i, Z_j, y_rel_tol=tol, findMin=False)
                 Z_p = 0.5 * (Z_1 + Z_2)
-
-                if abs(Z_p - Z_b) < tol:
-                    Z_p = Z_b
 
                 p_bar_p = _f_p_Z(Z_p)
                 i = [line[0] for line in record].index(Z_p)
@@ -423,10 +420,7 @@ class ConstrainedRecoilless:
 
             dt_bar = 2 / (theta * (p_bar - p_d_bar))
 
-            if Z <= Z_b:
-                dZ = dt_bar * (0.5 * theta / B) ** 0.5 * p_bar**n
-            else:
-                dZ = 0
+            dZ = dt_bar * (0.5 * theta / B) ** 0.5 * p_bar**n
 
             dl_bar = v_bar * dt_bar
 
@@ -437,7 +431,7 @@ class ConstrainedRecoilless:
                 psi - eta
             )  # dtau/dt_bar
 
-            return (dt_bar, dZ, dl_bar, deta, dtau)
+            return dt_bar, dZ, dl_bar, deta, dtau
 
         # noinspection PyUnusedLocal
         def abort_v(x, ys, record):
@@ -629,7 +623,7 @@ class ConstrainedRecoilless:
             lambda lf: f(lf)[1],
             low,
             high,
-            x_tol=tol,
+            y_rel_tol=tol,
             findMin=True,
             f_report=fr if progressQueue is not None else None,
         )

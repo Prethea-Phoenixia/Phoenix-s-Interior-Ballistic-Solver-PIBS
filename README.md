@@ -71,7 +71,7 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
 
 * 优化计算最小膛容解
     
-    对于常规火炮以及无座力炮，程序支持计算满足一定压强、弹速性能的最小膛容（炮管+药室容积）解。
+    对于常规火炮以及无座力炮，程序支持计算满足一定压强、弹速性能的最小膛容（含药室容积）解。
 
 ## 使用说明
 - 下载预先打包为Windows可执行文件的Python代码及运行环境

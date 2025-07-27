@@ -510,7 +510,10 @@ class LocalizedFrame(Frame):
         self.locs = []
 
         lang_menu = Menu(menubar)
-        menubar.add_cascade(label="Lang 语言", menu=lang_menu, underline=0)
+        menubar.add_cascade(
+            label="Lang 语言",
+            menu=lang_menu,
+        )
 
         for lang in localization_dict.keys():
             lang_menu.add_radiobutton(label=lang, variable=self.langVar, value=lang, command=self.change_lang)

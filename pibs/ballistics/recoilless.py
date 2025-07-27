@@ -222,10 +222,7 @@ class Recoilless:
         else:
             p_d_bar = 0
 
-        if Z <= self.Z_b:
-            dZ = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n
-        else:
-            dZ = 0  # dZ/dt_bar
+        dZ = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n
 
         dl_bar = v_bar
         dv_bar = self.theta * 0.5 * (p_bar - p_d_bar)
@@ -255,10 +252,7 @@ class Recoilless:
         else:
             p_d_bar = 0
 
-        if Z <= self.Z_b:
-            dZ = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n / v_bar
-        else:
-            dZ = 0  # dZ /dl_bar
+        dZ = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n / v_bar
         dv_bar = self.theta * 0.5 * (p_bar - p_d_bar) / v_bar  # dv_bar/dl_bar
         dt_bar = 1 / v_bar  # dt_bar / dl_bar
 

@@ -181,7 +181,7 @@ class Constrained:
             )
 
         psi_0 = (1 / Delta - 1 / rho_p) / (f / p_0 + alpha - 1 / rho_p)
-        Z_0, _ = dekker(lambda Z: self.propellant.f_psi_Z(Z) - psi_0, 0, 1, x_tol=tol, y_rel_tol=tol, y_abs_tol=tol**2)
+        Z_0, _ = dekker(lambda Z: self.propellant.f_psi_Z(Z) - psi_0, 0, 1, y_rel_tol=tol, y_abs_tol=tol**2)
         logger.info("solved starting burnup.")
 
         def _f_p_bar(Z, l_bar, v_bar):
@@ -231,7 +231,7 @@ class Constrained:
 
             return (p_bar < op_bar) or (p_bar > 2 * p_bar_d)
 
-        def _f_p_e_1(e_1):
+        def _f_p_e_1(e_1: float):
             """
             calculate either the peak pressure, given the arc thickness,
             or until the system develops 2x design pressure.
@@ -308,11 +308,8 @@ class Constrained:
             else:
                 Z_i = Z_0
 
-            Z_1, Z_2 = gss(lambda Z: _f_p_Z(Z)[0], Z_i, Z_j, y_rel_tol=0.5 * tol, findMin=False)
+            Z_1, Z_2 = gss(lambda Z: _f_p_Z(Z)[0], Z_i, Z_j, y_rel_tol=tol, y_abs_tol=tol**2, findMin=False)
             Z_p = 0.5 * (Z_1 + Z_2)
-
-            if abs(Z_p - Z_b) < tol:
-                Z_p = Z_b
 
             p_bar_p, *vals = _f_p_Z(Z_p)
 
@@ -335,6 +332,7 @@ class Constrained:
             lambda web: _f_p_e_1(web)[0],
             probeWeb,  # >0
             0.5 * probeWeb,  # ?0
+            y_rel_tol=tol,
             y_abs_tol=p_bar_d * tol,
             f_report=fr if progressQueue is not None else None,
         )  # this is the e_1 that satisfies the pressure specification.
@@ -378,7 +376,7 @@ class Constrained:
                 p_d_bar = 0
 
             dt_bar = 2 / (theta * (p_bar - p_d_bar))
-            dZ = dt_bar * (0.5 * theta / B) ** 0.5 * p_bar**n if Z <= Z_b else 0
+            dZ = dt_bar * (0.5 * theta / B) ** 0.5 * p_bar**n
             dl_bar = v_bar * dt_bar
 
             return [dt_bar, dZ, dl_bar]
@@ -453,7 +451,7 @@ class Constrained:
             )
             # TODO: Maximum recursion depth exceeded in comparison is occasionally thrown here. Investigate why.
         else:
-            logger.info("solution satisfying chambrage found.")
+            logger.info(f"solution satisfying chambrage found after {it} iterations.")
             return e_1, l_bar_g * l_0
 
     def findMinV(self, chargeMassRatio, progressQueue=None, **_):
@@ -585,11 +583,6 @@ class Constrained:
                 if l[1] > m[1] and h[1] > m[1]:
                     low = l[0]
                     high = h[0]
-
-        # delta = high - low
-
-        # low += delta * tol
-        # high -= delta * tol
 
         """
         Step 2, gss to min.

@@ -202,7 +202,7 @@ def RKF78(
             te = [y - y_hat for y, y_hat in zip(y_next, y_next_hat)]
 
         except (
-            ValueError,  # catch complex numbers being supplied to funcitons, etc
+            ValueError,  # catch complex numbers being supplied to functions, etc
             TypeError,  # catch complex numbers being used in comparisons, etc
             ZeroDivisionError,  # divide by zero in the equation
             OverflowError,  # numerical overflow, in practice very rare
@@ -320,7 +320,8 @@ def main():
     def df1(x, y, _):
         return (7 * y**2 * x**3,)
 
-    _, v, e = RKF78(df1, (3,), 2, 0, relTol=1e-4, absTol=1e-4, minTol=1e-14, debug=True)
+    for _ in range(100):
+        _, v, e = RKF78(df1, (3,), 2, 0, relTol=1e-4, absTol=1e-4, minTol=1e-14, debug=True)
 
     print(v)
     print(e)

@@ -311,10 +311,7 @@ class Gun:
         else:
             p_d_bar = 0
 
-        if Z <= self.Z_b:
-            dZ = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n
-        else:
-            dZ = 0  # dZ/dt_bar
+        dZ = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n
 
         dl_bar = v_bar
         dv_bar = self.theta * 0.5 * (p_bar - p_d_bar)
@@ -338,10 +335,7 @@ class Gun:
         else:
             p_d_bar = 0
 
-        if Z <= self.Z_b:
-            dZ = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n / v_bar
-        else:
-            dZ = 0  # dZ /dl_bar
+        dZ = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n / v_bar
 
         dv_bar = self.theta * 0.5 * (p_bar - p_d_bar) / v_bar  # dv_bar/dl_bar
         dt_bar = 1 / v_bar  # dt_bar / dl_bar
@@ -391,10 +385,8 @@ class Gun:
     def dPdZ(self, Z, l_bar, v_bar):
         psi = self.f_psi_Z(Z)
         p_bar = self.f_p_bar(Z, l_bar, v_bar)
-        if Z <= self.Z_b:
-            dZ = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n
-        else:
-            return 0
+
+        dZ = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n
 
         l_psi_bar = 1 - self.Delta * ((1 - psi) / self.rho_p + (self.alpha * psi))
         dp_bar = (
@@ -1172,7 +1164,7 @@ class Gun:
                         m + 2 * tol,
                         y=sigma,
                         x_min=m,
-                        y_rel_tol=tol**2,
+                        y_rel_tol=tol,
                     )
 
                 rho_s.append(rho)
