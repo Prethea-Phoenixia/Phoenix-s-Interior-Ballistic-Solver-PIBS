@@ -37,19 +37,19 @@ OptionalFloat = Optional[float]
 
 def f(
     target: Constrained,
-    loadFraction: float,
-    chargeMassRatio: float,
+    load_fraction: float,
+    charge_mass_ratio: float,
     caliber: float,
     propellant: Propellant,
-    dragCoefficient: float,
-    nozzleExpansion: float,
-    nozzleEfficiency: float,
+    drag_coefficient: float,
+    nozzle_expansion: float,
+    nozzle_efficiency: float,
     tol: float,
-    minWeb: float,
-    maxLength: float,
-    ambientRho: float,
-    ambientP: float,
-    ambientGamma: float,
+    min_web: float,
+    max_length: float,
+    ambient_rho: float,
+    ambient_p: float,
+    ambient_gamma: float,
     control: Points,
     sol: Solutions,
     dom: Domains,
@@ -58,74 +58,74 @@ def f(
     **__,
 ):
 
-    chargeMass = target.m * chargeMassRatio
-    loadDensity = loadFraction * target.propellant.rho_p
+    charge_mass = target.m * charge_mass_ratio
+    load_density = load_fraction * target.propellant.rho_p
     try:
-        halfWeb, lengthGun = target.solve(
-            loadFraction,
-            chargeMassRatio,
+        half_web, length_gun = target.solve(
+            load_fraction,
+            charge_mass_ratio,
             tol=tol,
-            minWeb=minWeb,
-            maxLength=maxLength,
+            minWeb=min_web,
+            maxLength=max_length,
             sol=sol,
-            ambientRho=ambientRho,
-            ambientP=ambientP,
-            ambientGamma=ambientGamma,
+            ambientRho=ambient_rho,
+            ambientP=ambient_p,
+            ambientGamma=ambient_gamma,
             control=control,
         )
 
-        chamberVolume = chargeMass / loadDensity
+        chamber_volume = charge_mass / load_density
 
         if typ == CONVENTIONAL:
             gun = Gun(
                 caliber=caliber,
-                shotMass=target.m,
+                shot_mass=target.m,
                 propellant=propellant,
-                grainSize=2 * halfWeb,
-                chargeMass=chargeMass,
-                chamberVolume=chamberVolume,
-                startPressure=target.p_0,
-                lengthGun=lengthGun,
+                grain_size=2 * half_web,
+                charge_mass=charge_mass,
+                chamber_volume=chamber_volume,
+                start_pressure=target.p_0,
+                length_gun=length_gun,
                 chambrage=target.chi_k,
-                dragCoefficient=dragCoefficient,
+                drag_coefficient=drag_coefficient,
             )
         elif typ == RECOILLESS:
             gun = Recoilless(
                 caliber=caliber,
-                shotMass=target.m,
+                shot_mass=target.m,
                 propellant=propellant,
-                grainSize=2 * halfWeb,
-                chargeMass=chargeMass,
-                chamberVolume=chamberVolume,
-                startPressure=target.p_0,
-                lengthGun=lengthGun,
+                grain_size=2 * half_web,
+                charge_mass=charge_mass,
+                chamber_volume=chamber_volume,
+                start_pressure=target.p_0,
+                length_gun=length_gun,
                 chambrage=target.chi_k,
-                dragCoefficient=dragCoefficient,
-                nozzleExpansion=nozzleExpansion,
-                nozzleEfficiency=nozzleEfficiency,
+                drag_coefficient=drag_coefficient,
+                nozzle_expansion=nozzle_expansion,
+                nozzle_efficiency=nozzle_efficiency,
             )
         else:
             raise ValueError("unknown gun type")
 
-        gunResult = gun.integrate(
-            step=0, tol=tol, dom=dom, sol=sol, ambientRho=ambientRho, ambientP=ambientP, ambientGamma=ambientGamma
+        gun_result = gun.integrate(
+            step=0, tol=tol, dom=dom, sol=sol, ambient_rho=ambient_rho, ambient_p=ambient_p, ambient_gamma=ambient_gamma
         )
 
         try:
-            burnout = gunResult.readTableData(POINT_BURNOUT).travel / lengthGun
+            burnout = gun_result.read_table_data(POINT_BURNOUT).travel / length_gun
         except ValueError:
             burnout = inf
 
-        tubeVolume = lengthGun * target.S
-        volume = chamberVolume + tubeVolume  # convert to liters
+        tube_volume = length_gun * target.s
+        volume = chamber_volume + tube_volume  # convert to liters
 
     except ValueError:
-        halfWeb, lengthGun, volume, burnout = None, None, None, None
+        half_web, length_gun, volume, burnout = None, None, None, None
 
-    return loadDensity, chargeMass, halfWeb, lengthGun, volume, burnout
+    return load_density, charge_mass, half_web, length_gun, volume, burnout
 
 
-def guideGraph(*_, **kwargs):
+def guide_graph(*_, **kwargs):
     typ = kwargs["typ"]
 
     if typ == CONVENTIONAL:
@@ -135,28 +135,28 @@ def guideGraph(*_, **kwargs):
     else:
         raise ValueError("unknown gun type")
 
-    loadFractions, chargeMassRatios, chargeMasses, loadDensities = [], [], [], []
+    load_fractions, charge_mass_ratios, charge_masses, load_densities = [], [], [], []
 
-    minCMR, maxCMR, stepCMR = (kwargs[k] for k in ("minCMR", "maxCMR", "stepCMR"))
-    chargeMassRatio = minCMR
-    while chargeMassRatio < maxCMR + 0.5 * stepCMR:
-        chargeMassRatios.append(chargeMassRatio)
-        chargeMasses.append(chargeMassRatio * target.m)
-        chargeMassRatio += stepCMR
+    min_cmr, max_cmr, step_cmr = (kwargs[k] for k in ("min_cmr", "max_cmr", "step_cmr"))
+    charge_mass_ratio = min_cmr
+    while charge_mass_ratio < max_cmr + 0.5 * step_cmr:
+        charge_mass_ratios.append(charge_mass_ratio)
+        charge_masses.append(charge_mass_ratio * target.m)
+        charge_mass_ratio += step_cmr
 
-    minLF, maxLF, stepLF = (kwargs[k] for k in ("minLF", "maxLF", "stepLF"))
-    loadFraction = minLF
+    min_lf, max_lf, step_lf = (kwargs[k] for k in ("min_lf", "max_lf", "step_lf"))
+    load_fraction = min_lf
 
-    while loadFraction < maxLF + 0.5 * stepLF:
-        loadFractions.append(loadFraction)
-        loadDensities.append(loadFraction * target.propellant.rho_p)
-        loadFraction += stepLF
+    while load_fraction < max_lf + 0.5 * step_lf:
+        load_fractions.append(load_fraction)
+        load_densities.append(load_fraction * target.propellant.rho_p)
+        load_fraction += step_lf
 
     parameters = []
-    for chargeMassRatio in chargeMassRatios:
-        for loadFraction in loadFractions:
+    for charge_mass_ratio in charge_mass_ratios:
+        for load_fraction in load_fractions:
             kv = {k: v for k, v in kwargs.items()}
-            kv.update({"loadFraction": loadFraction, "chargeMassRatio": chargeMassRatio})
+            kv.update({"load_fraction": load_fraction, "charge_mass_ratio": charge_mass_ratio})
             parameters.append(kv)
 
     processes = os.cpu_count()
@@ -166,8 +166,8 @@ def guideGraph(*_, **kwargs):
     with multiprocessing.Pool(processes=processes) as pool:
         results = starstarmap(pool, f, repeat([target], len(parameters)), parameters)
 
-    shapedResults = [
-        results[i * len(loadFractions) : (i + 1) * len(loadFractions)] for i in range(len(chargeMassRatios))
+    shaped_results = [
+        results[i * len(load_fractions) : (i + 1) * len(load_fractions)] for i in range(len(charge_mass_ratios))
     ]
 
-    return shapedResults
+    return shaped_results

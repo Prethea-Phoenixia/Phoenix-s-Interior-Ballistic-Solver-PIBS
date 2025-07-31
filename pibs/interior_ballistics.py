@@ -11,17 +11,7 @@ from logging.handlers import QueueHandler, QueueListener
 from math import ceil, inf, log10, pi
 from multiprocessing import Process, Queue
 from queue import Empty
-from tkinter import (
-    Frame,
-    IntVar,
-    Menu,
-    StringVar,
-    Text,
-    Tk,
-    filedialog,
-    messagebox,
-    ttk,
-)
+from tkinter import Frame, IntVar, Menu, StringVar, Text, Tk, filedialog, messagebox, ttk
 from tkinter.font import Font
 from typing import Literal
 from itertools import repeat
@@ -31,7 +21,7 @@ from matplotlib import font_manager
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-from pibs.guidegraph import guideGraph
+from pibs.guidegraph import guide_graph
 
 from . import __version__
 from .ballistics import (
@@ -55,7 +45,7 @@ from .ballistics import (
     SOL_PIDDUCK,
     Constrained,
     ConstrainedRecoilless,
-    GrainComp,
+    Composition,
     Gun,
     Propellant,
     Recoilless,
@@ -88,7 +78,6 @@ handler = logging.StreamHandler(sys.stderr)
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(message)s")
 handler.setFormatter(formatter)
 root_logger.addHandler(handler)
-
 
 USE_LF = "USE_LF"
 USE_CV = "USE_CV"
@@ -133,7 +122,7 @@ class TextHandler(logging.Handler):
     def __init__(self, text):
         # run the regular Handler __init__
         logging.Handler.__init__(self)
-        self.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(message)s"))
+        self.setFormatter(formatter)
         self.setLevel(logging.INFO)
         # Store a reference to the Text it will log to
         self.text = text
@@ -149,6 +138,7 @@ class TextHandler(logging.Handler):
             tags = record.name.split(".")
             self.text.insert("end", msg.strip("\n") + "\n", [record.levelno, *tags])
             self.text.configure(state="disabled")
+
             # Autoscroll to the bottom
             self.text.yview("end")
 
@@ -159,6 +149,8 @@ class TextHandler(logging.Handler):
 class PIBS(Tk):
     def __init__(self, *args, loc, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # self.attributes("-toolwindow", True)
 
         self.option_add("*tearOff", False)
 
@@ -194,8 +186,6 @@ class PIBS(Tk):
         self.frame.grid(row=0, column=0, sticky="nsew")
 
         self.minsize(self.winfo_width(), self.winfo_height())  # set minimum size
-        # self.mainloop()
-
         self.is_fullscreen = False
 
         self.bind("<F4>", lambda *_: self.toggle_fullscreen())
@@ -340,7 +330,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="peffLabel", tooltip_loc_key="peffText"),
             i + 2,
         )
-        # self.ld, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="ldLabel"), i + 2
         self.pa, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="paLabel"), i + 2
         self.gm, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="gmLabel"), i + 2
 
@@ -412,13 +401,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         err_scroll = ttk.Scrollbar(error_frm, orient="vertical")
         err_scroll.grid(row=0, column=1, sticky="nsew")
         self.error_text = Text(
-            error_frm,
-            yscrollcommand=err_scroll.set,
-            wrap="word",
-            height=6,
-            width=0,
-            font=(FONTNAME, FONTSIZE),
-            state="disabled",
+            error_frm, yscrollcommand=err_scroll.set, wrap="word", height=6, width=0, font=(FONTNAME, FONTSIZE)
         )
         self.error_text.grid(row=0, column=0, sticky="nsew")
 
@@ -553,7 +536,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         j = 0
         self.in_atmos, j = (
-            self.add_localized_label_check(parent=env_frm, label_loc_key="atmosLabel", row=j, columnspan=3),
+            self.add_localized_label_check(
+                parent=env_frm, label_loc_key="atmosLabel", desc_label_key="atmosLabel", row=j, columnspan=3
+            ),
             j + 1,
         )
         self.in_atmos.trace_add("write", self.amb_callback)
@@ -612,6 +597,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 columnspan=3,
                 default=0,
                 label_loc_key="consButton",
+                desc_label_key="consButton",
                 tooltip_loc_key="useConsText",
             ),
             i + 1,
@@ -633,6 +619,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 columnspan=3,
                 default=0,
                 label_loc_key="lockButton",
+                desc_label_key="lockButton",
                 tooltip_loc_key="lockText",
             ),
             j + 1,
@@ -645,6 +632,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 row=j,
                 columnspan=3,
                 default=0,
+                desc_label_key="minTVButton",
                 label_loc_key="minTVButton",
                 tooltip_loc_key="optLFText",
             ),
@@ -886,7 +874,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.drop_prop = self.add_localized_dropdown(
             parent=self.prop_frm,
-            str_obj_dict=GrainComp.read_file(resolvepath("ballistics/resource/propellants.csv")),
+            str_obj_dict=Composition.read_file(resolvepath("ballistics/resource/propellants.csv")),
             desc_label_key="propFrmLabel",
         )
         self.drop_prop.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
@@ -979,6 +967,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 parent=self.grain_frm,
                 row=j,
                 label_loc_key="useAuxGrainLabel",
+                desc_label_key="useAuxGrainLabel",
                 columnspan=3,
                 default=False,
             ),
@@ -1187,7 +1176,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
 
         self.is_af, i = (
-            self.add_localized_label_check(parent=mec_frm, label_loc_key="afLabel", row=j, col=0, columnspan=2),
+            self.add_localized_label_check(
+                parent=mec_frm, label_loc_key="afLabel", desc_label_key="afLabel", row=j, col=0, columnspan=2
+            ),
             i + 1,
         )
         spec_frm.rowconfigure(i, weight=5)
@@ -1272,14 +1263,15 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.use_theme()  # <- an update is authorized here
 
-        self.tLid = None
+        self.t_lid = None
 
         text_handler = TextHandler(self.error_text)
         root_logger.addHandler(text_handler)
         root_logger.info("text handler attached to root logger.")
 
         console = logging.StreamHandler(sys.stderr)
-        console.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(message)s"))
+        console.setFormatter(formatter)
+
         self.listener = QueueListener(self.log_queue, text_handler, console)
         self.listener.start()
 
@@ -1312,8 +1304,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
         if self.guide_process:
             self.get_guide()
 
-        # noinspection PyTypeChecker
-        self.tLid = self.after(33, self.timed_loop)
+        logging.info(f"{self.process} {self.guide_process}")
+
+        self.t_lid = self.parent.after(50, self.timed_loop)
 
     def quit(self):
         if self.process:
@@ -1326,8 +1319,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.listener.stop()
 
-        if self.tLid is not None:
-            self.after_cancel(self.tLid)
+        if self.t_lid is not None:
+            self.after_cancel(self.t_lid)
 
         super().quit()
 
@@ -1335,7 +1328,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         if self.gun is None:
             return "N/A"
         else:
-            typ, cal, w = self.kwargs["typ"], self.kwargs["caliber"], self.kwargs["shotMass"]
+            typ, cal, w = self.kwargs["typ"], self.kwargs["caliber"], self.kwargs["shot_mass"]
             return "{:} {:.0f} mm ".format(
                 "{:.4g} g".format(w * 1e3) if w < 1 else "{:.4g} kg".format(w), cal * 1e3
             ) + self.get_loc_str(typ)
@@ -1359,8 +1352,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         try:
             loc_val_dict = {
-                loc.get_descriptive(): str(loc.get()) for loc in self.locs if hasattr(loc, "get_descriptive")
+                loc.get_descriptive(): str(loc.get())
+                for loc in self.locs
+                if (hasattr(loc, "get_descriptive") and loc.get_descriptive())
             }
+
             kvs = {**loc_val_dict, "Description": self.description.get(1.0, "end").strip("\n")}
             with open(file_name, "w", encoding="utf-8") as file:
                 json.dump(kvs, file, indent="\t", ensure_ascii=False, sort_keys=True)
@@ -1381,7 +1377,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
             return
 
         try:
-            loc_dict = {loc.get_descriptive(): loc for loc in self.locs if hasattr(loc, "get_descriptive")}
+            loc_dict = {
+                loc.get_descriptive(): loc
+                for loc in self.locs
+                if (hasattr(loc, "get_descriptive") and loc.get_descriptive())
+            }
             with open(file_name, "r", encoding="utf-8") as file:
                 file_dict = json.load(file)
 
@@ -1423,7 +1423,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             with open(file_name, "w", encoding="utf-8", newline="") as csvFile:
                 csv_writer = csv.writer(csvFile, delimiter=",", quoting=csv.QUOTE_MINIMAL)
                 csv_writer.writerow(column_list)
-                for line in self.gun_result.getRawTableData():
+                for line in self.gun_result.get_raw_table_data():
                     csv_writer.writerow(line)
 
             messagebox.showinfo(
@@ -1523,48 +1523,48 @@ class InteriorBallisticsFrame(LocalizedFrame):
             "dom": self.drop_domain.get_obj(),
             "sol": self.drop_soln.get_obj(),
             "control": self.p_control.get_obj(),
-            "structuralMaterial": self.drop_mat.get_obj().createMaterialAtTemp(self.drop_mat_temp.get_obj()),
-            "structuralSafetyFactor": float(self.ssf.get()),
+            "structural_material": self.drop_mat.get_obj().createMaterialAtTemp(self.drop_mat_temp.get_obj()),
+            "structural_safety_factor": float(self.ssf.get()),
             "caliber": caliber,
-            "shotMass": float(self.sht_kg.get()),
+            "shot_mass": float(self.sht_kg.get()),
             "propellant": self.prop,
-            "grainSize": float(self.web_mm.get()) * 1e-3,
-            "chargeMass": charge_mass,
-            "chargeMassRatio": float(self.chg_kg.get()) / float(self.sht_kg.get()),
-            "chamberVolume": chamber_volume,
-            "startPressure": float(self.stp_MPa.get()) * 1e6,
-            "lengthGun": gun_length,
+            "grain_size": float(self.web_mm.get()) * 1e-3,
+            "charge_mass": charge_mass,
+            "charge_mass_ratio": float(self.chg_kg.get()) / float(self.sht_kg.get()),
+            "chamber_volume": chamber_volume,
+            "start_pressure": float(self.stp_MPa.get()) * 1e6,
+            "length_gun": gun_length,
             "chambrage": chambrage,  # chamber expansion
-            "nozzleExpansion": float(self.nozz_exp.get()),  # nozzle expansion
-            "nozzleEfficiency": float(self.nozz_eff.get()) * 1e-2,  # nozzle efficiency
-            "dragCoefficient": float(self.dgc.get()) * 1e-2,  # drag coefficient
-            "designPressure": float(self.p_tgt.get()) * 1e6,  # design pressure
-            "designVelocity": float(self.v_tgt.get()),  # design velocity
+            "nozzle_expansion": float(self.nozz_exp.get()),  # nozzle expansion
+            "nozzle_efficiency": float(self.nozz_eff.get()) * 1e-2,  # nozzle efficiency
+            "drag_coefficient": float(self.dgc.get()) * 1e-2,  # drag coefficient
+            "design_pressure": float(self.p_tgt.get()) * 1e6,  # design pressure
+            "design_velocity": float(self.v_tgt.get()),  # design velocity
             "tol": 10 ** -int(self.acc_exp.get()),
-            "minWeb": 1e-6 * float(self.min_web.get()),
-            "maxLength": float(self.lg_max.get()),
-            "loadFraction": load_fraction,
+            "min_web": 1e-6 * float(self.min_web.get()),
+            "max_length": float(self.lg_max.get()),
+            "load_fraction": load_fraction,
             "step": int(self.step.get()),
             "autofrettage": autofrettage,
-            "knownBore": lock,
-            "minCMR": float(self.guide_min_cmr.get()),
-            "maxCMR": float(self.guide_max_cmr.get()),
-            "stepCMR": float(self.guide_step_cmr.get()),
-            "minLF": float(self.guide_min_lf.get()) * 1e-2,
-            "maxLF": float(self.guide_max_lf.get()) * 1e-2,
-            "stepLF": float(self.guide_step_lf.get()) * 1e-2,
+            "known_bore": lock,
+            "min_cmr": float(self.guide_min_cmr.get()),
+            "max_cmr": float(self.guide_max_cmr.get()),
+            "step_cmr": float(self.guide_step_cmr.get()),
+            "min_lf": float(self.guide_min_lf.get()) * 1e-2,
+            "max_lf": float(self.guide_max_lf.get()) * 1e-2,
+            "step_lf": float(self.guide_step_lf.get()) * 1e-2,
         }
 
         if atmosphere:
             self.kwargs.update(
                 {
-                    "ambientP": float(self.amb_p.get()) * 1e3,
-                    "ambientRho": float(self.amb_rho.get()),
-                    "ambientGamma": float(self.amb_gamma.get()),
+                    "ambient_p": float(self.amb_p.get()) * 1e3,
+                    "ambient_rho": float(self.amb_rho.get()),
+                    "ambient_gamma": float(self.amb_gamma.get()),
                 }
             )
         else:
-            self.kwargs.update({"ambientP": 0, "ambientRho": 0, "ambientGamma": 1})
+            self.kwargs.update({"ambient_p": 0, "ambient_rho": 0, "ambient_gamma": 1})
 
     def on_guide(self):
         if self.process or self.guide_process:
@@ -1643,19 +1643,19 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         if gun:
             if constrain:
-                webmm = round_sig(self.kwargs["grainSize"] * 1e3, n=sigfig)
+                webmm = round_sig(self.kwargs["grain_size"] * 1e3, n=sigfig)
                 self.web_mm.set(webmm)
 
                 if not lock:
-                    lgmm = round_sig(self.kwargs["lengthGun"] * 1e3, n=sigfig)
+                    lgmm = round_sig(self.kwargs["length_gun"] * 1e3, n=sigfig)
                     self.tbl_mm.set(lgmm)
 
                 if optimize:
                     if self.use_cv.get_obj() == USE_CV:
-                        self.cvL.set(round_sig(self.kwargs["chamberVolume"] * 1e3, n=sigfig))
+                        self.cvL.set(round_sig(self.kwargs["chamber_volume"] * 1e3, n=sigfig))
                     else:
                         self.lf.set(
-                            round_sig(self.kwargs["loadFraction"] * 100, n=sigfig)
+                            round_sig(self.kwargs["load_fraction"] * 100, n=sigfig)
                         )  # corrected "bulk" load fraction
 
             # p = self.tabParent.index(self.tabParent.select())  # find the currently active tab
@@ -1688,14 +1688,14 @@ class InteriorBallisticsFrame(LocalizedFrame):
         try:
             caliber = self.kwargs["caliber"]
             chambrage = self.kwargs["chambrage"]
-            travel = self.kwargs["lengthGun"]
+            travel = self.kwargs["length_gun"]
 
             bore_s = pi * 0.25 * caliber**2
             breech_s = bore_s * chambrage
 
-            ps = self.gun_result.readTableData(POINT_PEAK_SHOT).shotPressure
+            ps = self.gun_result.read_table_data(POINT_PEAK_SHOT).shotPressure
 
-            eta_t, eta_b, eta_p = self.gun_result.getEff()
+            eta_t, eta_b, eta_p = self.gun_result.get_eff()
 
             self.te.set(str(round(eta_t * 100, 2)) + " %")
             self.be.set(str(round(eta_b * 100, 2)) + " %")
@@ -1703,7 +1703,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
             self.va.set(toSI(self.gun.v_j, unit="m/s"))
 
-            cartridge_len = self.kwargs["chamberVolume"] / breech_s  # is equivalent to chamber length
+            cartridge_len = self.kwargs["chamber_volume"] / breech_s  # is equivalent to chamber length
 
             self.lx.set(
                 (
@@ -1713,22 +1713,22 @@ class InteriorBallisticsFrame(LocalizedFrame):
             )
 
             self.ammo.set(toSI(cartridge_len, unit="m"))
-            self.pa.set(toSI(ps * self.gun.S / self.gun.m, unit="m/s²"))
+            self.pa.set(toSI(ps * self.gun.s / self.gun.m, unit="m/s²"))
             tube_mass = self.gun_result.tubeMass
             self.gm.set(format_mass(tube_mass))
-            peak_average_entry = self.gun_result.readTableData(POINT_PEAK_AVG)
-            peak_breech_entry = self.gun_result.readTableData(POINT_PEAK_BREECH)
+            peak_average_entry = self.gun_result.read_table_data(POINT_PEAK_AVG)
+            peak_breech_entry = self.gun_result.read_table_data(POINT_PEAK_BREECH)
             self.pp.set(
                 (
                     f"{toSI(peak_average_entry.avgPressure, unit='Pa'):}" + self.get_loc_str("mean"),
                     f"{toSI(peak_breech_entry.breechPressure, unit='Pa'):}" + self.get_loc_str("breech"),
                 )
             )
-            muzzle_entry = self.gun_result.readTableData(POINT_EXIT)
+            muzzle_entry = self.gun_result.read_table_data(POINT_EXIT)
             self.mv.set(toSI(muzzle_entry.velocity, unit="m/s"))
 
-        except Exception:
-            pass
+        except Exception as e:
+            self.handle_errors(exception=e, level=30)
 
     def get_guide(self):
         try:
@@ -1754,13 +1754,13 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.ax_v.cla()
 
             if self.gun:
-                v_tgt = self.kwargs["designVelocity"]
+                v_tgt = self.kwargs["design_velocity"]
                 gun_type = self.kwargs["typ"]
                 dom = self.kwargs["dom"]
 
                 xs, vs, vxs, pas, pss, pbs, p0s, psis, etas = [], [], [], [], [], [], [], [], []
 
-                for entry in self.gun_result.getRawTableData():
+                for entry in self.gun_result.get_raw_table_data():
                     tag, (time, l, psi, v, pb, p, ps, temp, vx, px, p0, eta) = "", repeat(0.0, 12)
 
                     if gun_type == CONVENTIONAL:
@@ -1885,21 +1885,24 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_ax.cla()
             self.aux_ax_h.cla()
 
-            p_trace = self.gun_result.pressureTrace
-            # noinspection SpellCheckingInspection
+            p_trace = self.gun_result.pressure_trace
             cmap = mpl.colormaps["afmhot" + ("_r" if THEMES[self.theme_name_var.get()] else "")]
 
             x_max, y_max, t_min, t_max = 0, 0, inf, 0
             for trace in p_trace:
-                if not trace.T:
+                if not trace.temperature:
                     continue
-                if trace.T > t_max:
-                    t_max = trace.T
-                elif trace.T < t_min:
-                    t_min = trace.T
+                if trace.temperature > t_max:
+                    t_max = trace.temperature
+                elif trace.temperature < t_min:
+                    t_min = trace.temperature
 
             for pressureTraceEntry in p_trace[::-1]:
-                tag, t, trace = pressureTraceEntry.tag, pressureTraceEntry.T, pressureTraceEntry.pressureTrace
+                tag, t, trace = (
+                    pressureTraceEntry.tag,
+                    pressureTraceEntry.temperature,
+                    pressureTraceEntry.pressure_trace,
+                )
 
                 if t:
                     v = (t - t_min) / (t_max - t_min)
@@ -1938,7 +1941,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             h_trace = self.gun_result.outline
 
             if h_trace is not None and self.trace_hull.get():
-                x_hull, r_in, r_out = zip(*[trace.getRawLine() for trace in h_trace])
+                x_hull, r_in, r_out = zip(*[trace.get_raw_line() for trace in h_trace])
                 r_in, r_out = [r * 1e3 for r in r_in], [r * 1e3 for r in r_out]
 
                 self.aux_ax_h.plot(x_hull, r_in, c="tab:blue")
@@ -1965,11 +1968,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
             )
         self.specs.insert("end", "{:}: {:>4.0f} kg/m³\n".format(self.get_loc_str("densityDesc"), compo.rho_p))
         self.specs.insert("end", "{:}: {:>4.0f} kJ/kg\n".format(self.get_loc_str("force"), compo.f / 1e3))
-        isp = compo.getIsp()
+        isp = compo.get_isp()
         self.specs.insert(
             "end", "{:}: {:>4.0f} m/s {:>3.0f} s\n".format(self.get_loc_str("vacISPDesc"), isp, isp / 9.805)
         )
-        isp = compo.getIsp(50)
+        isp = compo.get_isp(50)
         self.specs.insert(
             "end",
             "{:}: {:>4.0f} m/s {:>3.0f} s\n{:}\n".format(
@@ -1980,7 +1983,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         for p in (100e6, 200e6, 300e6):
             self.specs.insert(
                 "end",
-                "{:>12}".format(toSI(compo.getLBR(p), unit="m/s", dec=3))
+                "{:>12}".format(toSI(compo.get_lbr(p), unit="m/s", dec=3))
                 + " @ {:>12}\n".format(toSI(p, unit="Pa", dec=3)),
             )
 
@@ -2037,7 +2040,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
                     web.localize("athLabel", "arcText")
 
                 r2.localize("ltdLabel", "perfLRText")
-                # noinspection SpellCheckingInspection
                 r1.localize("pdtalLabel", "pDiaRText")
 
         self.callback()
@@ -2048,12 +2050,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.geom_ax.cla()
             prop = self.prop
             if prop is not None:
-                zb = prop.Z_b
+                zb = prop.z_b
                 xs = [i / n for i in range(n + 1)]
-                ys = [prop.f_sigma_Z(x) for x in xs]
+                ys = [prop.f_sigma_z(x) for x in xs]
 
                 xs.append(zb)
-                ys.append(prop.f_sigma_Z(zb))
+                ys.append(prop.f_sigma_z(zb))
 
                 xs.append(xs[-1])
                 ys.append(0)
@@ -2061,8 +2063,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 self.geom_ax.plot(xs, ys)
                 self.geom_ax.grid(which="major", color="grey", linestyle="dotted")
                 self.geom_ax.minorticks_on()
-                self.geom_ax.set_xlim(left=0, right=min(prop.Z_b, 2))
-                self.geom_ax.xaxis.set_ticks([i * 0.5 for i in range(ceil(min(prop.Z_b, 2) / 0.5) + 1)])
+                self.geom_ax.set_xlim(left=0, right=min(prop.z_b, 2))
+                self.geom_ax.xaxis.set_ticks([i * 0.5 for i in range(ceil(min(prop.z_b, 2) / 0.5) + 1)])
                 self.geom_ax.set_ylim(bottom=0, top=max(ys))
                 self.geom_ax.yaxis.set_ticks([i * 0.25 for i in range(ceil(max(ys) / 0.25) + 1)])
 
@@ -2075,7 +2077,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         try:
             gun_type = self.kwargs["typ"]
-            table_data, error_data = (self.gun_result.getRawTableData(), self.gun_result.getRawErrorData())
+            table_data, error_data = self.gun_result.get_raw_table_data(), self.gun_result.get_raw_error_data()
         except AttributeError:
             gun_type = self.type_optn.get_obj()
             table_data, error_data = [], []
@@ -2085,11 +2087,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
             loc_table_data.append((self.get_loc_str(line[0]), *line[1:]))
 
         if gun_type == CONVENTIONAL:
-            use_sn = (False, False, False, True, False, False, False, False, True)
-            units = (None, "s", "m", None, "m/s", "Pa", "Pa", "Pa", "K")
+            use_sn = False, False, False, True, False, False, False, False, True
+            units = None, "s", "m", None, "m/s", "Pa", "Pa", "Pa", "K"
         elif gun_type == RECOILLESS:
-            use_sn = (False, False, False, True, False, False, False, False, False, False, True, True)
-            units = (None, "s", "m", None, "m/s", "m/s", "Pa", "Pa", "Pa", "Pa", "K", None)
+            use_sn = False, False, False, True, False, False, False, False, False, False, True, True
+            units = None, "s", "m", None, "m/s", "m/s", "Pa", "Pa", "Pa", "Pa", "K", None
         else:
             raise ValueError("unknown gun types")
 
@@ -2123,7 +2125,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.tv.heading(i, text=column, anchor="e")  # let the column heading = column name
             self.tv.column(column, stretch=True, width=width, minwidth=font_width * 14, anchor="e")
 
-        # noinspection SpellCheckingInspection
         for i, (row, erow) in enumerate(zip(loc_table_data, error_data)):
             self.tv.insert("", "end", str(i + 1), values=row, tags=(row[0].strip(), "monospace"))
             self.tv.insert(
@@ -2461,25 +2462,25 @@ def calculate(job_queue, progress_queue, log_queue, kwargs):
 
             if optimize:
                 if gun_type == CONVENTIONAL or gun_type == RECOILLESS:
-                    l_f, e_1, l_g = constrained.findMinV(**kwargs, progressQueue=progress_queue)
+                    l_f, e_1, l_g = constrained.find_min_v(**kwargs, progress_queue=progress_queue)
 
                 else:
                     raise ValueError("unknown gun type")
 
-                kwargs.update({"loadFraction": l_f})
-                chamber_volume = kwargs["chargeMass"] / kwargs["propellant"].rho_p / kwargs["loadFraction"]
-                kwargs.update({"chamberVolume": chamber_volume})
+                kwargs.update({"load_fraction": l_f})
+                chamber_volume = kwargs["charge_mass"] / kwargs["propellant"].rho_p / kwargs["load_fraction"]
+                kwargs.update({"chamber_volume": chamber_volume})
             else:
                 if gun_type == CONVENTIONAL or gun_type == RECOILLESS:
-                    e_1, l_g = constrained.solve(**kwargs, progressQueue=progress_queue)
+                    e_1, l_g = constrained.solve(**kwargs, progress_queue=progress_queue)
 
                 else:
                     raise ValueError("unknown gun type")
 
-            kwargs.update({"grainSize": 2 * e_1})
+            kwargs.update({"grain_size": 2 * e_1})
 
             if not lock:
-                kwargs.update({"lengthGun": l_g})
+                kwargs.update({"length_gun": l_g})
 
         if gun_type == CONVENTIONAL:
             gun = Gun(**kwargs)
@@ -2488,7 +2489,7 @@ def calculate(job_queue, progress_queue, log_queue, kwargs):
         else:
             raise ValueError("unknown gun type")
 
-        gun_result = gun.integrate(**kwargs, progressQueue=progress_queue)
+        gun_result = gun.integrate(**kwargs, progress_queue=progress_queue)
         root_logger.info("calculation concluded successfully.")
 
     except Exception as e:
@@ -2509,7 +2510,7 @@ def guide(guide_job_queue, progress_queue, log_queue, kwargs):
 
     guide_results = None
     try:
-        guide_results = guideGraph(**kwargs)
+        guide_results = guide_graph(**kwargs)
         root_logger.info("guidance diagram calculation concluded successfully.")
 
     except Exception as e:

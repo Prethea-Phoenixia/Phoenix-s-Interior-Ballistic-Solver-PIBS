@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from functools import wraps
 from tkinter import Frame, IntVar, Menu, StringVar, ttk
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, Optional
 
 from .misc import format_float_input
 from .tip import CreateToolTip
@@ -492,8 +492,13 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
     def disinhibit(self):
         self.check_widget.config(state=self.nominal_state)
 
-    def get_descriptive(self) -> str:
-        return self.loc_func(self.label_loc_key if self.desc_label_key is None else self.desc_label_key, True)
+    def get_descriptive(self) -> Optional[str]:
+        if self.desc_label_key:
+            return self.loc_func(self.desc_label_key, True)
+        elif self.desc_label_key is None:  # handle special case where we don't want to save.
+            return None
+        else:
+            return self.loc_func(self.label_loc_key, True)
 
 
 class LocalizedFrame(Frame):

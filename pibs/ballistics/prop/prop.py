@@ -155,18 +155,9 @@ class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
     STRIP = ("STRIP", -1, -1)  # 带状, 1 > alpha >= beta
 
 
-class GrainComp:
-    """
-    detonation velocity and pressure exponent are related to:
+class Composition:
 
-    r_dot = u_1 * p^n
-
-    tested velocity for n=1 roughly equals
-    Nitrocellulose, 6e-7 - 9e-7 m/(MPa*s)
-    Nitroglycerin, 7e-7 - 9e-7 m/(MPa*s)
-    """
-
-    allGrainCompDict = {}
+    all_composition_dict = {}
 
     def __init__(
         self,
@@ -182,6 +173,7 @@ class GrainComp:
     ):
         self.name = name
         self.desc = desc
+
         self.f = force
         """
         Propellant force is related to the flame temperature
@@ -234,10 +226,10 @@ class GrainComp:
                 composition.append(new_comp)
 
         compo_dict = {i.name: i for i in composition}
-        cls.allGrainCompDict.update(compo_dict)
+        cls.all_composition_dict.update(compo_dict)
         return {i.name: i for i in composition}
 
-    def getLBR(self, p):
+    def get_lbr(self, p):
         """
         get linear burn rate, given a pressure supplied in Pa
 
@@ -245,28 +237,28 @@ class GrainComp:
         """
         return self.u_1 * p**self.n
 
-    def getIsp(self, pRatio=None):
+    def get_isp(self, p_ratio=None):
         # Tp = Tv/gamma
-        if pRatio is None:
+        if p_ratio:
+            # pressure ratio is interpreted as chamber/exit
+            return (2 * self.f / self.theta * (1 - p_ratio ** (-self.theta / (self.theta + 1)))) ** 0.5
+        else:
             # infinite pressure ratio, basically vacuum
             return (2 * self.f / self.theta) ** 0.5
-        else:
-            # pressure ratio is interpreted as chamber/exit
-            return (2 * self.f / self.theta * (1 - pRatio ** (-self.theta / (self.theta + 1)))) ** 0.5
 
 
 class Propellant:
     def __init__(
         self,
-        composition: GrainComp,
+        composition: Composition,
         main_geom: Geometry,
         main_r1: float,
         main_r2: float,
         aux_geom: Geometry = SimpleGeometry.SPHERE,
-        aux_r1: float = 1,
-        aux_r2: float = 1,
-        web_ratio: float = 1,  # e1_2 / e1_1
-        mass_ratio: float = 0,  # w_2 / w_1
+        aux_r1: float = 1.0,
+        aux_r2: float = 1.0,
+        web_ratio: float = 1.0,  # e1_2 / e1_1
+        mass_ratio: float = 0.0,  # w_2 / w_1
     ):
         """
         for propellant i = 1, 2:
@@ -288,46 +280,69 @@ class Propellant:
         self.main_params = main_geom.get_form_function_coefficients(r1=main_r1, r2=main_r2)
         self.aux_params = aux_geom.get_form_function_coefficients(r1=aux_r1, r2=aux_r2)
 
-        self.chi, self.labda, self.mu, self.chi_s, self.labda_s, self.Z_b = self.main_params
-        _, _, _, _, _, Z_b2 = self.aux_params
+        self.chi, self.labda, self.mu, self.chi_s, self.labda_s, self.z_b = self.main_params
+        _, _, _, _, _, z_b2 = self.aux_params
 
         self.web_ratio, self.mass_ratio = web_ratio, mass_ratio
 
-        if self.mass_ratio > 0 and Z_b2 > self.Z_b / self.web_ratio:
+        if self.mass_ratio > 0 and z_b2 > self.z_b / self.web_ratio:
             raise ValueError("Auxiliary grains must complete combustion in advance of the primary grains.")
 
-    def __getattr__(self, attr_name):
-        if not (attr_name.startswith("__") and attr_name.endswith("__")):
-            return getattr(self.composition, attr_name)
-        raise AttributeError("%r object has no attribute %r" % (self.__class__.__name__, attr_name))
+    @property
+    def f(self) -> float:
+        return self.composition.f
+
+    @property
+    def alpha(self) -> float:
+        return self.composition.alpha
+
+    @property
+    def rho_p(self) -> float:
+        return self.composition.rho_p
+
+    @property
+    def theta(self) -> float:
+        return self.composition.theta
+
+    @property
+    def u_1(self) -> float:
+        return self.composition.u_1
+
+    @property
+    def n(self) -> float:
+        return self.composition.n
+
+    @property
+    def T_v(self) -> float:
+        return self.composition.T_v
 
     @staticmethod
-    def f_sigma(Z_i: float, params: tuple[float, float, float, float, float, float]) -> float:
-        chi, labda, mu, chi_s, labda_s, Z_b = params
-        if Z_i <= 1.0:
-            return chi * (1 + 2 * labda * Z_i + 3 * mu * Z_i**2)
-        elif Z_i <= Z_b:
-            return 1 + 2 * labda_s * Z_i
+    def f_sigma(z_i: float, params: tuple[float, float, float, float, float, float]) -> float:
+        chi, labda, mu, chi_s, labda_s, z_b = params
+        if z_i <= 1.0:
+            return chi * (1 + 2 * labda * z_i + 3 * mu * z_i**2)
+        elif z_i <= z_b:
+            return 1 + 2 * labda_s * z_i
         else:
             return 0.0
 
     @staticmethod
-    def f_psi(Z_i: float, params: tuple[float, float, float, float, float, float]) -> float:
-        chi, labda, mu, chi_s, labda_s, Z_b = params
-        if Z_i <= 1.0:
-            return chi * Z_i * (1 + labda * Z_i + mu * Z_i**2)
-        elif Z_i <= Z_b:
-            return chi_s * Z_i * (1 + labda_s * Z_i)
+    def f_psi(z_i: float, params: tuple[float, float, float, float, float, float]) -> float:
+        chi, labda, mu, chi_s, labda_s, z_b = params
+        if z_i <= 1.0:
+            return chi * z_i * (1 + labda * z_i + mu * z_i**2)
+        elif z_i <= z_b:
+            return chi_s * z_i * (1 + labda_s * z_i)
         else:
             return 1.0
 
-    def f_sigma_Z(self, Z: float) -> float:
-        Z_main, Z_aux = Z, Z / self.web_ratio
-        sigma_main, sigma_aux = self.f_sigma(Z_main, self.main_params), self.f_sigma(Z_aux, self.aux_params)
+    def f_sigma_z(self, z: float) -> float:
+        z_main, z_aux = z, z / self.web_ratio
+        sigma_main, sigma_aux = self.f_sigma(z_main, self.main_params), self.f_sigma(z_aux, self.aux_params)
         return sigma_main / (self.mass_ratio + 1) + sigma_aux * self.mass_ratio / (self.mass_ratio + 1)
 
-    def f_psi_Z(self, Z: float) -> float:
-        Z_main, Z_aux = Z, Z / self.web_ratio
-        psi_main, psi_aux = self.f_psi(Z_main, self.main_params), self.f_psi(Z_aux, self.aux_params)
+    def f_psi_z(self, z: float) -> float:
+        z_main, z_aux = z, z / self.web_ratio
+        psi_main, psi_aux = self.f_psi(z_main, self.main_params), self.f_psi(z_aux, self.aux_params)
 
         return psi_main / (self.mass_ratio + 1) + psi_aux * self.mass_ratio / (self.mass_ratio + 1)

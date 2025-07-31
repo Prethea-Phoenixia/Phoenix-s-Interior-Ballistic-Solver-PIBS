@@ -1,17 +1,17 @@
 from pibs.ballistics import (
     CONVENTIONAL,
     POINT_PEAK_AVG,
-    GrainComp,
+    Composition,
     Propellant,
     SimpleGeometry,
 )
-from pibs.guidegraph import guideGraph
+from pibs.guidegraph import guide_graph
 
 if __name__ == "__main__":
-    compositions = GrainComp.read_file("../pibs/ballistics/resource/propellants.csv")
+    compositions = Composition.read_file("../pibs/ballistics/resource/propellants.csv")
     pyroxylin = compositions["Pyroxylin"]
 
-    guideGraph(
+    guide_graph(
         caliber=125e-3,
         tol=1e-4,
         dragCoefficient=2e-2,

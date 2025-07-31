@@ -91,10 +91,12 @@
 		"consButton": "Constrain Design",
 		"consFrmLabel": "Constraints",
 		"cvLabel": "Chamber Volume",
+		"cvlfLabel": "Load Condition",
 		"cylLRText": "Specify length to diameter ratio of the grain.",
 		"darkLabel": "Dark",
 		"debugLabel": "Debug",
 		"densityDesc": " Density",
+		"designLabel": "Design",
 		"dgcLabel": "Resistance Factor",
 		"dgcText": "Resistance factor models all resistive forces as a fraction of the shot base pressure.\n 2%-7% has been reported, higher end for small arm bullets which engage with the rifling via deformation of the jacket, lower end for large calibre shells with driving bands.",
 		"diaText": "Specify the diameter of propellant grain.",
@@ -166,7 +168,6 @@
 		"minTVButton": "Minimize Total Volume",
 		"minWebLabel": "Minimum Web",
 		"mvLabel": "Muzzle Velocity",
-		"designLabel": "Design",
 		"nameFrm": "Design Overview",
 		"noDataMsg": "Invalid Design or Data",
 		"nozzEffLabel": "Nozzle Efficiency",
@@ -341,6 +342,7 @@
 		"darkLabel": "深色",
 		"debugLabel": "调试信息",
 		"densityDesc": "　　　　密度",
+		"designLabel": "设计",
 		"dgcLabel": "阻力系数",
 		"dgcText": "膛内阻力，按与弹底压强的比例计算。对于线膛武器，取值从2%到7%不等，其中小口径武器相对较高。",
 		"diaText": "设置火药药粒的直径。",
@@ -484,7 +486,6 @@
 		"vacISPDesc": "　　真空比冲",
 		"vinfText": "该装药条件下的极限速度（vj），即炮管长度趋于无穷时弹速的极限。正比与火药力与装药量的乘积的平方根，反比于弹重，绝热指数-1，与次要功系数的平方根。",
 		"widthLabel": "宽度",
-		"widthText": "设置带状火药宽度。",
-		"designLabel": "设计"
+		"widthText": "设置带状火药宽度。"
 	}
 }
