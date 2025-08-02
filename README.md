@@ -31,11 +31,23 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
     From a desired system performance specification, the optimum loading fraction is searched and the one that minimizes total bore volume (the sum of chamber and bore volume) is found via varying the load fraction, with option `Minimize Tube Volume`, for both conventional and recoilless gun.
 
 ## How-To
-- Use the calculator:
+- Use the calculator on Windows:
     - download the latest executable at [latest release](https://github.com/octo-org/octo-repo/releases/latest)
 - Development setup:
-    - Install Python (>3.8)
-    - `pip install .[dev]`
+    - Install Python (>=3.9)
+    - Install development dependencies: 
+      ```console
+      pip install .[dev]
+      ```
+    - Convert to distributable program via auto-py-to-exe: 
+      ```console
+       auto-py-to-exe -db -c "singlefile.json"
+      ``` 
+
+## Contribution
+Your contribution is welcomed! Please feel free to raise issues or propose pull requests regarding features or problems encountered. To get started, see the [community documentation](CONTRIBUTING.md)
+
+
 
 ## Resources Used
 * tcl/tk themes used include "awdark" & "awlight" from awthemes: https://wiki.tcl-lang.org/page/awthemes

@@ -503,7 +503,6 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
 
 
 def wrap_and_warn(wrap_func):
-
     def decorator(func):
         @wraps(wrap_func)
         def wrapped(*args, loc_func=None, all_localized=None, **kwargs):
