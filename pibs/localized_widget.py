@@ -7,6 +7,7 @@ from typing import Any, Callable, Literal, Optional
 
 from .misc import format_float_input
 from .tip import CreateToolTip
+import warnings
 
 
 class Localizable(ABC):
@@ -501,6 +502,22 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
             return self.loc_func(self.label_loc_key, True)
 
 
+def wrap_and_warn(wrap_func):
+
+    def decorator(func):
+        @wraps(wrap_func)
+        def wrapped(*args, loc_func=None, all_localized=None, **kwargs):
+            if loc_func or all_localized:
+                warnings.warn(
+                    "LocalizedFrame sets the loc_func and all_localized parameters to instance of itself, supplied arguments will be ignored."
+                )
+            return func(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
+
+
 class LocalizedFrame(Frame):
     def __init__(self, *args, localization_dict: dict[str, dict[str, str]], menubar, default_lang: str, **kwargs):
         super().__init__(*args, **kwargs)
@@ -526,31 +543,32 @@ class LocalizedFrame(Frame):
     def change_lang(self):
         pass
 
-    @wraps(Loc12Disp.__init__)
+    @wrap_and_warn(Loc12Disp.__init__)
     def add_localized_12_display(self, *args, **kwargs) -> Loc12Disp:
+        # logging.warn("")
         return Loc12Disp(*args, loc_func=self.get_loc_str, all_localized=self.locs, **kwargs)
 
-    @wraps(Loc122Disp.__init__)
+    @wrap_and_warn(Loc122Disp.__init__)
     def add_localized_122_display(self, *args, **kwargs) -> Loc122Disp:
         return Loc122Disp(*args, loc_func=self.get_loc_str, all_localized=self.locs, **kwargs)
 
-    @wraps(LocLabelCheck.__init__)
+    @wrap_and_warn(LocLabelCheck.__init__)
     def add_localized_label_check(self, *args, **kwargs) -> LocLabelCheck:
         return LocLabelCheck(*args, loc_func=self.get_loc_str, all_localized=self.locs, **kwargs)
 
-    @wraps(Loc2Input.__init__)
+    @wrap_and_warn(Loc2Input.__init__)
     def add_localized_2_input(self, *args, **kwargs) -> Loc2Input:
         return Loc2Input(*args, loc_func=self.get_loc_str, all_localized=self.locs, **kwargs)
 
-    @wraps(Loc3Input.__init__)
+    @wrap_and_warn(Loc3Input.__init__)
     def add_localized_3_input(self, *args, **kwargs) -> Loc3Input:
         return Loc3Input(*args, loc_func=self.get_loc_str, all_localized=self.locs, **kwargs)
 
-    @wraps(LocDropdown.__init__)
+    @wrap_and_warn(LocDropdown.__init__)
     def add_localized_dropdown(self, *args, **kwargs) -> LocDropdown:
         return LocDropdown(*args, loc_func=self.get_loc_str, all_localized=self.locs, **kwargs)
 
-    @wraps(LocLabelFrame.__init__)
+    @wrap_and_warn(LocLabelFrame.__init__)
     def add_localized_label_frame(self, *args, **kwargs) -> LocLabelFrame:
         return LocLabelFrame(*args, loc_func=self.get_loc_str, all_localized=self.locs, **kwargs)
 

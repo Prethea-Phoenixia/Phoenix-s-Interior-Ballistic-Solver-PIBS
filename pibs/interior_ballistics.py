@@ -143,7 +143,8 @@ class TextHandler(logging.Handler):
             self.text.yview("end")
 
         # This is necessary because we can't modify the Text from other threads
-        self.text.after(33, append)
+        # self.text.after(1000, append)
+        self.text.after_idle(append)
 
 
 class PIBS(Tk):
@@ -1304,9 +1305,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         if self.guide_process:
             self.get_guide()
 
-        logging.info(f"{self.process} {self.guide_process}")
-
-        self.t_lid = self.parent.after(50, self.timed_loop)
+        self.t_lid = self.root.after(100, self.timed_loop)
 
     def quit(self):
         if self.process:
@@ -1320,7 +1319,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.listener.stop()
 
         if self.t_lid is not None:
-            self.after_cancel(self.t_lid)
+            self.root.after_cancel(self.t_lid)
 
         super().quit()
 
