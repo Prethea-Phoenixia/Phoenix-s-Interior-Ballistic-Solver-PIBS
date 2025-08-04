@@ -6,6 +6,7 @@ import traceback
 from dataclasses import dataclass
 from math import inf, pi, tan
 
+from pibs.ballistics.material import Material, Material
 from . import (
     COMPUTE,
     DOMAIN_LEN,
@@ -64,21 +65,21 @@ class RecoillessResult(GenericResult):
 class Recoilless(DelegatesPropellant):
     def __init__(
         self,
-        caliber,
-        shot_mass,
-        propellant,
-        grain_size,
-        charge_mass,
-        chamber_volume,
-        start_pressure,
-        length_gun,
-        chambrage,
-        nozzle_expansion,
-        drag_coefficient=0,
-        nozzle_efficiency=0.92,
-        structural_material=None,
-        structural_safety_factor=1.1,
-        autofrettage=True,
+        caliber: float,
+        shot_mass: float,
+        propellant: Propellant,
+        grain_size: float,
+        charge_mass: float,
+        chamber_volume: float,
+        start_pressure: float,
+        length_gun: float,
+        chambrage: float,
+        nozzle_expansion: float,
+        drag_coefficient: float = 0.0,
+        nozzle_efficiency: float = 0.92,
+        structural_material: Material = None,
+        structural_safety_factor: float = 1.1,
+        autofrettage: bool = True,
         **_,
     ):
         super().__init__(propellant=propellant)
@@ -954,12 +955,15 @@ class Recoilless(DelegatesPropellant):
         return cf
 
     def get_structural(self, recoilless_result: RecoillessResult, step: int, tol: float):
+        if not self.material:
+            raise ValueError("Material must be supplied for structural calculation.")
+
         logger.info("commencing structural calculation")
         step = max(step, 1)
         l_c = self.l_c
         l_g = self.l_g
         chi_k = self.chi_k
-        sigma = self.material.Y
+        sigma = self.material.yield_strength
         s = self.s
         gamma = self.theta + 1
 

@@ -59,7 +59,7 @@ from .gun import (
     PressureProbePoint,
     PressureTraceEntry,
 )
-from .material import MATERIALS
+from .material import Material
 from .optimize_gun import Constrained
 from .optimize_recoilless import ConstrainedRecoilless
 from .prop import GEOMETRIES, Composition, MultPerfGeometry, Propellant, SimpleGeometry

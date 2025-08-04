@@ -243,7 +243,9 @@
 		"vacISPDesc": "Isp(Vac)",
 		"vinfText": "Velocity the shot would achieve if the barrel is extended to infinite length, or equivalently, if the gas is allowed to expand to temperature of absolute zero.",
 		"widthLabel": "Width",
-		"widthText": "Specify the width of propellant strip or flake."
+		"widthText": "Specify the width of propellant strip or flake.",
+		"matYieldLabel": "Yield Strength",
+		"matDensityLabel": "Density"
 	},
 	"中文": {
 		"BURNOUT": "火药燃尽",

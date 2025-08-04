@@ -30,7 +30,6 @@ from .ballistics import (
     DOMAIN_LEN,
     DOMAIN_TIME,
     GEOMETRIES,
-    MATERIALS,
     POINT_BURNOUT,
     POINT_EXIT,
     POINT_FRACTURE,
@@ -50,6 +49,7 @@ from .ballistics import (
     Propellant,
     Recoilless,
     SimpleGeometry,
+    Material,
 )
 from .localized_widget import LocalizedFrame
 from .misc import (
@@ -594,7 +594,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.add_localized_label_check(
                 parent=op_frm,
                 row=i,
-                col=0,
                 columnspan=3,
                 default=0,
                 label_loc_key="consButton",
@@ -716,7 +715,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.add_localized_2_input(
                 parent=sample_frm,
                 row=j,
-                col=0,
                 label_loc_key="stepLabel",
                 default="33",
                 validation=validation_nn,
@@ -729,7 +727,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.add_localized_2_input(
                 parent=op_frm,
                 row=i,
-                col=0,
                 label_loc_key="-log10(ε)",
                 default="3",
                 validation=validation_pi,
@@ -863,10 +860,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.prop_tab_parent.rowconfigure(0, weight=1)
 
         self.prop_frm = self.add_localized_label_frame(
-            self.prop_tab_parent,
-            label_loc_key="propFrmLabel",
-            style="SubLabelFrame.TLabelframe",
-            tooltip_loc_key="specsText",
+            self.prop_tab_parent, label_loc_key="propFrmLabel", tooltip_loc_key="specsText"
         )
 
         self.prop_frm.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
@@ -900,9 +894,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.force_update_on_theme_widget.append(self.specs)
 
-        self.grain_frm = self.add_localized_label_frame(
-            self.prop_tab_parent, label_loc_key="grainFrmLabel", style="SubLabelFrame.TLabelframe"
-        )
+        self.grain_frm = self.add_localized_label_frame(self.prop_tab_parent, label_loc_key="grainFrmLabel")
         self.grain_frm.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         i += 1
 
@@ -1145,30 +1137,40 @@ class InteriorBallisticsFrame(LocalizedFrame):
             i + 1,
         )
 
-        mec_frm = self.add_localized_label_frame(spec_frm, label_loc_key="matFrmLabel")
-        mec_frm.grid(row=i, column=0, sticky="nsew", columnspan=3)
-        mec_frm.columnconfigure(0, weight=1)
+        material_frame = self.add_localized_label_frame(spec_frm, label_loc_key="matFrmLabel")
+        material_frame.grid(row=i, column=0, sticky="nsew", columnspan=3)
+        material_frame.columnconfigure(0, weight=1)
         i += 1
 
         j = 0
-        self.drop_mat = self.add_localized_dropdown(
-            parent=mec_frm, str_obj_dict=MATERIALS, desc_label_key="matFrmLabel"
-        )
-        self.drop_mat.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        self.drop_mat.trace_add("write", lambda *args: self.drop_mat_temp.reset(self.drop_mat.get_obj().getTdict()))
-        j += 1
 
-        self.drop_mat_temp = self.add_localized_dropdown(
-            parent=mec_frm, str_obj_dict=self.drop_mat.get_obj().getTdict(), desc_label_key="matFrmTempLabel"
+        self.mat_density, j = (
+            self.add_localized_3_input(
+                material_frame,
+                row=j,
+                label_loc_key="matDensityLabel",
+                unit_text="kg/m³",
+                default="7850.0",
+                validation=validation_nn,
+            ),
+            j + 1,
         )
-        self.drop_mat_temp.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        j += 1
+        self.mat_yield, j = (
+            self.add_localized_3_input(
+                material_frame,
+                row=j,
+                label_loc_key="matYieldLabel",
+                unit_text="MPa",
+                default="1000.0",
+                validation=validation_nn,
+            ),
+            j + 1,
+        )
 
         self.ssf, j = (
             self.add_localized_2_input(
-                parent=mec_frm,
+                parent=material_frame,
                 row=j,
-                col=0,
                 label_loc_key="sffLabel",
                 default="1.35",
                 validation=validation_nn,
@@ -1178,7 +1180,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.is_af, i = (
             self.add_localized_label_check(
-                parent=mec_frm, label_loc_key="afLabel", desc_label_key="afLabel", row=j, col=0, columnspan=2
+                parent=material_frame, label_loc_key="afLabel", desc_label_key="afLabel", row=j, columnspan=2
             ),
             i + 1,
         )
@@ -1522,7 +1524,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
             "dom": self.drop_domain.get_obj(),
             "sol": self.drop_soln.get_obj(),
             "control": self.p_control.get_obj(),
-            "structural_material": self.drop_mat.get_obj().createMaterialAtTemp(self.drop_mat_temp.get_obj()),
+            "structural_material": Material(
+                rho=float(self.mat_density.get()), yield_strength=float(self.mat_yield.get()) * 1e6
+            ),
             "structural_safety_factor": float(self.ssf.get()),
             "caliber": caliber,
             "shot_mass": float(self.sht_kg.get()),

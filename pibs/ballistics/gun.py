@@ -119,7 +119,7 @@ class Gun(DelegatesPropellant):
         start_pressure: float,
         length_gun: float,
         chambrage: float,
-        structural_material: Material | None = None,
+        structural_material: Material = None,
         structural_safety_factor: float = 1.1,
         drag_coefficient: float = 0.0,
         autofrettage: bool = True,
@@ -912,14 +912,18 @@ class Gun(DelegatesPropellant):
         return p_x, u
 
     def get_structural(self, gun_result: GunResult, step: int, tol: float):
+        if not self.material:
+            raise ValueError("Material must be supplied for structural calculation.")
+
         logger.info("commencing structural calculation")
         step = max(step, 1)
+
         # step 1. calculate the barrel mass
         r = 0.5 * self.caliber
         l_c = self.l_c
         l_g = self.l_g
         chi_k = self.chi_k
-        sigma = self.material.Y
+        sigma = self.material.yield_strength
         s = self.s
 
         r_b = r * chi_k**0.5
