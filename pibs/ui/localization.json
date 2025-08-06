@@ -245,7 +245,8 @@
 		"widthLabel": "Width",
 		"widthText": "Specify the width of propellant strip or flake.",
 		"matYieldLabel": "Yield Strength",
-		"matDensityLabel": "Density"
+		"matDensityLabel": "Density",
+      "useMaterialLabel": "Calculate Structure"
 	},
 	"中文": {
 		"BURNOUT": "火药燃尽",

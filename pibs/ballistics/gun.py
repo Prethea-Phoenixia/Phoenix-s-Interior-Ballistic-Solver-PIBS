@@ -119,7 +119,7 @@ class Gun(DelegatesPropellant):
         start_pressure: float,
         length_gun: float,
         chambrage: float,
-        structural_material: Material = None,
+        structural_material: Material | None = None,
         structural_safety_factor: float = 1.1,
         drag_coefficient: float = 0.0,
         autofrettage: bool = True,
@@ -1098,7 +1098,7 @@ class Gun(DelegatesPropellant):
         elif sigma_min(1) > sigma:
             """if the minimum junction stress at an autofrettage fraction
             of 1 exceeds material yield, implies a certain amount of
-            auto-frettaging is required to contain the pressure"""
+            autofrettaging is required to contain the pressure"""
             m_min, _ = dekker(sigma_min, 1, m_opt, y=sigma, y_rel_tol=tol)
 
             """safety, fudge code to ensure a valid minimum autofrettage

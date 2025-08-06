@@ -605,8 +605,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.solve_W_Lg.trace_add("write", self.ctrl_callback)
 
         cons_frm = self.add_localized_label_frame(
-            op_frm, label_loc_key="consFrmLabel", style="SubLabelFrame.TLabelframe"
-        )
+            op_frm, label_loc_key="consFrmLabel"
+        )  # style="SubLabelFrame.TLabelframe"
         cons_frm.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         i += 1
         cons_frm.columnconfigure(0, weight=1)
@@ -788,15 +788,15 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.guide_button.grid(row=6, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
         ## spec frame
-        spec_frm = self.add_localized_label_frame(self, label_loc_key="specFrmLabel")
-        spec_frm.grid(row=0, column=2, rowspan=2, sticky="nsew")
-        spec_frm.columnconfigure(0, weight=1)
+        specs_frame = self.add_localized_label_frame(self, label_loc_key="specFrmLabel")
+        specs_frame.grid(row=0, column=2, rowspan=2, sticky="nsew")
+        specs_frame.columnconfigure(0, weight=1)
 
         validation_nn, validation_ce = self.register(validate_nn), self.register(validate_ce)
 
         i = 0
         self.type_optn = self.add_localized_dropdown(
-            parent=spec_frm,
+            parent=specs_frame,
             str_obj_dict={gun_type: gun_type for gun_type in (CONVENTIONAL, RECOILLESS)},
             desc_label_key="typeLabel",
         )
@@ -805,7 +805,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.cal_mm, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="calLabel",
                 unit_text="mm",
@@ -817,7 +817,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.tbl_mm, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="tblLabel",
                 unit_text="mm",
@@ -829,7 +829,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.sht_kg, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="shtLabel",
                 unit_text="kg",
@@ -841,7 +841,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.chg_kg, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="chgLabel",
                 unit_text="kg",
@@ -852,9 +852,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
             i + 1,
         )
 
-        self.prop_tab_parent = ttk.Notebook(spec_frm, padding=0)
+        self.prop_tab_parent = ttk.Notebook(specs_frame, padding=0)
         self.prop_tab_parent.grid(row=i, column=0, columnspan=3, sticky="nsew")
-        spec_frm.rowconfigure(i, weight=1)
+        specs_frame.rowconfigure(i, weight=1)
 
         self.prop_tab_parent.columnconfigure(0, weight=1)
         self.prop_tab_parent.rowconfigure(0, weight=1)
@@ -1031,21 +1031,28 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
 
         self.use_cv = self.add_localized_dropdown(
-            parent=spec_frm, str_obj_dict={USE_CV: USE_CV, USE_LD: USE_LD, USE_LF: USE_LF}, desc_label_key="cvlfLabel"
+            parent=specs_frame,
+            str_obj_dict={USE_CV: USE_CV, USE_LD: USE_LD, USE_LF: USE_LF},
+            desc_label_key="cvlfLabel",
         )
         self.use_cv.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         i += 1
 
         self.cvL, i = (
             self.add_localized_3_input(
-                parent=spec_frm, row=i, label_loc_key="cvLabel", unit_text="L", default="1.0", validation=validation_nn
+                parent=specs_frame,
+                row=i,
+                label_loc_key="cvLabel",
+                unit_text="L",
+                default="1.0",
+                validation=validation_nn,
             ),
             i + 1,
         )
 
         self.ld, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="ldLabel",
                 unit_text="kg/m³",
@@ -1057,7 +1064,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.lf, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="ldfLabel",
                 unit_text="%",
@@ -1074,7 +1081,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.clr, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="clrLabel",
                 unit_text="x",
@@ -1087,7 +1094,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.dgc, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="dgcLabel",
                 unit_text="%",
@@ -1100,7 +1107,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.stp_MPa, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="stpLabel",
                 unit_text="MPa",
@@ -1113,7 +1120,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.nozz_exp, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="nozzExpLabel",
                 unit_text="x",
@@ -1126,7 +1133,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.nozz_eff, i = (
             self.add_localized_3_input(
-                parent=spec_frm,
+                parent=specs_frame,
                 row=i,
                 label_loc_key="nozzEffLabel",
                 unit_text="%",
@@ -1137,14 +1144,21 @@ class InteriorBallisticsFrame(LocalizedFrame):
             i + 1,
         )
 
-        material_frame = self.add_localized_label_frame(spec_frm, label_loc_key="matFrmLabel")
+        self.use_material, i = (
+            self.add_localized_label_check(
+                specs_frame, row=i, label_loc_key="useMaterialLabel", default=False, columnspan=3
+            ),
+            i + 1,
+        )
+
+        material_frame = self.add_localized_label_frame(specs_frame, label_loc_key="matFrmLabel")
         material_frame.grid(row=i, column=0, sticky="nsew", columnspan=3)
         material_frame.columnconfigure(0, weight=1)
         i += 1
 
         j = 0
 
-        self.mat_density, j = (
+        self.material_density, j = (
             self.add_localized_3_input(
                 material_frame,
                 row=j,
@@ -1155,7 +1169,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             j + 1,
         )
-        self.mat_yield, j = (
+        self.material_yield, j = (
             self.add_localized_3_input(
                 material_frame,
                 row=j,
@@ -1167,7 +1181,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             j + 1,
         )
 
-        self.ssf, j = (
+        self.material_ssf, j = (
             self.add_localized_2_input(
                 parent=material_frame,
                 row=j,
@@ -1178,20 +1192,19 @@ class InteriorBallisticsFrame(LocalizedFrame):
             j + 1,
         )
 
-        self.is_af, i = (
+        self.material_is_af, i = (
             self.add_localized_label_check(
                 parent=material_frame, label_loc_key="afLabel", desc_label_key="afLabel", row=j, columnspan=2
             ),
             i + 1,
         )
-        spec_frm.rowconfigure(i, weight=5)
+        specs_frame.rowconfigure(i, weight=5)
 
         self.drop_prop.trace_add("write", self.update_spec)
-
         self.geom.trace_add("write", self.update_geom)
         self.aux_geom.trace_add("write", self.update_geom)
-
         self.type_optn.trace_add("write", self.type_callback)
+        self.use_material.trace_add("write", self.material_callback)
 
         for entry in (
             self.grain_r1,
@@ -1254,6 +1267,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.cvldlf_callback()
         self.type_callback()
         self.ctrl_callback()
+        self.material_callback()
 
         self.update_stats()
         self.update_table()
@@ -1490,7 +1504,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         optimize = self.opt_lf.get() == 1
         debug = self.debug.get() == 1
         atmosphere = self.in_atmos.get() == 1
-        autofrettage = self.is_af.get() == 1
+        autofrettage = self.material_is_af.get() == 1
 
         gun_type = self.type_optn.get_obj()
 
@@ -1524,10 +1538,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
             "dom": self.drop_domain.get_obj(),
             "sol": self.drop_soln.get_obj(),
             "control": self.p_control.get_obj(),
-            "structural_material": Material(
-                rho=float(self.mat_density.get()), yield_strength=float(self.mat_yield.get()) * 1e6
+            "structural_material": (
+                Material(rho=float(self.material_density.get()), yield_strength=float(self.material_yield.get()) * 1e6)
+                if self.use_material.get()
+                else None
             ),
-            "structural_safety_factor": float(self.ssf.get()),
+            "structural_safety_factor": float(self.material_ssf.get()),
             "caliber": caliber,
             "shot_mass": float(self.sht_kg.get()),
             "propellant": self.prop,
@@ -2319,6 +2335,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         except (ZeroDivisionError, ValueError):
             return
+
+    def material_callback(self, *_):
+        for entry in (self.material_yield, self.material_density, self.material_ssf, self.material_is_af):
+            entry.enable() if self.use_material.get() else entry.disable()
 
     def amb_callback(self, *_):
         self.amb_p.enable() if self.in_atmos.get() else self.amb_p.disable()
