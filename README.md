@@ -39,6 +39,11 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
       ```
       pip install .[dev]
       ```
+    - (Optional) set up pre-commit hooks
+      ```
+      exec black . --check
+      exec isort . --check
+      ```
     - Convert to distributable program via auto-py-to-exe: 
       ```
        auto-py-to-exe -db -c "singlefile.json"
@@ -46,9 +51,6 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
 
 ## Contribution
 Your contribution is welcomed! Please feel free to raise issues or propose pull requests regarding features or problems encountered. To get started, see the [community documentation](CONTRIBUTING.md)
-
-
-
 
 
 ## Resources Used

@@ -17,7 +17,7 @@
 	"Constrain Design": true,
 	"Constrain Travel": true,
 	"Density (kg/m³)": "7850.0",
-	"Description": "Ballistics of the 30x165mm OFZ (alternative designations 3UOF8, OF47) round for the 2A42, 2A72 autocannons. Loads 118 grams of P-5 BPfl propellant, notionally develops 960 m/s (±15 m/s, median deviation <5m/s) from 3600 kgf/cm².\n\nRepresented ballistics per 《引进俄BMP3步兵战车战斗部技术论文集》(2002). Barrel length is 2413/2416mm, travel approximated by subtracting cartridge length. Chambrage chosen to match cartridge length. Grain geometry is assumed.",
+	"Description": "Ballistics of the 30x165mm OFZ (alternative designations 3UOF8, OF47) round for the 2A42, 2A72 autocannons. Loads 118 grams of P-5 BPfl propellant, notionally develops 960 m/s (±15 m/s, median deviation <5m/s) from 3600 kgf/cm² space-mean pressure.\n\nRepresented ballistics per 《引进俄BMP3步兵战车战斗部技术论文集》(2002). Barrel length is 2413/2416mm, travel approximated by subtracting cartridge length. Chambrage chosen to match cartridge length. Grain geometry is assumed.",
 	"Expansion Ratio (x)": "4.0",
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "SEVEN_PERF_CYLINDER",

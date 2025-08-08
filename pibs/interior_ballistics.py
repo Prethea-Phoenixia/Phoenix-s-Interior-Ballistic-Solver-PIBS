@@ -254,6 +254,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.root.bind("<Control-R>", lambda *_: self.on_calculate())
         self.root.bind("<Control-r>", lambda *_: self.on_calculate())
 
+        design_menu.add_command(label=self.get_loc_str("resetLabel"), command=self.on_reset, accelerator="Ctrl+N")
+        self.root.bind("<Control-N>", lambda *_: self.on_reset())
+        self.root.bind("<Control-n>", lambda *_: self.on_reset())
+
         design_menu.add_command(label=self.get_loc_str("guideLabel"), command=self.on_guide, accelerator="Ctrl+G")
         self.root.bind("<Control-G>", lambda *_: self.on_guide())
         self.root.bind("<Control-g>", lambda *_: self.on_guide())
@@ -262,7 +266,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         file_menu.add_command(label=self.get_loc_str("exportAux"), command=lambda: self.export_graph(save="aux"))
         file_menu.add_command(label=self.get_loc_str("exportGeom"), command=lambda: self.export_graph(save="geom"))
         file_menu.add_command(label=self.get_loc_str("exportGuide"), command=lambda: self.export_graph(save="guide"))
-
         file_menu.add_command(label=self.get_loc_str("exportLabel"), command=self.export_table)
 
         for themeName in THEMES.keys():
@@ -1066,7 +1069,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 row=i,
                 label_loc_key="ldLabel",
                 unit_text="kg/m³",
-                default="1.0",
+                default="0.0",
                 validation=validation_nn,
             ),
             i + 1,
@@ -1078,7 +1081,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 row=i,
                 label_loc_key="ldfLabel",
                 unit_text="%",
-                default="1.0",
+                default="0.0",
                 validation=validation_ce,
                 tooltip_loc_key="ldfText",
             ),
@@ -1280,14 +1283,14 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.amb_callback()
         self.cvldlf_callback()
+        self.cvldlf_consistency_callback()
         self.type_callback()
         self.ctrl_callback()
         self.material_callback()
+        self.guide_callback()
+        self.callback()
 
-        self.update_stats()
-        self.update_table()
-        self.update_spec()
-        self.update_geom()
+        self.update_all()
 
         # self.bind("<Configure>", self.resizePlot)
 
@@ -1431,6 +1434,23 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.on_calculate()
 
+    def on_reset(self):
+        for loc in self.locs:
+            loc.reset() if hasattr(loc, "get_descriptive") else None
+        self.description.delete(1.0, "end")
+        self.kwargs, self.gun, self.gun_result, self.guide = None, None, None, None
+        self.update_all()
+
+    def update_all(self):
+        self.update_stats()
+        self.update_table()
+        self.update_geom()
+        self.update_spec()
+        self.update_fig_plot()
+        self.update_aux_plot()
+        self.update_geom_plot()
+        self.update_guide_graph()
+
     def export_table(self):
         gun = self.gun
         if gun is None:
@@ -1473,7 +1493,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.design_menu.entryconfig(0, label=self.get_loc_str("saveLabel"))
         self.design_menu.entryconfig(1, label=self.get_loc_str("loadLabel"))
         self.design_menu.entryconfig(2, label=self.get_loc_str("calcLabel"))
-        self.design_menu.entryconfig(3, label=self.get_loc_str("guideLabel"))
+        self.design_menu.entryconfig(3, label=self.get_loc_str("resetLabel"))
+        self.design_menu.entryconfig(4, label=self.get_loc_str("guideLabel"))
 
         self.file_menu.entryconfig(0, label=self.get_loc_str("exportMain"))
         self.file_menu.entryconfig(1, label=self.get_loc_str("exportAux"))
@@ -1503,13 +1524,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.guide_plot_volume.config(text=self.get_loc_str("guidePlotVolume"))
         self.guide_plot_burnout.config(text=self.get_loc_str("guidePlotBurnout"))
 
-        self.update_stats()
-        self.update_table()
-        self.update_geom()
-        self.update_spec()
-        self.update_fig_plot()
-        self.update_aux_plot()
-        self.update_guide_graph()
+        self.update_all()
 
         super().change_lang()
 
@@ -1704,6 +1719,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.update_table()
         self.update_fig_plot()
         self.update_aux_plot()
+
         self.calc_button.config(state="normal")
         self.guide_button.config(state="normal")
 
@@ -1716,7 +1732,19 @@ class InteriorBallisticsFrame(LocalizedFrame):
     def update_stats(self, *_):
         self.name.set(self.get_description())  # this would always work
 
-        for entry in (self.te, self.be, self.pe, self.va, self.lx, self.ammo, self.pa, self.gm, self.pp, self.mv):
+        for entry in (
+            self.te,
+            self.be,
+            self.pe,
+            self.va,
+            self.lx,
+            self.ammo,
+            self.pa,
+            self.gm,
+            self.pp,
+            self.mv,
+            self.bop,
+        ):
             entry.reset()
         try:
             caliber = self.kwargs["caliber"]
@@ -2461,8 +2489,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 fig = self.guide_fig
             elif save == "geom":
                 fig = self.geom_fig
-            else:
-                raise ValueError("unknown save destination")
 
             with mpl.rc_context(CONTEXT):
                 fig.savefig(file_name, transparent=True, dpi=600)

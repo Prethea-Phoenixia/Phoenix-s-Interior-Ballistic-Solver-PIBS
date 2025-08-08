@@ -17,7 +17,7 @@
 	"Constrain Design": true,
 	"Constrain Travel": true,
 	"Density (kg/m³)": "7850.0",
-	"Description": "Ballistics of 57x348SR caliber UOR-281(U) rounds from the AZP S-60 and S-68 mounted on the ZSU-57 \"Sparka\". Loads 1.16kg of 11/7 grains, canonical performance is 1000 m/s from <3100 kgf/cm² max space-mean pressure.\n\nRepresented ballistics from 枪炮内弹道学 (2014), modified to account for chambrage in consultation with 火炮内弹道计算手册（1987）. ",
+	"Description": "Ballistics of 57x348SR caliber UOR-281(U) rounds from the AZP S-60 and S-68 mounted on the ZSU-57 \"Sparka\". Loads 1.16kg of 11/7 grains, canonical performance is 1000 m/s from <3100 kgf/cm² space-mean pressure.\n\nRepresented ballistics from 枪炮内弹道学 (2014), modified to account for chambrage in consultation with 火炮内弹道计算手册（1987）. ",
 	"Expansion Ratio (x)": "4.0",
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "SEVEN_PERF_CYLINDER",

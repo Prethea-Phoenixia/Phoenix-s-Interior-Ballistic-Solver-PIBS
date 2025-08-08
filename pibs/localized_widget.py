@@ -33,11 +33,27 @@ class LocalizableWidget(Localizable):
 
 
 class Descriptive(ABC):
-    @abstractmethod
-    def get_descriptive(self) -> str: ...
 
     @abstractmethod
-    def get(self) -> Any: ...
+    def get_descriptive(self) -> str:
+        """
+        returns the json key to this widget's value.
+        """
+        ...
+
+    @abstractmethod
+    def get(self) -> Any:
+        """
+        returns the object containing the data this widget holds.
+        """
+        ...
+
+    @abstractmethod
+    def reset(self, *_) -> None:
+        """
+        resets the value of this widget to the default value.
+        """
+        ...
 
 
 class Loc12Disp(LocalizableWidget):
@@ -201,10 +217,10 @@ class Loc2Input(LocalizableWidget, Descriptive):
             foreground=color,
             justify="center",
         )
-        en.default = default
         en.grid(row=row, column=col + (0 if reverse else 1), sticky="nsew", padx=2, pady=2)
         en.bind("<FocusOut>", lambda event: formatter(event, e))
 
+        self.default = default
         self.label_widget = lb
         self.input_var = e
         self.input_widget = en
@@ -232,6 +248,9 @@ class Loc2Input(LocalizableWidget, Descriptive):
     def restore(self):
         self.label_widget.grid()
         self.input_widget.grid()
+
+    def reset(self, *_) -> None:
+        self.input_var.set(self.default)
 
     def get(self) -> str:
         return self.input_var.get()
@@ -395,15 +414,17 @@ class LocDropdown(LocalizableWidget, Descriptive):
     def get_descriptive(self) -> str:
         return self.loc_func(self.desc_label_key, True)
 
-    def reset(self, str_obj_dict):
-        current_object = self.get_obj()
-        self.str_obj_dict = str_obj_dict
-        self.loc_str_obj_dict = {self.loc_func(k): v for k, v in str_obj_dict.items()}
+    def reset(self, str_obj_dict=None):
+        # current_object = self.get_obj()
+        if str_obj_dict:
+            self.str_obj_dict = str_obj_dict
+        self.loc_str_obj_dict = {self.loc_func(k): v for k, v in self.str_obj_dict.items()}
         self.widget["values"] = tuple(self.loc_str_obj_dict.keys())
-        try:
-            self.set_by_obj(current_object)
-        except ValueError:
-            self.widget.current(0)
+        # try:
+        #     self.set_by_obj(current_object)
+        # except ValueError:
+        #     self.widget.current(0)
+        self.widget.current(0)
 
 
 class LocLabelFrame(ttk.LabelFrame, Localizable):
@@ -444,6 +465,7 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         all_localized=None,
     ):
         super().__init__(loc_func=loc_func, all_localized=all_localized)
+        self.default = default
         self.nominal_state = "normal"
         self.check_var = BooleanVar(value=default)
         self.loc_func = loc_func
@@ -502,6 +524,9 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
             return None
         else:
             return self.loc_func(self.label_loc_key, True)
+
+    def reset(self) -> None:
+        self.check_var.set(self.default)
 
 
 def warn(func):

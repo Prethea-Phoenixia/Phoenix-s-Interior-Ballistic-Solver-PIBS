@@ -248,7 +248,8 @@
 		"vacISPDesc": "Isp(Vac)",
 		"vinfText": "Velocity the shot would achieve if the barrel is extended to infinite length, or equivalently, if the gas is allowed to expand to temperature of absolute zero.",
 		"widthLabel": "Width",
-		"widthText": "Specify the width of propellant strip or flake."
+		"widthText": "Specify the width of propellant strip or flake.",
+      "resetLabel": "Reset Gun"
 	},
 	"中文": {
 		"BURNOUT": "火药燃尽",
@@ -493,6 +494,7 @@
 		"vacISPDesc": "　　真空比冲",
 		"vinfText": "该装药条件下的极限速度（vj），即炮管长度趋于无穷时弹速的极限。正比与火药力与装药量的乘积的平方根，反比于弹重，绝热指数-1，与次要功系数的平方根。",
 		"widthLabel": "宽度",
-		"widthText": "设置带状火药宽度。"
+		"widthText": "设置带状火药宽度。",
+      "resetLabel": "重置设计"
 	}
 }
