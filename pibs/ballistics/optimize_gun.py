@@ -2,8 +2,9 @@ import logging
 from math import floor, log, pi
 from random import uniform
 
-from .generics import DelegatesPropellant
 from . import (
+    MAX_GUESSES,
+    MAX_ITER,
     POINT_PEAK_AVG,
     POINT_PEAK_BREECH,
     POINT_PEAK_SHOT,
@@ -12,9 +13,8 @@ from . import (
     SOL_PIDDUCK,
     Points,
     Solutions,
-    MAX_GUESSES,
-    MAX_ITER,
 )
+from .generics import DelegatesPropellant
 from .gun import pidduck
 from .num import RKF78, dekker, gss
 from .prop import Propellant

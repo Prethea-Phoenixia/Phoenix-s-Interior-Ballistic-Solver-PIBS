@@ -1,7 +1,6 @@
 type,description,adiabatic index,density kg/m^3,force J/kg,covolume m^3/kg,pressure exponent,burnrate coefficient m/s/Pa^n,isochoric adb flame temp K
-Pyroxylin,"Pyroxylin (nitrocellulose) propellant with values typically used to model multiple-perforated grains",1.2,1600,950000,1.0e-3,0.8,2.8528e-8,""
-Pyroxylin (Low Nitration), "Pyroxylin (nitrocellulose) propellant with values typically used to model multiple-perforated grains",1.2,1600,850000,1.0e-3,0.8,2.8528e-8,""
-P-5 BPfl,"High Nitrogen Single Base,*-------- High Nitrated Pyroxylin, 2.2 - 4.1% Dimethacrylate (Bis-Triethylene Glycol) Phthalate, 1.4 - 3.2% Volatile, 1.0 - 2.0% Diphenyl Amine, 0.1 - 0.5% Potassium Sulphate, 0.05-0.15% Graphite.",1.23,1575,990000,1.0e-3,1.0,7.9e-10,""
+P-5 BPfl,"High Nitrogen Single Base,*-------- High Nitrated Pyroxylin, 2.2 - 4.1% Dimethacrylate (Bis-Triethylene Glycol) Phthalate, 1.4 - 3.2% Volatile, 1.0 - 2.0% Diphenyl Amine, 0.1 - 0.5% Potassium Sulphate, 0.05-0.15% Graphite.",1.23,1575,990000,1.0e-3,1.0,7.1951e-10,""
+Pyroxylin,"Pyroxylin (nitrocellulose) propellant with values typically used to model multiple-perforated grains",1.25,1600,950000,1.0e-3,0.83,8.343e-8,""
 M1,"Single Base,AMCP 706-150,ADA043778,*85.00% Nitrocellulose (13.15%N), 10.00% Dinitrotloluene,  5.00% Dibutylphthalate,  1.00% Diphenylamine",1.2593,1569,911700,1.104e-3,0.951,1.078e-9,2417
 M2,"Double Base,AMCP 706-150,ADA043778,*77.45% Nitrocellulose (13.25%N),*19.50% Nitroglycerin,  1.40% Barium Nitrate,  0.75% Potassium Nitrate,  0.60% Ethyl Centralite,  0.30% Graphite",1.2238,1652,1076000,1.008e-3,0.933,3.540e-9,3319
 M5,"Double Base,AMCP 706-150,ADA043778,*81.95% Nitrocellulose (13.25%N),*15.00% Nitroglycerin,  1.40% Barium Nitrate,  0.75% Potassium Nitrate,  0.60% Ethyl Centralite,  0.30% Graphite",1.2238,1650,1061000,9.942e-4,0.948,2.504e-9,3245

@@ -36,11 +36,11 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
 - Development setup:
     - Install Python (>=3.9)
     - Install development dependencies: 
-      ```console
+      ```
       pip install .[dev]
       ```
     - Convert to distributable program via auto-py-to-exe: 
-      ```console
+      ```
        auto-py-to-exe -db -c "singlefile.json"
       ``` 
 

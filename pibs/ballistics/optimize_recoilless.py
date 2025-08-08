@@ -2,8 +2,15 @@ import logging
 from math import floor, inf, log, pi
 from random import uniform
 
+from . import (
+    MAX_GUESSES,
+    POINT_PEAK_AVG,
+    POINT_PEAK_BREECH,
+    POINT_PEAK_SHOT,
+    POINT_PEAK_STAG,
+    Points,
+)
 from .generics import DelegatesPropellant
-from . import POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT, POINT_PEAK_STAG, Points, MAX_GUESSES
 from .num import RKF78, dekker, gss
 from .prop import Propellant
 from .recoilless import Recoilless

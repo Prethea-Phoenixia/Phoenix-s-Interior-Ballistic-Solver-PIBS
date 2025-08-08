@@ -1,16 +1,15 @@
 from __future__ import annotations
-from dataclasses import dataclass, asdict
-from functools import wraps
 
+from dataclasses import asdict, dataclass
+from functools import wraps
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .gun import Gun
     from . import Points
 
-from .prop import Propellant
-
 from . import POINT_EXIT, POINT_PEAK_AVG
+from .prop import Propellant
 
 
 @dataclass
@@ -26,9 +25,9 @@ class GenericEntry(HasGetRawLine):
     travel: float
     burnup: float
     velocity: float
-    breechPressure: float
-    avgPressure: float
-    shotPressure: float
+    breech_pressure: float
+    avg_pressure: float
+    shot_pressure: float
     temperature: float
 
 
@@ -39,9 +38,9 @@ class GenericErrorEntry(HasGetRawLine):
     travel: float | None = None
     burnup: float | None = None
     velocity: float | None = None
-    breechPressure: float | None = None
-    avgPressure: float | None = None
-    shotPressure: float | None = None
+    breech_pressure: float | None = None
+    avg_pressure: float | None = None
+    shot_pressure: float | None = None
     temperature: float | None = None
 
 
@@ -54,9 +53,9 @@ class GenericResult:
 
     tubeMass: float = None
     outline: list[OutlineEntry] = None
-    thermalEfficiency: float = None
-    ballisticEfficiency: float = None
-    piezoEfficiency: float = None
+    thermal_efficiency: float = None
+    ballistic_efficiency: float = None
+    piezo_efficiency: float = None
 
     def read_table_data(self, tag: Points) -> GenericEntry:
         for tableEntry in self.table_data:
@@ -92,7 +91,7 @@ class GenericResult:
         pe: piezoelectric efficiency
         """
         vg = self.read_table_data(POINT_EXIT).velocity
-        p_max = self.read_table_data(POINT_PEAK_AVG).avgPressure
+        p_max = self.read_table_data(POINT_PEAK_AVG).avg_pressure
 
         te = (vg / self.gun.v_j) ** 2
         be = te / self.gun.phi

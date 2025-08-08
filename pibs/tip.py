@@ -50,10 +50,10 @@ class ToolTip(object):
         label = Label(
             tw,
             text=self.text,
-            justify=LEFT,
+            justify="left",
             background="#ffffe0",
             wraplength=(columnWidth - 2) * width,  # 2 to account for the padding.
-            relief=SOLID,
+            relief="solid",
             borderwidth=0,
             font=t_Font,
         )

@@ -6,7 +6,8 @@ import traceback
 from dataclasses import dataclass
 from math import inf, pi, tan
 
-from pibs.ballistics.material import Material, Material
+from pibs.ballistics.material import Material
+
 from . import (
     COMPUTE,
     DOMAIN_LEN,
@@ -22,7 +23,6 @@ from . import (
     SAMPLE,
     Domains,
 )
-
 from .gun import Gun
 from .num import RKF78, dekker, gss
 from .prop import Composition, Propellant
@@ -31,28 +31,28 @@ logger = logging.getLogger(__name__)
 
 
 from .generics import (
+    DelegatesPropellant,
     GenericEntry,
+    GenericErrorEntry,
     GenericResult,
     OutlineEntry,
     PressureProbePoint,
     PressureTraceEntry,
-    GenericErrorEntry,
-    DelegatesPropellant,
 )
 
 
 @dataclass
 class RecoillessTableEntry(GenericEntry):
-    outflowVelocity: float
-    stagPressure: float
-    outflowFraction: float
+    outflow_velocity: float
+    stag_pressure: float
+    outflow_fraction: float
 
 
 @dataclass
 class RecoillessErrorEntry(GenericErrorEntry):
-    outflowVelocity: float | None = None
-    stagPressure: float | None = None
-    outflowFraction: float | None = None
+    outflow_velocity: float | None = None
+    stag_pressure: float | None = None
+    outflow_fraction: float | None = None
 
 
 @dataclass
@@ -985,9 +985,9 @@ class Recoilless(DelegatesPropellant):
         for recoillessTableEntry in recoilless_result.table_data:
             l = recoillessTableEntry.travel
             v = recoillessTableEntry.velocity
-            vb = recoillessTableEntry.outflowVelocity
-            ps = recoillessTableEntry.shotPressure
-            eta = recoillessTableEntry.outflowFraction
+            vb = recoillessTableEntry.outflow_velocity
+            ps = recoillessTableEntry.shot_pressure
+            eta = recoillessTableEntry.outflow_fraction
 
             for i, x in enumerate(x_probes):
                 if (x - l_c) <= l:

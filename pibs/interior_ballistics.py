@@ -7,14 +7,25 @@ import platform
 import sys
 import traceback
 from ctypes import windll
+from itertools import repeat
 from logging.handlers import QueueHandler, QueueListener
-from math import ceil, inf, log10, pi
+from math import ceil, inf, log10
 from multiprocessing import Process, Queue
 from queue import Empty
-from tkinter import Frame, IntVar, Menu, StringVar, Text, Tk, filedialog, messagebox, ttk
+from tkinter import (
+    Frame,
+    IntVar,
+    Menu,
+    StringVar,
+    Text,
+    Tk,
+    filedialog,
+    messagebox,
+    ttk,
+)
 from tkinter.font import Font
 from typing import Literal
-from itertools import repeat
+
 import matplotlib as mpl
 from labellines import labelLines
 from matplotlib import font_manager
@@ -42,18 +53,19 @@ from .ballistics import (
     SOL_LAGRANGE,
     SOL_MAMONTOV,
     SOL_PIDDUCK,
+    Composition,
     Constrained,
     ConstrainedRecoilless,
-    Composition,
     Gun,
+    Material,
     Propellant,
     Recoilless,
     SimpleGeometry,
-    Material,
 )
 from .localized_widget import LocalizedFrame
 from .misc import (
     STRING,
+    detect_darkmode_in_windows,
     dot_aligned,
     filenameize,
     format_int_input,
@@ -66,7 +78,6 @@ from .misc import (
     validate_ce,
     validate_nn,
     validate_pi,
-    detect_darkmode_in_windows,
 )
 from .tip import CreateToolTip
 
@@ -150,9 +161,6 @@ class TextHandler(logging.Handler):
 class PIBS(Tk):
     def __init__(self, *args, loc, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # self.attributes("-toolwindow", True)
-
         self.option_add("*tearOff", False)
 
         font = Font(family=FONTNAME, size=FONTSIZE)
@@ -267,13 +275,14 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.prop, self.gun, self.guide = None, None, None
 
         self.columnconfigure(1, weight=1)
-        self.rowconfigure(1, weight=1)
+        self.rowconfigure(0, weight=1)
+        self.rowconfigure(1, weight=2)
 
         ## nameplate
         name_frm = self.add_localized_label_frame(self, label_loc_key="nameFrm")
         name_frm.grid(row=0, column=0, sticky="nsew", columnspan=2)
         name_frm.columnconfigure(0, weight=1)
-        name_frm.rowconfigure(0, weight=1)
+        name_frm.rowconfigure(1, weight=1)
 
         self.name = StringVar(self)
         name_plate = ttk.Entry(
@@ -310,6 +319,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.add_localized_122_display(parent=par_frm, row=i, label_loc_key="ppLabel", tooltip_loc_key="ppText"),
             i + 3,
         )
+        self.bop, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="bopLabel"), i + 2
         self.lx, i = (
             self.add_localized_122_display(parent=par_frm, row=i, label_loc_key="lxLabel", tooltip_loc_key="calLxText"),
             i + 3,
@@ -1146,7 +1156,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.use_material, i = (
             self.add_localized_label_check(
-                specs_frame, row=i, label_loc_key="useMaterialLabel", default=False, columnspan=3
+                specs_frame,
+                row=i,
+                label_loc_key="useMaterialLabel",
+                desc_label_key="useMaterialLabel",
+                default=False,
+                columnspan=3,
             ),
             i + 1,
         )
@@ -1367,7 +1382,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         try:
             loc_val_dict = {
-                loc.get_descriptive(): str(loc.get())
+                loc.get_descriptive(): loc.get()
                 for loc in self.locs
                 if (hasattr(loc, "get_descriptive") and loc.get_descriptive())
             }
@@ -1699,39 +1714,28 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 pass
 
     def update_stats(self, *_):
-
         self.name.set(self.get_description())  # this would always work
 
         for entry in (self.te, self.be, self.pe, self.va, self.lx, self.ammo, self.pa, self.gm, self.pp, self.mv):
             entry.reset()
         try:
             caliber = self.kwargs["caliber"]
-            chambrage = self.kwargs["chambrage"]
-            travel = self.kwargs["length_gun"]
 
-            bore_s = pi * 0.25 * caliber**2
-            breech_s = bore_s * chambrage
-
-            ps = self.gun_result.read_table_data(POINT_PEAK_SHOT).shotPressure
-
+            ps = self.gun_result.read_table_data(POINT_PEAK_SHOT).shot_pressure
             eta_t, eta_b, eta_p = self.gun_result.get_eff()
-
-            self.te.set(str(round(eta_t * 100, 2)) + " %")
-            self.be.set(str(round(eta_b * 100, 2)) + " %")
-            self.pe.set(str(round(eta_p * 100, 2)) + " %")
-
+            self.te.set(f"{eta_t * 100:.2f} %")
+            self.be.set(f"{eta_b * 100:.2f} %")
+            self.pe.set(f"{eta_p * 100:.2f} %")
             self.va.set(toSI(self.gun.v_j, unit="m/s"))
-
-            cartridge_len = self.kwargs["chamber_volume"] / breech_s  # is equivalent to chamber length
 
             self.lx.set(
                 (
-                    toSI(travel / caliber, unit=self.get_loc_str("calLabel")),
-                    toSI((travel + cartridge_len / chambrage) / caliber, unit=self.get_loc_str("calLabel")),
+                    toSI(self.gun.l_g / caliber, unit=self.get_loc_str("calLabel")),
+                    toSI((self.gun.l_g + self.gun.l_c) / caliber, unit=self.get_loc_str("calLabel")),
                 )
             )
 
-            self.ammo.set(toSI(cartridge_len, unit="m"))
+            self.ammo.set(toSI(self.gun.l_c, unit="m"))
             self.pa.set(toSI(ps * self.gun.s / self.gun.m, unit="m/s²"))
             tube_mass = self.gun_result.tubeMass
             self.gm.set(format_mass(tube_mass))
@@ -1739,12 +1743,17 @@ class InteriorBallisticsFrame(LocalizedFrame):
             peak_breech_entry = self.gun_result.read_table_data(POINT_PEAK_BREECH)
             self.pp.set(
                 (
-                    f"{toSI(peak_average_entry.avgPressure, unit='Pa'):}" + self.get_loc_str("mean"),
-                    f"{toSI(peak_breech_entry.breechPressure, unit='Pa'):}" + self.get_loc_str("breech"),
+                    f"{toSI(peak_average_entry.avg_pressure, unit='Pa'):}" + self.get_loc_str("mean"),
+                    f"{toSI(peak_breech_entry.breech_pressure, unit='Pa'):}" + self.get_loc_str("breech"),
                 )
             )
             muzzle_entry = self.gun_result.read_table_data(POINT_EXIT)
             self.mv.set(toSI(muzzle_entry.velocity, unit="m/s"))
+            try:
+                burnout_entry = self.gun_result.read_table_data(POINT_BURNOUT)
+                self.bop.set(f"{burnout_entry.travel / self.gun.l_g * 1e2:.2f} %")
+            except ValueError:
+                self.bop.set(self.get_loc_str("uncontained"))
 
         except Exception as e:
             self.handle_errors(exception=e, level=30)
@@ -2314,7 +2323,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             entry.disable() if self.use_aux_grain.get() == 0 else entry.enable()
 
     def cvldlf_consistency_callback(self, *_):
-        prop = self.drop_prop.get()
+        prop = self.drop_prop.get_obj()
         try:
             sigfig = int(self.acc_exp.get()) + 1
             w = float(self.chg_kg.get())
@@ -2565,8 +2574,7 @@ def main(loc: str = None):
     else:
         print("Unknown release: ", win_release, ", skipping DPI handling")
 
-    if not loc:
-        loc = locale.windows_locale[windll.kernel32.GetUserDefaultUILanguage()]
+    loc = locale.windows_locale[windll.kernel32.GetUserDefaultUILanguage()] if not loc else loc
 
     loadfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"), True, True)
     font_manager.fontManager.addfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"))

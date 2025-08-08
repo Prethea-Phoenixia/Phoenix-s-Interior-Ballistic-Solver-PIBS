@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
 from functools import wraps
-from tkinter import Frame, IntVar, Menu, StringVar, ttk
+from tkinter import BooleanVar, Frame, Menu, StringVar, ttk
 from typing import Any, Callable, Literal, Optional
 
 from .misc import format_float_input
 from .tip import CreateToolTip
-import warnings
 
 
 class Localizable(ABC):
@@ -35,6 +35,9 @@ class LocalizableWidget(Localizable):
 class Descriptive(ABC):
     @abstractmethod
     def get_descriptive(self) -> str: ...
+
+    @abstractmethod
+    def get(self) -> Any: ...
 
 
 class Loc12Disp(LocalizableWidget):
@@ -87,7 +90,6 @@ class Loc12Disp(LocalizableWidget):
         if new_loc_key:
             self.label_loc_key = new_loc_key
         self.label_widget.config(text=self.loc_func(self.label_loc_key))
-
         if self.loc_tooltip_var is not None:
             if new_tooltip_key is not None:
                 self.tooltip_loc_key = new_tooltip_key
@@ -231,7 +233,7 @@ class Loc2Input(LocalizableWidget, Descriptive):
         self.label_widget.grid()
         self.input_widget.grid()
 
-    def get(self):
+    def get(self) -> str:
         return self.input_var.get()
 
     def set(self, val):
@@ -351,8 +353,8 @@ class LocDropdown(LocalizableWidget, Descriptive):
         self.widget.config(values=tuple(self.loc_str_obj_dict.keys()))
         self.widget.current(index)
 
-    def get(self):
-        return self.get_obj()
+    def get(self) -> str:
+        return str(self.get_obj())
 
     def get_obj(self):
         return self.loc_str_obj_dict[self.textVar.get()]
@@ -430,7 +432,7 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
     def __init__(
         self,
         parent,
-        default=1,
+        default=True,
         row=0,
         col=0,
         columnspan=None,
@@ -443,12 +445,12 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
     ):
         super().__init__(loc_func=loc_func, all_localized=all_localized)
         self.nominal_state = "normal"
-        self.check_var = IntVar(value=default)
+        self.check_var = BooleanVar(value=default)
         self.loc_func = loc_func
         self.check_widget = ttk.Checkbutton(parent, text=loc_func(label_loc_key), variable=self.check_var, width=width)
         self.check_widget.grid(row=row, column=col, sticky="nsew", columnspan=columnspan, padx=2, pady=2)
 
-        if tooltip_loc_key is not None:
+        if tooltip_loc_key:
             self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
             CreateToolTip(self.check_widget, self.loc_tooltip_var)
         else:
@@ -459,10 +461,10 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         self.tooltip_loc_key = tooltip_loc_key
 
     def localize(self, new_loc_key=None):
-        if new_loc_key is not None:
+        if new_loc_key:
             self.label_loc_key = new_loc_key
         self.check_widget.config(text=self.loc_func(self.label_loc_key))
-        if self.loc_tooltip_var is not None:
+        if self.loc_tooltip_var:
             self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
     def disable(self):
@@ -477,7 +479,7 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
     def restore(self):
         self.check_widget.grid()
 
-    def get(self):
+    def get(self) -> bool:
         return self.check_var.get()
 
     def set(self, value):

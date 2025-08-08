@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 import sys
 import traceback
-from math import exp, inf, log, pi
 from dataclasses import dataclass
+from math import exp, inf, log, pi
 
 from . import (
     COMPUTE,
@@ -24,18 +24,18 @@ from . import (
     Domains,
     Solutions,
 )
+from .generics import (
+    DelegatesPropellant,
+    GenericEntry,
+    GenericErrorEntry,
+    GenericResult,
+    OutlineEntry,
+    PressureProbePoint,
+    PressureTraceEntry,
+)
 from .material import Material
 from .num import RKF78, dekker, gss, intg, secant
 from .prop import Composition, Propellant
-from .generics import (
-    PressureProbePoint,
-    PressureTraceEntry,
-    OutlineEntry,
-    DelegatesPropellant,
-    GenericResult,
-    GenericEntry,
-    GenericErrorEntry,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -153,13 +153,13 @@ class Gun(DelegatesPropellant):
         self.s = (0.5 * caliber) ** 2 * pi
         self.m = shot_mass
         self.omega = charge_mass
-        self.v_0 = chamber_volume
+        self.vol_0 = chamber_volume
         self.p_0 = start_pressure
         self.l_g = length_gun
         self.chi_k = chambrage  # ration of l_0 / l_chamber
-        self.l_0 = self.v_0 / self.s
+        self.l_0 = self.vol_0 / self.s
         self.l_c = self.l_0 / self.chi_k
-        self.delta = self.omega / self.v_0
+        self.delta = self.omega / self.vol_0
 
         self.phi_1 = 1 / (1 - drag_coefficient)  # drag work coefficient
         self.material = structural_material
@@ -905,9 +905,9 @@ class Gun(DelegatesPropellant):
         p_x = p_s * k + p_b * (1 - k)
 
         if x < l_c:
-            u = a_1 * x * v / (self.v_0 + a_1 * l_1)
+            u = a_1 * x * v / (self.vol_0 + a_1 * l_1)
         else:
-            u = (a_1 * x + (a_0 - a_1) * l_c) * v / (self.v_0 + a_1 * l_1)
+            u = (a_1 * x + (a_0 - a_1) * l_c) * v / (self.vol_0 + a_1 * l_1)
 
         return p_x, u
 
@@ -925,9 +925,7 @@ class Gun(DelegatesPropellant):
         chi_k = self.chi_k
         sigma = self.material.yield_strength
         s = self.s
-
         r_b = r * chi_k**0.5
-
         x_probes = (
             [i / step * l_c for i in range(step)]
             + [l_c * (1 - tol)]
@@ -939,8 +937,8 @@ class Gun(DelegatesPropellant):
         for gunTableEntry in gun_result.table_data:
             l = gunTableEntry.travel
             v = gunTableEntry.velocity
-            p_s = gunTableEntry.shotPressure
-            p_b = gunTableEntry.breechPressure
+            p_s = gunTableEntry.shot_pressure
+            p_b = gunTableEntry.breech_pressure
             for i, x in enumerate(x_probes):
                 if (x - l_c) <= l:
                     p_x, _ = self.to_px_u(l, p_s, p_b, v, x)
