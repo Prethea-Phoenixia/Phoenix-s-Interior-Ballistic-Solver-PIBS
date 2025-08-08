@@ -250,13 +250,13 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.parent.bind("<Control-o>", lambda *_: self.load())
         self.parent.bind("<Control-O>", lambda *_: self.load())
 
-        design_menu.add_command(label=self.get_loc_str("calcLabel"), command=self.on_calculate, accelerator="Ctrl+R")
-        self.root.bind("<Control-R>", lambda *_: self.on_calculate())
-        self.root.bind("<Control-r>", lambda *_: self.on_calculate())
-
         design_menu.add_command(label=self.get_loc_str("resetLabel"), command=self.on_reset, accelerator="Ctrl+N")
         self.root.bind("<Control-N>", lambda *_: self.on_reset())
         self.root.bind("<Control-n>", lambda *_: self.on_reset())
+
+        design_menu.add_command(label=self.get_loc_str("calcLabel"), command=self.on_calculate, accelerator="Ctrl+R")
+        self.root.bind("<Control-R>", lambda *_: self.on_calculate())
+        self.root.bind("<Control-r>", lambda *_: self.on_calculate())
 
         design_menu.add_command(label=self.get_loc_str("guideLabel"), command=self.on_guide, accelerator="Ctrl+G")
         self.root.bind("<Control-G>", lambda *_: self.on_guide())
@@ -1492,8 +1492,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.design_menu.entryconfig(0, label=self.get_loc_str("saveLabel"))
         self.design_menu.entryconfig(1, label=self.get_loc_str("loadLabel"))
-        self.design_menu.entryconfig(2, label=self.get_loc_str("calcLabel"))
-        self.design_menu.entryconfig(3, label=self.get_loc_str("resetLabel"))
+        self.design_menu.entryconfig(2, label=self.get_loc_str("resetLabel"))
+        self.design_menu.entryconfig(3, label=self.get_loc_str("calcLabel"))
+
         self.design_menu.entryconfig(4, label=self.get_loc_str("guideLabel"))
 
         self.file_menu.entryconfig(0, label=self.get_loc_str("exportMain"))

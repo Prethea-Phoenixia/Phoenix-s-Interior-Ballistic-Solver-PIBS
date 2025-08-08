@@ -211,6 +211,7 @@
 		"ppLabel": "Peak Pressure",
 		"ppText": "Peak pressure includes maximum average pressure, and the maximum breech pressure.",
 		"propFrmLabel": "Propellant",
+		"resetLabel": "Reset Gun",
 		"sampText": "The domain to sample equidistantly form shot start until projectile exit.\n PIBS first solves the characteristic points, controlling for error. Then, the projectile's history is sampled equidistantly along the specified domain. Significant discontinuity between the two usually indicates insufficient accuracy specification, in which case the sample amount should be reduced, and the accuracy specification increased.",
 		"sampleFrmLabel": "Sampling Points",
 		"saveLabel": "Save Gun",
@@ -248,8 +249,7 @@
 		"vacISPDesc": "Isp(Vac)",
 		"vinfText": "Velocity the shot would achieve if the barrel is extended to infinite length, or equivalently, if the gas is allowed to expand to temperature of absolute zero.",
 		"widthLabel": "Width",
-		"widthText": "Specify the width of propellant strip or flake.",
-      "resetLabel": "Reset Gun"
+		"widthText": "Specify the width of propellant strip or flake."
 	},
 	"中文": {
 		"BURNOUT": "火药燃尽",
@@ -459,6 +459,7 @@
 		"ppLabel": "最大压强",
 		"ppText": "分别记最大平均工作压强，及最大膛底压强。",
 		"propFrmLabel": "火药参数",
+		"resetLabel": "重置设计",
 		"sampText": "   采样时将给定域等间隔均分的数目。程序中，特征点的计算先行进行，与采样设置无关。采样点的计算在时间域上独立于特征点计算，可以用于特征点计算结果的验证。\n   需要注意的是，由于基于长度的常微分系统在零点上有数值奇点，因此在长度域上的采样点计算与特征点计算并不独立。",
 		"sampleFrmLabel": "采样控制",
 		"saveLabel": "保存设计",
@@ -494,7 +495,6 @@
 		"vacISPDesc": "　　真空比冲",
 		"vinfText": "该装药条件下的极限速度（vj），即炮管长度趋于无穷时弹速的极限。正比与火药力与装药量的乘积的平方根，反比于弹重，绝热指数-1，与次要功系数的平方根。",
 		"widthLabel": "宽度",
-		"widthText": "设置带状火药宽度。",
-      "resetLabel": "重置设计"
+		"widthText": "设置带状火药宽度。"
 	}
 }
