@@ -153,4 +153,3 @@ cython_debug/
 *.pstats
 *.png
 
-/output/*

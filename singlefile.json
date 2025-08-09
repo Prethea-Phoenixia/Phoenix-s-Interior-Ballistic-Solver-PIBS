@@ -23,7 +23,7 @@
     },
     {
       "optionDest": "name",
-      "value": "PIBS"
+      "value": "pibs"
     },
     {
       "optionDest": "clean_build",
