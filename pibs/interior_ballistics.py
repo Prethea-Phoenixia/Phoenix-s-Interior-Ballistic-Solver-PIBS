@@ -1749,22 +1749,19 @@ class InteriorBallisticsFrame(LocalizedFrame):
             entry.reset()
         try:
             caliber = self.kwargs["caliber"]
-
-            ps = self.gun_result.read_table_data(POINT_PEAK_SHOT).shot_pressure
             eta_t, eta_b, eta_p = self.gun_result.get_eff()
             self.te.set(f"{eta_t * 100:.2f} %")
             self.be.set(f"{eta_b * 100:.2f} %")
             self.pe.set(f"{eta_p * 100:.2f} %")
             self.va.set(toSI(self.gun.v_j, unit="m/s"))
-
             self.lx.set(
                 (
                     toSI(self.gun.l_g / caliber, unit=self.get_loc_str("calLabel")),
                     toSI((self.gun.l_g + self.gun.l_c) / caliber, unit=self.get_loc_str("calLabel")),
                 )
             )
-
             self.ammo.set(toSI(self.gun.l_c, unit="m"))
+            ps = self.gun_result.read_table_data(POINT_PEAK_SHOT).shot_pressure
             self.pa.set(toSI(ps * self.gun.s / self.gun.m, unit="m/s²"))
             tube_mass = self.gun_result.tubeMass
             self.gm.set(format_mass(tube_mass))
@@ -1784,8 +1781,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
             except ValueError:
                 self.bop.set(self.get_loc_str("uncontained"))
 
-        except Exception as e:
-            self.handle_errors(exception=e, level=30)
+        except (AttributeError, ValueError, TypeError):
+            pass
 
     def get_guide(self):
         try:
