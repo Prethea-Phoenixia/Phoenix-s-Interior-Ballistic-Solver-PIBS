@@ -11,7 +11,7 @@
 	"Calculate Structure": false,
 	"Caliber (mm)": "57.0",
 	"Chamber Volume (L)": "1.51",
-	"Chambrage Ratio (x)": "1.877",
+	"Chambrage Ratio (x)": "1.905",
 	"Charge / Shot Mass Step": "0.05",
 	"Charge Mass (kg)": "1.16",
 	"Constrain Design": true,
@@ -38,7 +38,7 @@
 	"Nozzle Efficiency (%)": "92.0",
 	"Pressure (kPa)": "101.325",
 	"Pressure Constraint": "PEAK_BREECH_P",
-	"Pressure Target (MPa)": "331.0",
+	"Pressure Target (MPa)": "329.3",
 	"Propellant": "Pyroxylin",
 	"Resistance Factor (%)": "3.0",
 	"Safety Factor": "1.35",
@@ -48,7 +48,7 @@
 	"Steps": "33",
 	"Travel (mm)": "3624.0",
 	"Velocity Target (m/s)": "1000.0",
-	"Web (mm)": "5.472",
+	"Web (mm)": "5.501",
 	"Web Aux / Main (x)": "1.0",
 	"Yield Strength (MPa)": "1000.0"
 }
