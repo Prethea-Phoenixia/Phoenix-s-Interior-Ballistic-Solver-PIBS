@@ -36,13 +36,17 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
 - Development setup:
     - Install Python (>=3.9)
     - Install development dependencies: 
-      ```
+      ```commandline
       pip install .[dev]
       ```
     - Convert to distributable program via auto-py-to-exe: 
-      ```
-       auto-py-to-exe -db -c "singlefile.json"
+      ```commandline
+      auto-py-to-exe -db -c "singlefile.json"
       ``` 
+    - or, Generate executables via:
+      ```commandline
+      pyinstaller --noconfirm --onefile --windowed --icon "pibs\ui\logo.ico" --name "pibs" --debug "all" --add-data "pibs\ballistics\resource;ballistics/resource/" --add-data "pibs\ui;ui/"  "run_pibs.py"
+      ```
 
 ## Contribution
 Your contribution is welcomed! Please feel free to raise issues or propose pull requests regarding features or problems encountered. To get started, see the [community documentation](CONTRIBUTING.md)

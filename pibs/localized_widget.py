@@ -252,8 +252,8 @@ class Loc2Input(LocalizableWidget, Descriptive):
     def reset(self, *_) -> None:
         self.input_var.set(self.default)
 
-    def get(self) -> str:
-        return self.input_var.get()
+    def get(self) -> float:
+        return float(self.input_var.get())
 
     def set(self, val):
         self.input_var.set(val)
@@ -415,15 +415,11 @@ class LocDropdown(LocalizableWidget, Descriptive):
         return self.loc_func(self.desc_label_key, True)
 
     def reset(self, str_obj_dict=None):
-        # current_object = self.get_obj()
         if str_obj_dict:
             self.str_obj_dict = str_obj_dict
         self.loc_str_obj_dict = {self.loc_func(k): v for k, v in self.str_obj_dict.items()}
         self.widget["values"] = tuple(self.loc_str_obj_dict.keys())
-        # try:
-        #     self.set_by_obj(current_object)
-        # except ValueError:
-        #     self.widget.current(0)
+
         self.widget.current(0)
 
 
@@ -539,8 +535,6 @@ def warn(func):
         return func(*args, **kwargs)
 
     return wrapped
-
-    # return decorator
 
 
 class LocalizedFrame(Frame):
