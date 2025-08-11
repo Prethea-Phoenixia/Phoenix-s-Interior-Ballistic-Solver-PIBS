@@ -152,3 +152,4 @@ cython_debug/
 *.pstats
 *.png
 
+pibs.spec
