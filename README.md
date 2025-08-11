@@ -45,7 +45,7 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
       ``` 
     - or, Generate executables via:
       ```commandline
-      pyinstaller --noconfirm --onefile --windowed --icon "pibs\ui\logo.ico" --name "pibs" --debug "all" --add-data "pibs\ballistics\resource;ballistics/resource/" --add-data "pibs\ui;ui/"  "run_pibs.py"
+      pyinstaller --clean --noconfirm --onefile --windowed --icon "pibs\ui\logo.ico" --name "pibs" --debug "all" --add-data "pibs\ballistics\resource;ballistics/resource/" --add-data "pibs\ui;ui/"  "run_pibs.py"
       ```
 
 ## Contribution
