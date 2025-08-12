@@ -39,16 +39,26 @@ cs_hat = [     0,  0, 0, 0, 0, 34/105, 9/35, 9/35, 9/280, 9/280,      0, 41/840,
 # fmt: on
 
 
-def RKF78(
-    dFunc,
-    iniVal,
+def handle_record(record):
+    print("record:")
+    for line in record:
+        x, yval = line
+        print("{:^12.8g}|".format(x), end="")
+        for i, y in enumerate(yval):
+            print("{:^12.8g}|".format(y), end="")
+        print()
+
+
+def rkf78(
+    d_func,
+    ini_val,
     x_0,
     x_1,
-    relTol,
-    absTol=1e-16,
-    minTol=1e-16,
-    adaptTo=True,
-    abortFunc=None,
+    rel_tol,
+    abs_tol=1e-16,
+    min_tol=1e-16,
+    adapt_to=True,
+    abort_func=None,
     record=None,
     debug=False,
 ):
@@ -57,27 +67,27 @@ def RKF78(
     as defined by dFunc
 
     Arguments:
-        dFunc       : d/dx|x=x(y1, y2, y3....) = dFunc(x, y1, y2, y3..., dx)
-        iniVal      : initial values for (y1, y2, y3...)
+        d_func       : d/dx|x=x(y1, y2, y3....) = dFunc(x, y1, y2, y3..., dx)
+        ini_val      : initial values for (y1, y2, y3...)
         x_0         : integration start point
         x_1         : integration end point
-        relTol      : relative tolerance, per component
-        absTol      : absolute tolerance, per component
-        minTol      : minimum tolerance, per component. This is added to the error
+        rel_tol      : relative tolerance, per component
+        abs_tol      : absolute tolerance, per component
+        min_tol      : minimum tolerance, per component. This is added to the error
                     estimation, to encourage conservatism in the integrator, and to
                     guard against division by 0 if functional value tends to 0
 
-        abortFunc   : optional, function that accepts arguments of
+        abort_func   : optional, function that accepts arguments of
                     (x - current value of integrand, ys - current value of the SoE,
                     record - record of value up to that point)
                     and terminates the integrator on a boolean value of True
 
-        adaptTo     : optional, values used to control error.
+        adapt_to     : optional, values used to control error.
                     if True, adapt stepsize to error estimation in every component.
                     if [Boolean] * nbr. of components, adapt stepsize to error estimation in component that is true in adaptTo.
                     a value of False will cause an exception to be raised.
 
-        minTol      : optional, minimum magnitude of error
+        min_tol      : optional, minimum magnitude of error
         record      : optional, if supplied will record all committed steps
 
 
@@ -90,17 +100,17 @@ def RKF78(
     # fmt: on
     if record is None:
         record = []
-    x, y_this = x_0, iniVal
+    x, y_this = x_0, ini_val
 
     beta = 0.84  # "safety" factor
     h = x_1 - x_0  # initial step size
 
-    Rm = [0 for _ in iniVal]
+    rm = [0 for _ in ini_val]
 
-    if adaptTo is True:
-        adaptTo = [True] * len(iniVal)
+    if adapt_to:
+        adapt_to = [True] * len(ini_val)
 
-    sig = inspect.signature(dFunc)
+    sig = inspect.signature(d_func)
     params = len([param for param in sig.parameters.values() if param.kind == param.POSITIONAL_OR_KEYWORD])
     if debug:
         paramstr = [str(param) for param in sig.parameters.values() if param.kind == param.POSITIONAL_OR_KEYWORD]
@@ -114,7 +124,7 @@ def RKF78(
             print("{:^12.8g}|".format(yval), end="")
         print()
 
-    if adaptTo is False or ((params - 2) == len(adaptTo) == len(iniVal)):
+    if adapt_to is False or ((params - 2) == len(adapt_to) == len(ini_val)):
         pass
     else:
         raise ValueError(
@@ -124,10 +134,10 @@ def RKF78(
             + "iniVal = (y_0.....y_i)"
         )
 
-    allK = [None for _ in range(13)]
+    all_k = [None for _ in range(13)]
 
     if h == 0:
-        return x, y_this, Rm
+        return x, y_this, rm
 
     while (h > 0 and x < x_1) or (h < 0 and x > x_1):
         if (x + h) == x:
@@ -155,7 +165,7 @@ def RKF78(
             """
             # initialize the next estimate, which is 7th order
             y_next = [y for y in y_this]
-            # initialize the error esimate, which is 8th order
+            # initialize the error estimate, which is 8th order
             y_next_hat = [y for y in y_this]
 
             for i, (bi, asi) in enumerate(zip(bs, _as)):
@@ -164,7 +174,7 @@ def RKF78(
                 """
                 xi = x + asi * h  # x to use for calling dfunc
                 yi = [y for y in y_this]  # initialize the current y vector
-                for bij, Kj in zip(bi[:i], allK):
+                for bij, kj in zip(bi[:i], all_k):
                     """Update the current y estimate using *all* values calculated
                     up to this point.
                     zip iterates up to the shortest list.
@@ -177,16 +187,16 @@ def RKF78(
                     vector vector scalar  vector
                     without using fancy Python vector libraries like numpy
                     """
-                    yi = [y + k * bij for y, k in zip(yi, Kj)]
+                    yi = [y + k * bij for y, k in zip(yi, kj)]
 
                 # after the loop, yi is the new y we can call dFunc with.
-                di = dFunc(xi, *yi, h)
+                di = d_func(xi, *yi, h)
                 """
                 ki   = h   *   di
                 vector scalar  vector
                 """
                 ki = [h * d for d in di]
-                allK[i] = ki
+                all_k[i] = ki
 
                 ci = cs[i]
                 ci_hat = cs_hat[i]
@@ -206,16 +216,13 @@ def RKF78(
             TypeError,  # catch complex numbers being used in comparisons, etc
             ZeroDivisionError,  # divide by zero in the equation
             OverflowError,  # numerical overflow, in practice very rare
-        ) as e:
-            # if debug:
-            #     exc_type, exc_value, exc_traceback = sys.exc_info()
-            #     errMsg = "".join(
-            #         traceback.format_exception(
-            #             exc_type, exc_value, exc_traceback
-            #         )
-            #     )
-            #     print(f"Error encountered at x={x:.8g}")
-            #     print(str(errMsg))
+        ):
+            if debug:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                err_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+                print(f"Error encountered at x={x:.8g}")
+                print(str(err_msg))
+
             h *= beta
             continue
 
@@ -225,14 +232,14 @@ def RKF78(
         than scaling using the remaining, and also decouples error estimate from
         current position, which results in more consistent results.
         """
-        Rs = [abs(e) * (x_1 - x_0) / h for e in te]
+        rs = [abs(e) * (x_1 - x_0) / h for e in te]
 
         """
         Construct a relative error specification, comparing the global extrapolated
         error to the smaller of current and next values.
         """
-        R = 0  # initialize R
-        for r, y1, y2, adapt in zip(Rs, y_this, y_next, adaptTo):
+        r = 0  # initialize R
+        for r, y1, y2, adapt in zip(rs, y_this, y_next, adapt_to):
             """
             the generated relative error estimation for each component is to take
             the extrapolated global error (see above), divide by the least of
@@ -247,40 +254,35 @@ def RKF78(
             by zero in the case of a both a supplied absolute tolerance of zero
             and an integrand at zero point.
             """
-            Ry = abs(r) / (max((relTol * min(abs(y1), abs(y2))), absTol, minTol))
+            ry = abs(r) / (max((rel_tol * min(abs(y1), abs(y2))), abs_tol, min_tol))
             if adapt:
-                R = max(R, Ry)
+                r = max(r, ry)
             else:
                 pass
 
-        delta = 1  # initialize the prospective change in step size
+        # delta = 1  # initialize the prospective change in step size
 
-        if R >= 1:  # error is greater than acceptable
-            delta = beta * abs(1 / R) ** (1 / 8)
+        if r >= 1:  # error is greater than acceptable
+            delta = beta * abs(1 / r) ** (1 / 8)
 
         else:  # error is acceptable
             y_this = y_next
             x += h
-            Rm = [max(Rmi, Rsi) for Rmi, Rsi in zip(Rm, Rs)]
+            rm = [max(rmi, rsi) for rmi, rsi in zip(rm, rs)]
 
-            if abortFunc is not None and abortFunc(x=x, ys=y_this, record=record):  # premature terminating cond. is met
+            if abort_func is not None and abort_func(
+                x=x, ys=y_this, record=record
+            ):  # premature terminating cond. is met
                 if debug:
-                    print("exiting via debug")
-                    print("record")
-                    for line in record:
-                        x, yval = line
-                        print("{:^12.8g}|".format(x), end="")
-                        for i, y in enumerate(yval):
-                            print("{:^12.8g}|".format(y), end="")
-                        print()
+                    handle_record(record=record)
 
-                return x, y_this, Rm
+                return x, y_this, rm
 
             record.append([x, [*y_this]])
 
-            if R != 0:
+            if r != 0:
                 # adaptively modify the step size according to composite error estimate
-                delta = beta * abs(1 / R) ** (1 / 7)
+                delta = beta * abs(1 / r) ** (1 / 7)
 
             else:  # R == 0
                 """
@@ -300,20 +302,14 @@ def RKF78(
 
     if debug:
         print("exiting main loop normally")
-        print("record")
-        for line in record:
-            x, yval = line
-            print("{:^12.8g}|".format(x), end="")
-            for i, y in enumerate(yval):
-                print("{:^12.8g}|".format(y), end="")
-            print()
+        handle_record(record=record)
 
-    if abs(x - x_1) > abs(x_1 - x_0) * relTol:
+    if abs(x - x_1) > abs(x_1 - x_0) * rel_tol:
         raise ValueError(
             "Premature Termination of Integration due to vanishing step size," + " x at {}, h at {}.".format(x, h)
         )
 
-    return x, y_this, Rm
+    return x, y_this, rm
 
 
 def main():
@@ -321,7 +317,7 @@ def main():
         return (7 * y**2 * x**3,)
 
     for _ in range(100):
-        _, v, e = RKF78(df1, (3,), 2, 0, relTol=1e-4, absTol=1e-4, minTol=1e-14, debug=True)
+        _, v, e = rkf78(df1, (3,), 2, 0, rel_tol=1e-4, abs_tol=1e-4, min_tol=1e-14, debug=True)
 
     print(v)
     print(e)

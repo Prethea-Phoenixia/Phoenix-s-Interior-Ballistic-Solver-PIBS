@@ -34,7 +34,7 @@ from .generics import (
     PressureTraceEntry,
 )
 from .material import Material
-from .num import RKF78, dekker, gss, intg, secant
+from .num import dekker, gss, intg, rkf78, secant
 from .prop import Composition, Propellant
 
 logger = logging.getLogger(__name__)
@@ -450,14 +450,14 @@ class Gun(DelegatesPropellant):
             try:
                 if z_j > z_b:
                     z_j = z_b
-                z, (t_bar_j, l_bar_j, v_bar_j), _ = RKF78(
+                z, (t_bar_j, l_bar_j, v_bar_j), _ = rkf78(
                     self.ode_z,
                     (t_bar_i, l_bar_i, v_bar_i),
                     z_i,
                     z_j,
-                    relTol=tol,
-                    absTol=tol**2,
-                    abortFunc=abort,
+                    rel_tol=tol,
+                    abs_tol=tol**2,
+                    abort_func=abort,
                     record=ztlv_record_i,
                 )
 
@@ -552,8 +552,8 @@ class Gun(DelegatesPropellant):
         """
 
         ltzv_record = []
-        l_bar, (t_bar_e, z_e, v_bar_e), (t_bar_err, z_err, v_bar_err) = RKF78(
-            self.ode_l, (t_bar_i, z_i, v_bar_i), l_bar_i, l_g_bar, relTol=tol, absTol=tol**2, record=ltzv_record
+        l_bar, (t_bar_e, z_e, v_bar_e), (t_bar_err, z_err, v_bar_err) = rkf78(
+            self.ode_l, (t_bar_i, z_i, v_bar_i), l_bar_i, l_g_bar, rel_tol=tol, abs_tol=tol**2, record=ltzv_record
         )
 
         if l_bar != l_g_bar:
@@ -591,8 +591,8 @@ class Gun(DelegatesPropellant):
             Subscript f indicate fracture condition
             ODE w.r.t Z is integrated from Z_0 to 1, from onset of projectile movement to charge fracture
             """
-            (_, (t_bar_f, l_bar_f, v_bar_f), (t_bar_err_f, l_bar_err_f, v_bar_err_f)) = RKF78(
-                self.ode_z, (0, 0, 0), z_0, 1, relTol=tol, absTol=tol**2
+            (_, (t_bar_f, l_bar_f, v_bar_f), (t_bar_err_f, l_bar_err_f, v_bar_err_f)) = rkf78(
+                self.ode_z, (0, 0, 0), z_0, 1, rel_tol=tol, abs_tol=tol**2
             )
 
             upd_bar_data(
@@ -620,7 +620,7 @@ class Gun(DelegatesPropellant):
                 _,
                 (t_bar_b, l_bar_b, v_bar_b),
                 (t_bar_err_b, l_bar_err_b, v_bar_err_b),
-            ) = RKF78(self.ode_z, (0, 0, 0), z_0, z_b, relTol=tol, absTol=tol**2)
+            ) = rkf78(self.ode_z, (0, 0, 0), z_0, z_b, rel_tol=tol, abs_tol=tol**2)
 
             upd_bar_data(
                 tag=POINT_BURNOUT,
@@ -659,8 +659,8 @@ class Gun(DelegatesPropellant):
 
             t_bar = 0.5 * (t_bar_1 + t_bar_2)
 
-            (_, (z, l_bar, v_bar), (z_err, l_bar_err, v_bar_err)) = RKF78(
-                self.ode_t, (z_0, 0, 0), 0, t_bar, relTol=tol, absTol=tol**2
+            (_, (z, l_bar, v_bar), (z_err, l_bar_err, v_bar_err)) = rkf78(
+                self.ode_t, (z_0, 0, 0), 0, t_bar, rel_tol=tol, abs_tol=tol**2
             )
             t_bar_err = 0.5 * t_bar_tol
 
@@ -677,7 +677,7 @@ class Gun(DelegatesPropellant):
             )
 
         def g(t, tag) -> float:
-            z, l_bar, v_bar = RKF78(self.ode_t, (z_0, 0, 0), 0, t, relTol=tol, absTol=tol**2)[1]
+            z, l_bar, v_bar = rkf78(self.ode_t, (z_0, 0, 0), 0, t, rel_tol=tol, abs_tol=tol**2)[1]
 
             p_bar = self.f_p_bar(z, l_bar, v_bar)
             if tag == POINT_PEAK_AVG:
@@ -707,8 +707,8 @@ class Gun(DelegatesPropellant):
             (z_j, l_bar_j, v_bar_j, t_bar_j) = (z_0, 0, 0, 0)
             for j in range(step):
                 t_bar_k = t_bar_e / (step + 1) * (j + 1)
-                (_, (z_j, l_bar_j, v_bar_j), (z_err, l_bar_err, v_bar_err)) = RKF78(
-                    self.ode_t, (z_j, l_bar_j, v_bar_j), t_bar_j, t_bar_k, relTol=tol, absTol=tol**2
+                (_, (z_j, l_bar_j, v_bar_j), (z_err, l_bar_err, v_bar_err)) = rkf78(
+                    self.ode_t, (z_j, l_bar_j, v_bar_j), t_bar_j, t_bar_k, rel_tol=tol, abs_tol=tol**2
                 )
                 t_bar_j = t_bar_k
 
@@ -733,13 +733,13 @@ class Gun(DelegatesPropellant):
             burning is still ongoing).
             """
             t_bar_j = 0.5 * t_bar_i
-            z_j, l_bar_j, v_bar_j = RKF78(self.ode_t, (z_0, 0, 0), 0, t_bar_j, relTol=tol, absTol=tol**2)[1]
+            z_j, l_bar_j, v_bar_j = rkf78(self.ode_t, (z_0, 0, 0), 0, t_bar_j, rel_tol=tol, abs_tol=tol**2)[1]
 
             for j in range(step):
                 l_bar_k = l_g_bar / (step + 1) * (j + 1)
 
-                (_, (t_bar_j, z_j, v_bar_j), (t_bar_err, z_err, v_bar_err)) = RKF78(
-                    self.ode_l, (t_bar_j, z_j, v_bar_j), l_bar_j, l_bar_k, relTol=tol, absTol=tol**2
+                (_, (t_bar_j, z_j, v_bar_j), (t_bar_err, z_err, v_bar_err)) = rkf78(
+                    self.ode_l, (t_bar_j, z_j, v_bar_j), l_bar_j, l_bar_k, rel_tol=tol, abs_tol=tol**2
                 )
                 l_bar_j = l_bar_k
 

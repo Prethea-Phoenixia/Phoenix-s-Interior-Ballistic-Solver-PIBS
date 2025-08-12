@@ -11,7 +11,7 @@ from . import (
     Points,
 )
 from .generics import DelegatesPropellant
-from .num import RKF78, dekker, gss
+from .num import dekker, gss, rkf78
 from .prop import Propellant
 from .recoilless import Recoilless
 
@@ -270,14 +270,14 @@ class ConstrainedRecoilless(DelegatesPropellant):
             # stepVanished = False
             record = [[z_0, [0, 0, 0, 0, 1]]]
             try:
-                (z_j, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j), _) = RKF78(
-                    dFunc=_ode_z,
-                    iniVal=(0, 0, 0, 0, 1),
+                (z_j, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j), _) = rkf78(
+                    d_func=_ode_z,
+                    ini_val=(0, 0, 0, 0, 1),
                     x_0=z_0,
                     x_1=z_b,
-                    relTol=tol,
-                    absTol=tol**2,
-                    abortFunc=abort_z,
+                    rel_tol=tol,
+                    abs_tol=tol**2,
+                    abort_func=abort_z,
                     record=record,
                 )
 
@@ -313,13 +313,13 @@ class ConstrainedRecoilless(DelegatesPropellant):
                     ys = record[i][1]
 
                     r = []
-                    _, (t_bar, l_bar, v_bar, eta, tau), _ = RKF78(
-                        dFunc=_ode_z,
-                        iniVal=ys,
+                    _, (t_bar, l_bar, v_bar, eta, tau), _ = rkf78(
+                        d_func=_ode_z,
+                        ini_val=ys,
                         x_0=x,
                         x_1=z,
-                        relTol=tol,
-                        absTol=tol**2,
+                        rel_tol=tol,
+                        abs_tol=tol**2,
                         record=r,
                     )
 
@@ -435,14 +435,14 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 v_bar_g,
                 (t_bar_g, z_g, l_bar_g, eta_g, tau_g),
                 _,
-            ) = RKF78(
-                dFunc=_ode_v,
-                iniVal=(t_bar_i, z_i, l_bar_i, eta_i, tau_i),
+            ) = rkf78(
+                d_func=_ode_v,
+                ini_val=(t_bar_i, z_i, l_bar_i, eta_i, tau_i),
                 x_0=v_bar_i,
                 x_1=v_bar_d,
-                relTol=tol,
-                absTol=tol**2,
-                abortFunc=abort_v,
+                rel_tol=tol,
+                abs_tol=tol**2,
+                abort_func=abort_v,
                 record=vtzlet_record,
             )
 

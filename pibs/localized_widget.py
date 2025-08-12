@@ -7,7 +7,7 @@ from tkinter import BooleanVar, Frame, Menu, StringVar, ttk
 from typing import Any, Callable, Literal, Optional
 
 from .misc import format_float_input
-from .tip import CreateToolTip
+from .tip import create_tool_tip
 
 
 class Localizable(ABC):
@@ -88,7 +88,7 @@ class Loc12Disp(LocalizableWidget):
         )
         if tooltip_loc_key is not None:
             self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
-            CreateToolTip(lb, self.loc_tooltip_var)
+            create_tool_tip(lb, self.loc_tooltip_var)
         else:
             self.loc_tooltip_var = None
 
@@ -201,7 +201,7 @@ class Loc2Input(LocalizableWidget, Descriptive):
         lb.grid(row=row, column=col + (1 if reverse else 0), sticky="nsew", padx=2, pady=2)
         if tooltip_loc_key is not None:
             self.locTooltipVar = StringVar(parent, value=loc_func(tooltip_loc_key))
-            CreateToolTip(lb, self.locTooltipVar)
+            create_tool_tip(lb, self.locTooltipVar)
         else:
             self.locTooltipVar = None
 
@@ -431,7 +431,7 @@ class LocLabelFrame(ttk.LabelFrame, Localizable):
 
         if tooltip_loc_key is not None:
             self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
-            CreateToolTip(self, self.loc_tooltip_var)
+            create_tool_tip(self, self.loc_tooltip_var)
         else:
             self.loc_tooltip_var = None
 
@@ -470,7 +470,7 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
 
         if tooltip_loc_key:
             self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
-            CreateToolTip(self.check_widget, self.loc_tooltip_var)
+            create_tool_tip(self.check_widget, self.loc_tooltip_var)
         else:
             self.loc_tooltip_var = None
 

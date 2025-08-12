@@ -79,7 +79,7 @@ from .misc import (
     validate_nn,
     validate_pi,
 )
-from .tip import CreateToolTip
+from .tip import create_tool_tip
 
 DESCRIPTION = "Description"
 
@@ -762,7 +762,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
         i += 1
         self.calc_button_tip = StringVar(value=self.get_loc_str("calcButtonText"))
-        CreateToolTip(self.calc_button, self.calc_button_tip)
+        create_tool_tip(self.calc_button, self.calc_button_tip)
 
         ctrl_frm = self.add_localized_label_frame(right_frm, label_loc_key="guideCtrlFrmLabel")
         ctrl_frm.grid(row=i, column=0, columnspan=3, sticky="nsew")
@@ -2604,6 +2604,15 @@ def main(loc: str = None):
     font_manager.fontManager.addfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"))
 
     pibs = PIBS(loc=loc)
+    try:
+        import pyi_splash
+
+        # Close the splash screen. It does not matter when the call
+        # to this function is made, the splash screen remains open until
+        # this function is called or the Python program is terminated.
+        pyi_splash.close()
+    except ModuleNotFoundError:
+        pass
     pibs.mainloop()
 
 

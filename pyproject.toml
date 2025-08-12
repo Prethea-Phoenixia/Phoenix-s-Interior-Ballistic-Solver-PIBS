@@ -24,7 +24,8 @@ keywords = ["interior ballistics"]
 classifiers = ["Development Status :: 4 - Beta", "Programming Language :: Python"]
 
 [project.optional-dependencies]
-dev = ["black", "isort", "auto-py-to-exe", "pysocks"]
+dev = ["black", "isort", "pysocks", "pyinstaller"]
 
 [project.urls]
 Repository = "https://github.com/Prethea-Phoenixia/Phoenix-s-Interior-Ballistic-Solver-PIBS"
+

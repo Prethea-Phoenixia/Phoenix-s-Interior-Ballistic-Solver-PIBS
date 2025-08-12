@@ -35,18 +35,20 @@ A series of Python scripts (with a tkinter Graphical User Interface) for solving
     - download the latest executable at [latest release](https://github.com/octo-org/octo-repo/releases/latest)
 - Development setup:
     - Install Python (>=3.9)
+    - Activate virtual environment:
+      ```commandline
+      python -m venv .venv
+      ```
     - Install development dependencies: 
       ```commandline
       pip install .[dev]
       ```
-    - Convert to distributable program via auto-py-to-exe: 
+      
+    - Generate executables via:
       ```commandline
-      auto-py-to-exe -db -c "singlefile.json"
-      ``` 
-    - or, Generate executables via:
-      ```commandline
-      pyinstaller --clean --noconfirm --onefile --windowed --icon "pibs\ui\logo.ico" --name "pibs" --debug "all" --add-data "pibs\ballistics\resource;ballistics/resource/" --add-data "pibs\ui;ui/"  "run_pibs.py"
+      generate_executable.py
       ```
+      
 
 ## Contribution
 Your contribution is welcomed! Please feel free to raise issues or propose pull requests regarding features or problems encountered. To get started, see the [community documentation](CONTRIBUTING.md)

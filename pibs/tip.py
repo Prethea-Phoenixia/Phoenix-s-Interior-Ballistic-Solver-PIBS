@@ -1,5 +1,5 @@
 import tkinter.font as tkFont
-from tkinter import LEFT, SOLID, Label, StringVar, Toplevel
+from tkinter import Label, StringVar, Toplevel
 
 
 class ToolTip(object):
@@ -86,16 +86,14 @@ class ToolTip(object):
             tw.after(100, lambda: tw.destroy())
 
 
-def CreateToolTip(widget, text):
-    toolTip = ToolTip(widget)
+def create_tool_tip(widget, text):
+    tool_tip = ToolTip(widget)
 
-    # noinspection PyUnusedLocal
-    def enter(event):
-        toolTip.showtip(text)
+    def enter(_):
+        tool_tip.showtip(text)
 
-    # noinspection PyUnusedLocal
-    def leave(event):
-        toolTip.hidetip()
+    def leave(_):
+        tool_tip.hidetip()
 
     widget.bind("<Enter>", enter)
     widget.bind("<Leave>", leave)

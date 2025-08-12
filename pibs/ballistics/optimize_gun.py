@@ -16,7 +16,7 @@ from . import (
 )
 from .generics import DelegatesPropellant
 from .gun import pidduck
-from .num import RKF78, dekker, gss
+from .num import dekker, gss, rkf78
 from .prop import Propellant
 
 """
@@ -257,14 +257,14 @@ class Constrained(DelegatesPropellant):
 
             record = [[z_0, [0, 0, 0]]]
 
-            z_j, (t_bar_j, l_bar_j, v_bar_j), e = RKF78(
-                dFunc=_ode_z,
-                iniVal=(0, 0, 0),
+            z_j, (t_bar_j, l_bar_j, v_bar_j), e = rkf78(
+                d_func=_ode_z,
+                ini_val=(0, 0, 0),
                 x_0=z_0,
                 x_1=z_b,
-                relTol=tol,
-                absTol=tol**2,
-                abortFunc=abort_z,
+                rel_tol=tol,
+                abs_tol=tol**2,
+                abort_func=abort_z,
                 record=record,
             )
 
@@ -281,8 +281,8 @@ class Constrained(DelegatesPropellant):
                 ys = record[i][1]
 
                 r = []
-                _, (t_bar, l_bar, v_bar), _ = RKF78(
-                    dFunc=_ode_z, iniVal=ys, x_0=x, x_1=z, relTol=tol, absTol=tol**2, record=r
+                _, (t_bar, l_bar, v_bar), _ = rkf78(
+                    d_func=_ode_z, ini_val=ys, x_0=x, x_1=z, rel_tol=tol, abs_tol=tol**2, record=r
                 )
                 xs = [v[0] for v in record]
                 record.extend(v for v in r if v[0] not in xs)
@@ -377,14 +377,14 @@ class Constrained(DelegatesPropellant):
 
         vtzl_record = [[v_bar_i, (t_bar_i, z_i, l_bar_i)]]
         try:
-            (v_bar_g, (t_bar_g, z_g, l_bar_g), _) = RKF78(
-                dFunc=_ode_v,
-                iniVal=(t_bar_i, z_i, l_bar_i),
+            (v_bar_g, (t_bar_g, z_g, l_bar_g), _) = rkf78(
+                d_func=_ode_v,
+                ini_val=(t_bar_i, z_i, l_bar_i),
                 x_0=v_bar_i,
                 x_1=v_bar_d,
-                relTol=tol,
-                absTol=tol**2,
-                abortFunc=abort_v,
+                rel_tol=tol,
+                abs_tol=tol**2,
+                abort_func=abort_v,
                 record=vtzl_record,
             )
 
