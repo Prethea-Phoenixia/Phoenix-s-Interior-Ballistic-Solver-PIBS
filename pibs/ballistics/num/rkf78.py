@@ -238,7 +238,7 @@ def rkf78(
         Construct a relative error specification, comparing the global extrapolated
         error to the smaller of current and next values.
         """
-        r = 0  # initialize R
+        ry_global = 0  # initialize R
         for r, y1, y2, adapt in zip(rs, y_this, y_next, adapt_to):
             """
             the generated relative error estimation for each component is to take
@@ -256,14 +256,14 @@ def rkf78(
             """
             ry = abs(r) / (max((rel_tol * min(abs(y1), abs(y2))), abs_tol, min_tol))
             if adapt:
-                r = max(r, ry)
+                ry_global = max(ry_global, ry)
             else:
                 pass
 
         # delta = 1  # initialize the prospective change in step size
 
-        if r >= 1:  # error is greater than acceptable
-            delta = beta * abs(1 / r) ** (1 / 8)
+        if ry_global >= 1:  # error is greater than acceptable
+            delta = beta * abs(1 / ry_global) ** (1 / 8)
 
         else:  # error is acceptable
             y_this = y_next
@@ -280,9 +280,9 @@ def rkf78(
 
             record.append([x, [*y_this]])
 
-            if r != 0:
+            if ry_global != 0:
                 # adaptively modify the step size according to composite error estimate
-                delta = beta * abs(1 / r) ** (1 / 7)
+                delta = beta * abs(1 / ry_global) ** (1 / 7)
 
             else:  # R == 0
                 """
