@@ -2,7 +2,11 @@ import os
 
 import PyInstaller.__main__
 
+from pibs import __version__
+
 if __name__ == "__main__":
+
+    name = "PIBSv" + __version__
 
     options = [
         "run_pibs.py",
@@ -12,7 +16,7 @@ if __name__ == "__main__":
         "--icon",
         "pibs/ui/logo.ico",
         "--name",
-        "pibs",
+        name,
         "--debug",
         "all",
         "--add-data",
@@ -25,7 +29,7 @@ if __name__ == "__main__":
     # use this for dist
     PyInstaller.__main__.run(options + ["--onefile"])
 
-    with open("pibs.spec", "r") as f:
+    with open(name + ".spec", "r") as f:
         content = f.readlines()
 
     i = content.index("pyz = PYZ(a.pure)\n")
@@ -69,7 +73,7 @@ a.datas = [entry for entry in a.datas if not entry[0].startswith(mpl_data_path)]
         content.insert(i, line + "\n")
         i += 1
 
-    with open("pibs.spec", "w") as f:
+    with open(name + ".spec", "w") as f:
         f.writelines(content)
 
-    os.system("pyinstaller pibs.spec --noconfirm")
+    os.system("pyinstaller " + name + ".spec" + " --noconfirm")

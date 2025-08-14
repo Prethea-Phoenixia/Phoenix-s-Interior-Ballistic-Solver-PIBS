@@ -127,7 +127,6 @@ class Gun(DelegatesPropellant):
     ):
 
         super().__init__(propellant=propellant)
-        logger.info("initializing gun object.")
         if any(
             (
                 caliber <= 0,
@@ -179,8 +178,6 @@ class Gun(DelegatesPropellant):
         self.k_1 = 0.0
 
         self.z_0, self.psi_0 = 0, 0
-
-        logger.info("gun object successfully initialized.")
 
     def f_p_bar(self, z, l_bar, v_bar) -> float:
         psi = self.f_psi_z(z)
@@ -306,7 +303,6 @@ class Gun(DelegatesPropellant):
         ambient_rho: float = 1.204,
         ambient_p: float = 101.325e3,
         ambient_gamma: float = 1.4,
-        progress_queue=None,
         **_,
     ) -> GunResult:
         """
@@ -346,10 +342,6 @@ class Gun(DelegatesPropellant):
         self.z_0, _ = dekker(
             lambda z: self.propellant.f_psi_z(z) - self.psi_0, 0, 1, x_tol=tol, y_rel_tol=tol, y_abs_tol=tol**2
         )
-
-        if progress_queue is not None:
-            progress_queue.put(1)
-        logger.info("commencing integration for characteristic points.")
 
         record = []
 
@@ -536,9 +528,6 @@ class Gun(DelegatesPropellant):
             if t_bar != 0
         )
 
-        if progress_queue is not None:
-            progress_queue.put(10)
-
         if is_burn_out_contained:
             logger.info("integrated to burnout point.")
         else:
@@ -580,11 +569,6 @@ class Gun(DelegatesPropellant):
             v_bar_err=v_bar_err,
         )
 
-        if progress_queue is not None:
-            progress_queue.put(20)
-
-        logger.info("integrated and determined conditions at exit point.")
-
         t_bar_f = None
         if z_b > 1.0 and z_e >= 1.0:  # fracture point exist and is contained
             """
@@ -606,8 +590,6 @@ class Gun(DelegatesPropellant):
                 z_err=0,
                 v_bar_err=v_bar_err_f,
             )
-
-            logger.info("integrated and determined conditions at propellant fracture point.")
 
         t_bar_b = None
         if is_burn_out_contained:
@@ -633,10 +615,6 @@ class Gun(DelegatesPropellant):
                 z_err=0,
                 v_bar_err=v_bar_err_b,
             )
-            logger.info("integrated and determined conditions at propellant burnout point.")
-
-        if progress_queue is not None:
-            progress_queue.put(30)
 
         """
         Subscript p indicate peak pressure
@@ -693,9 +671,6 @@ class Gun(DelegatesPropellant):
 
         for i, peak in enumerate([POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH]):
             find_peak(lambda x: g(x, peak), peak)
-            logger.info(f"found peak conditions {peak}.")
-            if progress_queue is not None:
-                progress_queue.put(40 + i * 20)  # 40.60.80
 
         """
         populate data for output purposes
@@ -756,11 +731,6 @@ class Gun(DelegatesPropellant):
                 )
         else:
             raise ValueError("dom not handled.")
-
-        logger.info("sampling completed.")
-
-        if progress_queue is not None:
-            progress_queue.put(100)
 
         """
         sort the data points
@@ -838,8 +808,6 @@ class Gun(DelegatesPropellant):
             )
         )
 
-        logger.info("scaled intermediate results to SI.")
-
         # calculate a pressure and flow velocity tracing.
         gun_result = GunResult(self, data, error, p_trace)
 
@@ -854,8 +822,6 @@ class Gun(DelegatesPropellant):
                 logger.error("exception occurred during structural calculation:")
                 logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
                 logger.info("structural calculation skipped.")
-
-        logger.info("integration concluded.")
 
         return gun_result
 
@@ -915,7 +881,6 @@ class Gun(DelegatesPropellant):
         if not self.material:
             raise ValueError("Material must be supplied for structural calculation.")
 
-        logger.info("commencing structural calculation")
         step = max(step, 1)
 
         # step 1. calculate the barrel mass
@@ -1020,8 +985,6 @@ class Gun(DelegatesPropellant):
                 else:
                     v += dv
 
-        logger.info("structural calculation of tube section complete.")
-
         hull = []
         for x, rho in zip(x_probes, rho_probes):
             if x < l_c:
@@ -1029,12 +992,8 @@ class Gun(DelegatesPropellant):
             else:
                 hull.append(OutlineEntry(x, r, rho * r))
 
-        logger.info("structural calculation of breech complete.")
-
         gun_result.outline = hull
         gun_result.tubeMass = v * self.material.rho
-
-        logger.info("structural calculation results attached.")
 
     @staticmethod
     def vrho_k(x_s, p_s, s_s, sigma, tol, k_max=None, k_min=None, index=0, p_ref=None):

@@ -161,11 +161,11 @@ class TextHandler(logging.Handler):
 class PIBS(Tk):
     def __init__(self, *args, loc, **kwargs):
         super().__init__(*args, **kwargs)
-        self.option_add("*tearOff", False)
+        super().iconbitmap(default=resolvepath("ui/logo.ico"))
+        super().option_add("*tearOff", False)
 
         font = Font(family=FONTNAME, size=FONTSIZE)
         self.option_add("*Font", font)
-        self.iconbitmap(resolvepath("ui/logo.ico"))
 
         dpi = self.winfo_fpixels("1i")
         # Tk was originally developed for a dpi of 72
@@ -215,7 +215,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         super().__init__(parent, menubar=menubar, default_lang=default_lang, localization_dict=localization_dict)
 
         self.font = font
-        self.job_queue, self.guide_job_queue, self.log_queue, self.progress_queue = Queue(), Queue(), Queue(), Queue()
+        self.job_queue, self.guide_job_queue, self.log_queue = Queue(), Queue(), Queue()
         self.process, self.guide_process, self.kwargs, self.gun_result = None, None, None, None
         self.dpi = dpi
         self.parent = parent
@@ -756,11 +756,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         op_frm.rowconfigure(i, weight=1)
         i += 1
 
-        self.progress = IntVar()
-        ttk.Progressbar(op_frm, maximum=100, variable=self.progress).grid(
-            row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2
-        )
-        i += 1
         self.calc_button_tip = StringVar(value=self.get_loc_str("calcButtonText"))
         create_tool_tip(self.calc_button, self.calc_button_tip)
 
@@ -1322,17 +1317,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             root_logger.log(level, str(exception))
 
     def timed_loop(self):
-        # polling function for the calculation subprocess
-        try:
-            p = None
-            while not self.progress_queue.empty():
-                pg = self.progress_queue.get_nowait()
-                p = pg if p is None else max(p, pg)
-            if p is not None:
-                self.progress.set(p)
-        except Empty:
-            pass
-
         if self.process:
             self.get_value()
 
@@ -1626,9 +1610,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.guide_process = None
         try:
             self.generate_kwargs()
-            self.guide_process = Process(
-                target=guide, args=(self.guide_job_queue, self.progress_queue, self.log_queue, self.kwargs)
-            )
+            self.guide_process = Process(target=guide, args=(self.guide_job_queue, self.log_queue, self.kwargs))
             self.guide_process.start()
 
         except Exception as e:
@@ -1654,9 +1636,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.process = None
         try:
             self.generate_kwargs()
-            self.process = Process(
-                target=calculate, args=(self.job_queue, self.progress_queue, self.log_queue, self.kwargs)
-            )
+            self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, self.kwargs))
 
             self.process.start()
 
@@ -2497,7 +2477,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
 
 
-def calculate(job_queue, progress_queue, log_queue, kwargs):
+def calculate(job_queue, log_queue, kwargs):
     root_logger.addHandler(QueueHandler(log_queue))
     root_logger.info("calculation started.")
 
@@ -2518,7 +2498,7 @@ def calculate(job_queue, progress_queue, log_queue, kwargs):
 
             if optimize:
                 if gun_type == CONVENTIONAL or gun_type == RECOILLESS:
-                    l_f, e_1, l_g = constrained.find_min_v(**kwargs, progress_queue=progress_queue)
+                    l_f, e_1, l_g = constrained.find_min_v(**kwargs)
 
                 else:
                     raise ValueError("unknown gun type")
@@ -2528,7 +2508,7 @@ def calculate(job_queue, progress_queue, log_queue, kwargs):
                 kwargs.update({"chamber_volume": chamber_volume})
             else:
                 if gun_type == CONVENTIONAL or gun_type == RECOILLESS:
-                    e_1, l_g = constrained.solve(**kwargs, progress_queue=progress_queue)
+                    e_1, l_g = constrained.solve(**kwargs)
 
                 else:
                     raise ValueError("unknown gun type")
@@ -2545,8 +2525,8 @@ def calculate(job_queue, progress_queue, log_queue, kwargs):
         else:
             raise ValueError("unknown gun type")
 
-        gun_result = gun.integrate(**kwargs, progress_queue=progress_queue)
-        root_logger.info("calculation concluded successfully.")
+        gun_result = gun.integrate(**kwargs)
+        root_logger.info("calculation concluded.")
 
     except Exception as e:
         gun, gun_result = None, None
@@ -2560,14 +2540,14 @@ def calculate(job_queue, progress_queue, log_queue, kwargs):
         job_queue.put((kwargs, gun, gun_result))
 
 
-def guide(guide_job_queue, progress_queue, log_queue, kwargs):
+def guide(guide_job_queue, log_queue, kwargs):
     root_logger.addHandler(QueueHandler(log_queue))
     root_logger.info("guidance diagram calculation started")
 
     guide_results = None
     try:
         guide_results = guide_graph(**kwargs)
-        root_logger.info("guidance diagram calculation concluded successfully.")
+        root_logger.info("guidance diagram calculation concluded.")
 
     except Exception as e:
         guide_results = None
@@ -2604,15 +2584,6 @@ def main(loc: str = None):
     font_manager.fontManager.addfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"))
 
     pibs = PIBS(loc=loc)
-    try:
-        import pyi_splash
-
-        # Close the splash screen. It does not matter when the call
-        # to this function is made, the splash screen remains open until
-        # this function is called or the Python program is terminated.
-        pyi_splash.close()
-    except ModuleNotFoundError:
-        pass
     pibs.mainloop()
 
 

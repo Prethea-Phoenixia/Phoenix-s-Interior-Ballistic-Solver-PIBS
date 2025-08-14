@@ -260,8 +260,6 @@ def rkf78(
             else:
                 pass
 
-        # delta = 1  # initialize the prospective change in step size
-
         if ry_global >= 1:  # error is greater than acceptable
             delta = beta * abs(1 / ry_global) ** (1 / 8)
 
