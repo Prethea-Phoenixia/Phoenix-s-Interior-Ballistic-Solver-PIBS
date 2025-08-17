@@ -96,6 +96,7 @@ class Constrained(DelegatesPropellant):
         length_gun: float | None = None,
         known_bore: bool = False,
         suppress: bool = False,  # suppress design velocity exceeded before peak pressure check
+        max_iteration: int = MAX_ITER,
         **_,
     ):
 
@@ -380,8 +381,7 @@ conditions is {v_j:.4g} m/s."
             lmax = l_bar_m * l_0
             raise ValueError(
                 "Integration appears to be approaching asymptote, "
-                + "last calculated to v = {:.4g} m/s, ".format(vmax)
-                + "x = {:.4g} m, p = {:.4g} MPa. ".format(lmax, pmax * 1e-6)
+                + f"last calculated to v = {vmax:.4g} m/s, x = {lmax:.4g} m, p = {pmax * 1e-6:.4g} MPa. "
                 + "This indicates an excessive velocity target relative to pressure developed."
             )
 
@@ -393,8 +393,7 @@ conditions is {v_j:.4g} m/s."
         if l_bar_g > l_bar_d:
             raise ValueError(
                 "Solution requires excessive tube length, last calculated to "
-                + "v = {:.4g} m/s, x = {:.4g} m, ".format(v_g, l_g)
-                + "p = {:.4g} MPa.".format(p_g * 1e-6)
+                + f"v = {v_g:.4g} m/s, x = {l_g:.4g} m, p = {p_g * 1e-6:.4g} MPa."
             )
 
         # calculate the averaged chambrage correction factor
@@ -402,7 +401,7 @@ conditions is {v_j:.4g} m/s."
         cc_n = 1 - (1 - 1 / chi_k) * log(l_bar_g + 1) / l_bar_g
 
         l_g = l_bar_g * l_0
-        if abs((l_bar_g - l_bar_g_0) / min(l_bar_g, l_bar_g_0)) > tol and it < MAX_ITER:
+        if abs((l_bar_g - l_bar_g_0) / min(l_bar_g, l_bar_g_0)) > tol and it < max_iteration:
             # successive better approximations will eventually
             # result in value within tolerance.
             return self.solve(
@@ -422,7 +421,7 @@ conditions is {v_j:.4g} m/s."
             )
             return e_1, l_g
 
-    def find_min_v(self, charge_mass_ratio, **_):
+    def find_min_v(self, charge_mass_ratio: float, max_guess: int = MAX_GUESSES, **_):
         """
         find the minimum volume solution.
         """
@@ -465,7 +464,7 @@ conditions is {v_j:.4g} m/s."
             return e_1, (l_g + l_0), l_g
 
         records = []
-        for i in range(MAX_GUESSES):
+        for i in range(max_guess):
             start_probe = uniform(tol, 1 - tol)
             try:
                 _, lt_i, lg_i = f(start_probe)
@@ -474,7 +473,7 @@ conditions is {v_j:.4g} m/s."
             except ValueError:
                 pass
         else:
-            raise ValueError(f"Unable to find any valid load fraction with {MAX_GUESSES:d} random samples.")
+            raise ValueError(f"Unable to find any valid load fraction with {max_guess} random samples.")
 
         logger.info(f"valid Δ/ρ = {start_probe:.3%}.")
 
@@ -539,7 +538,7 @@ conditions is {v_j:.4g} m/s."
         values.
         """
 
-        logger.info(f"solution constrained to Δ/ρ between {low:.3%} and {high:.3%}")
+        logger.info(f"solution constrained to Δ/ρ : {low:.3%} - {high:.3%}")
         lf_low, lf_high = gss(lambda load_fraction: f(load_fraction)[1], low, high, x_tol=tol, findMin=True)
         lf = 0.5 * (lf_high + lf_low)
         e_1, l_t, l_g = f(lf)

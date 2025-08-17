@@ -40,7 +40,6 @@ from .ballistics import (
     CONVENTIONAL,
     DOMAIN_LEN,
     DOMAIN_TIME,
-    GEOMETRIES,
     POINT_BURNOUT,
     POINT_EXIT,
     POINT_FRACTURE,
@@ -56,6 +55,7 @@ from .ballistics import (
     Composition,
     Constrained,
     ConstrainedRecoilless,
+    Geometry,
     Gun,
     Material,
     Propellant,
@@ -184,7 +184,6 @@ class PIBS(Tk):
         self.columnconfigure(0, weight=1)
         self.frame = InteriorBallisticsFrame(
             self,
-            self,
             menubar,
             dpi,
             default_lang="English" if loc != "zh_CN" else "中文",
@@ -211,31 +210,38 @@ class PIBS(Tk):
 
 class InteriorBallisticsFrame(LocalizedFrame):
 
-    def __init__(self, parent, root, menubar, dpi, default_lang, localization_dict, font, os_dark: bool):
-        super().__init__(parent, menubar=menubar, default_lang=default_lang, localization_dict=localization_dict)
+    def __init__(self, root, menubar, dpi, default_lang, localization_dict, font, os_dark: bool):
+        super().__init__(
+            root, font=font, menubar=menubar, default_lang=default_lang, localization_dict=localization_dict
+        )
 
         self.font = font
         self.job_queue, self.guide_job_queue, self.log_queue = Queue(), Queue(), Queue()
         self.process, self.guide_process, self.kwargs, self.gun_result = None, None, None, None
         self.dpi = dpi
-        self.parent = parent
         self.root = root
         self.force_update_on_theme_widget = []
 
         self.menubar = menubar
 
-        file_menu = Menu(menubar)
-        menubar.add_cascade(label=self.get_loc_str("fileLabel"), menu=file_menu)
+        # file_menu = Menu(menubar)
+        # menubar.add_cascade(label=self.get_loc_str("fileLabel"), menu=file_menu)
+
+        data_menu = Menu(menubar)
+        menubar.add_cascade(label=self.get_loc_str("dataLabel"), menu=data_menu)
 
         design_menu = Menu(menubar)
         menubar.add_cascade(label=self.get_loc_str("designLabel"), menu=design_menu)
+
         theme_menu = Menu(menubar)
         menubar.add_cascade(label=self.get_loc_str("themeLabel"), menu=theme_menu)
+
         debug_menu = Menu(menubar)
         menubar.add_cascade(label=self.get_loc_str("debugLabel"), menu=debug_menu)
 
         self.design_menu = design_menu
-        self.file_menu = file_menu
+        # self.file_menu = file_menu
+        self.data_menu = data_menu
         self.theme_menu = theme_menu
         self.debug_menu = debug_menu
 
@@ -243,12 +249,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.debug = IntVar(value=0)
 
         design_menu.add_command(label=self.get_loc_str("saveLabel"), command=self.save, accelerator="Ctrl+S")
-        self.parent.bind("<Control-s>", lambda *_: self.save())
-        self.parent.bind("<Control-S>", lambda *_: self.save())
+        self.root.bind("<Control-s>", lambda *_: self.save())
+        self.root.bind("<Control-S>", lambda *_: self.save())
 
-        design_menu.add_command(label=self.get_loc_str("loadLabel"), command=self.load, accelerator="Ctrl+O")
-        self.parent.bind("<Control-o>", lambda *_: self.load())
-        self.parent.bind("<Control-O>", lambda *_: self.load())
+        design_menu.add_command(label=self.get_loc_str("loadLabel"), command=self.load_gun, accelerator="Ctrl+O")
+        self.root.bind("<Control-o>", lambda *_: self.load_gun())
+        self.root.bind("<Control-O>", lambda *_: self.load_gun())
 
         design_menu.add_command(label=self.get_loc_str("resetLabel"), command=self.on_reset, accelerator="Ctrl+N")
         self.root.bind("<Control-N>", lambda *_: self.on_reset())
@@ -262,11 +268,13 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.root.bind("<Control-G>", lambda *_: self.on_guide())
         self.root.bind("<Control-g>", lambda *_: self.on_guide())
 
-        file_menu.add_command(label=self.get_loc_str("exportMain"), command=lambda: self.export_graph(save="main"))
-        file_menu.add_command(label=self.get_loc_str("exportAux"), command=lambda: self.export_graph(save="aux"))
-        file_menu.add_command(label=self.get_loc_str("exportGeom"), command=lambda: self.export_graph(save="geom"))
-        file_menu.add_command(label=self.get_loc_str("exportGuide"), command=lambda: self.export_graph(save="guide"))
-        file_menu.add_command(label=self.get_loc_str("exportLabel"), command=self.export_table)
+        data_menu.add_command(label=self.get_loc_str("exportMain"), command=lambda: self.export_graph(save="main"))
+        data_menu.add_command(label=self.get_loc_str("exportAux"), command=lambda: self.export_graph(save="aux"))
+        data_menu.add_command(label=self.get_loc_str("exportGeom"), command=lambda: self.export_graph(save="geom"))
+        data_menu.add_command(label=self.get_loc_str("exportGuide"), command=lambda: self.export_graph(save="guide"))
+        data_menu.add_command(label=self.get_loc_str("exportLabel"), command=self.export_table)
+
+        data_menu.add_command(label=self.get_loc_str("reloadPropellant"), command=self.load_propellant)
 
         for themeName in THEMES.keys():
             theme_menu.add_radiobutton(
@@ -750,6 +758,32 @@ class InteriorBallisticsFrame(LocalizedFrame):
             i + 1,
         )
 
+        self.max_iter, i = (
+            self.add_localized_2_input(
+                parent=op_frm,
+                row=i,
+                label_loc_key="maxIterLabel",
+                default="10",
+                validation=validation_pi,
+                formatter=format_int_input,
+                color="red",
+            ),
+            i + 1,
+        )
+
+        self.max_guess, i = (
+            self.add_localized_2_input(
+                parent=op_frm,
+                row=i,
+                label_loc_key="maxGuessLabel",
+                default="25",
+                validation=validation_pi,
+                formatter=format_int_input,
+                color="red",
+            ),
+            i + 1,
+        )
+
         self.calc_button = ttk.Button(op_frm, text=self.get_loc_str("calcLabel"), command=self.on_calculate)
         self.calc_button.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
@@ -757,7 +791,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         i += 1
 
         self.calc_button_tip = StringVar(value=self.get_loc_str("calcButtonText"))
-        create_tool_tip(self.calc_button, self.calc_button_tip)
+        create_tool_tip(self.calc_button, self.calc_button_tip, font=self.font)
 
         ctrl_frm = self.add_localized_label_frame(right_frm, label_loc_key="guideCtrlFrmLabel")
         ctrl_frm.grid(row=i, column=0, columnspan=3, sticky="nsew")
@@ -867,28 +901,28 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.prop_tab_parent.columnconfigure(0, weight=1)
         self.prop_tab_parent.rowconfigure(0, weight=1)
 
-        self.prop_frm = self.add_localized_label_frame(
+        self.prop_frame = self.add_localized_label_frame(
             self.prop_tab_parent, label_loc_key="propFrmLabel", tooltip_loc_key="specsText"
         )
 
-        self.prop_frm.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
-        self.prop_frm.rowconfigure(1, weight=1)
-        self.prop_frm.columnconfigure(0, weight=1)
+        self.prop_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+        self.prop_frame.rowconfigure(1, weight=1)
+        self.prop_frame.columnconfigure(0, weight=1)
 
         self.drop_prop = self.add_localized_dropdown(
-            parent=self.prop_frm,
+            parent=self.prop_frame,
             str_obj_dict=Composition.read_file(resolvepath("ballistics/resource/propellants.csv")),
             desc_label_key="propFrmLabel",
         )
-        self.drop_prop.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        self.drop_prop.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
-        spec_scroll = ttk.Scrollbar(self.prop_frm, orient="vertical")
+        spec_scroll = ttk.Scrollbar(self.prop_frame, orient="vertical")
         spec_scroll.grid(row=1, rowspan=2, column=1, sticky="nsew")
-        spec_h_scroll = ttk.Scrollbar(self.prop_frm, orient="horizontal")
+        spec_h_scroll = ttk.Scrollbar(self.prop_frame, orient="horizontal")
         spec_h_scroll.grid(row=2, column=0, sticky="nsew")
 
         self.specs = Text(
-            self.prop_frm,
+            self.prop_frame,
             wrap="word",
             height=20,
             width=30,
@@ -897,6 +931,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             font=(FONTNAME, FONTSIZE),
         )
         self.specs.grid(row=1, column=0, sticky="nsew")
+
         spec_scroll.config(command=self.specs.yview)
         spec_h_scroll.config(command=self.specs.xview)
 
@@ -908,7 +943,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.grain_frm.columnconfigure(0, weight=1)
         self.grain_frm.rowconfigure(0, weight=1)
-        self.prop_tab_parent.add(self.prop_frm, text=self.get_loc_str("propFrmLabel"))
+        self.prop_tab_parent.add(self.prop_frame, text=self.get_loc_str("propFrmLabel"))
         self.prop_tab_parent.add(self.grain_frm, text=self.get_loc_str("grainFrmLabel"))
 
         self.prop_tab_parent.enable_traversal()
@@ -921,7 +956,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         j += 1
 
         self.geom = self.add_localized_dropdown(
-            parent=self.grain_frm, str_obj_dict=GEOMETRIES, desc_label_key="Grain Geometry"
+            parent=self.grain_frm, str_obj_dict=Geometry.get_desc_geometry_dict(), desc_label_key="Grain Geometry"
         )
         self.geom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         j += 1
@@ -996,7 +1031,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
 
         self.aux_geom = self.add_localized_dropdown(
-            parent=self.aux_grain_frm, str_obj_dict=GEOMETRIES, desc_label_key="Auxiliary Grain Geometry"
+            parent=self.aux_grain_frm,
+            str_obj_dict=Geometry.get_desc_geometry_dict(),
+            desc_label_key="Auxiliary Grain Geometry",
         )
         self.aux_geom.grid(row=k, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         k += 1
@@ -1289,7 +1326,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         # self.bind("<Configure>", self.resizePlot)
 
-        parent.protocol("WM_DELETE_WINDOW", self.quit)
+        root.protocol("WM_DELETE_WINDOW", self.quit)
 
         self.use_theme()  # <- an update is authorized here
 
@@ -1385,7 +1422,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         except Exception as e:
             messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
 
-    def load(self):
+    def load_gun(self):
         file_name = filedialog.askopenfilename(
             title=self.get_loc_str("loadLabel"), filetypes=(("JSON File", "*.json"),), defaultextension=".json"
         )
@@ -1417,6 +1454,19 @@ class InteriorBallisticsFrame(LocalizedFrame):
             messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
 
         self.on_calculate()
+
+    def load_propellant(self):
+        file_name = filedialog.askopenfilename(
+            title=self.get_loc_str("loadLabel"), filetypes=(("Comma Separated Values File", "*.csv"),)
+        )
+        if file_name == "":
+            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
+            return
+        try:
+            self.drop_prop.reset(str_obj_dict=Composition.read_file(file_name))
+        except Exception as e:
+            self.handle_errors(e)
+            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
 
     def on_reset(self):
         for loc in self.locs:
@@ -1469,7 +1519,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
     def change_lang(self):
 
-        self.menubar.entryconfig(1, label=self.get_loc_str("fileLabel"))
+        self.menubar.entryconfig(1, label=self.get_loc_str("dataLabel"))
         self.menubar.entryconfig(2, label=self.get_loc_str("designLabel"))
         self.menubar.entryconfig(3, label=self.get_loc_str("themeLabel"))
         self.menubar.entryconfig(4, label=self.get_loc_str("debugLabel"))
@@ -1481,15 +1531,18 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.design_menu.entryconfig(4, label=self.get_loc_str("guideLabel"))
 
-        self.file_menu.entryconfig(0, label=self.get_loc_str("exportMain"))
-        self.file_menu.entryconfig(1, label=self.get_loc_str("exportAux"))
-        self.file_menu.entryconfig(2, label=self.get_loc_str("exportGeom"))
-        self.file_menu.entryconfig(3, label=self.get_loc_str("exportGuide"))
-        self.file_menu.entryconfig(4, label=self.get_loc_str("exportLabel"))
+        self.data_menu.entryconfig(0, label=self.get_loc_str("exportMain"))
+        self.data_menu.entryconfig(1, label=self.get_loc_str("exportAux"))
+        self.data_menu.entryconfig(2, label=self.get_loc_str("exportGeom"))
+        self.data_menu.entryconfig(3, label=self.get_loc_str("exportGuide"))
+        self.data_menu.entryconfig(4, label=self.get_loc_str("exportLabel"))
+
+        self.data_menu.entryconfig(5, label=self.get_loc_str("reloadPropellant"))
 
         self.debug_menu.entryconfig(0, label=self.get_loc_str("enableLabel"))
 
         self.calc_button_tip.set(self.get_loc_str("calcButtonText"))
+        # self.specs_text_tip.set(self.get_loc_str("specsText"))
 
         for loc_widget in self.locs:
             loc_widget.localize()
@@ -1502,7 +1555,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.tab_parent.tab(self.errorTab, text=self.get_loc_str("errorTab"))
         self.tab_parent.tab(self.guide_tab, text=self.get_loc_str("guideTab"))
 
-        self.prop_tab_parent.tab(self.prop_frm, text=self.get_loc_str("propFrmLabel"))
+        self.prop_tab_parent.tab(self.prop_frame, text=self.get_loc_str("propFrmLabel"))
         self.prop_tab_parent.tab(self.grain_frm, text=self.get_loc_str("grainFrmLabel"))
 
         self.guide_plot_travel.config(text=self.get_loc_str("guidePlotTravel"))
@@ -1587,6 +1640,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
             "min_lf": float(self.guide_min_lf.get()) * 1e-2,
             "max_lf": float(self.guide_max_lf.get()) * 1e-2,
             "step_lf": float(self.guide_step_lf.get()) * 1e-2,
+            "max_iter": int(self.max_iter.get()),
+            "max_guess": int(self.max_guess.get()),
         }
 
         if atmosphere:
@@ -2021,8 +2076,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 + " @ {:>12}\n".format(toSI(p, unit="Pa", dec=3)),
             )
 
-        for line in compo.desc.split(","):
-            self.specs.insert("end", line + "\n")
+        # for line in compo.desc.split("\\n"):
+        # self.specs.insert("end", line + "\n")
+        self.specs.insert("end", compo.desc)
         self.specs.config(state="disabled")
 
         self.callback()

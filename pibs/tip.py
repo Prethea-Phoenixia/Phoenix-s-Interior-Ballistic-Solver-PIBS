@@ -8,11 +8,13 @@ class ToolTip(object):
     -when-hovering-over-something-with-mouse-cursor-in-python
     """
 
-    def __init__(self, widget):
+    def __init__(self, widget, font):
         self.widget = widget
         self.tipwindow = None
         self.id = None
         self.x = self.y = 0
+        self.font = font
+        self.text = None
 
     def showtip(self, text):
         """Display text in tooltip window"""
@@ -27,19 +29,20 @@ class ToolTip(object):
         tw.wm_overrideredirect(1)
         root = self.widget.winfo_toplevel()
 
-        t_Font = tkFont.Font(family="Sarasa Fixed SC", size=8)
+        # t_Font = tkFont.Font(family="Sarasa Fixed SC", size=8)
 
+        t_font = self.font
         # we use a fixed width font so any char will do
-        columnWidth = 60
-        # apparnetly this doesn't work correctly with CJK fonts.....
-        width, height = t_Font.measure(" "), t_Font.metrics("linespace")
+        column_width = 60
+        # apparently this doesn't work correctly with CJK fonts.....
+        width, height = t_font.measure(" "), t_font.metrics("linespace")
 
         x, y, _, _ = self.widget.bbox("insert")
         # rx, ry, crx, cry = root.bbox()
-        # bouding box coordinate is in regard to origin of widget/window
+        # bounding box coordinate is in relation to origin of widget/window
 
         if x + self.widget.winfo_rootx() > root.winfo_rootx() + 0.5 * root.winfo_width():
-            x = x + self.widget.winfo_rootx() - width * columnWidth
+            x = x + self.widget.winfo_rootx() - width * column_width
             y = y + self.widget.winfo_rooty()
         else:
             x = x + self.widget.winfo_rootx() + self.widget.winfo_width()
@@ -52,14 +55,14 @@ class ToolTip(object):
             text=self.text,
             justify="left",
             background="#ffffe0",
-            wraplength=(columnWidth - 2) * width,  # 2 to account for the padding.
+            wraplength=(column_width - 2) * width,  # 2 to account for the padding.
             relief="solid",
             borderwidth=0,
-            font=t_Font,
+            font=t_font,
         )
         label.pack(ipadx=width, ipady=height * 0.25, anchor="nw", fill="both")
 
-        tw.update_idletasks()
+        # tw.update_idletasks()
         wheight = tw.winfo_height()
 
         margin = (
@@ -86,8 +89,8 @@ class ToolTip(object):
             tw.after(100, lambda: tw.destroy())
 
 
-def create_tool_tip(widget, text):
-    tool_tip = ToolTip(widget)
+def create_tool_tip(widget, text, font):
+    tool_tip = ToolTip(widget, font)
 
     def enter(_):
         tool_tip.showtip(text)

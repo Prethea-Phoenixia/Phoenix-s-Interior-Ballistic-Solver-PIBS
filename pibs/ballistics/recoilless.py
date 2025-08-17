@@ -261,13 +261,12 @@ class Recoilless(DelegatesPropellant):
 
     def integrate(
         self,
-        step=10,
-        tol=1e-5,
+        step: int = 10,
+        tol: float = 1e-5,
         dom: Domains = DOMAIN_TIME,
-        ambient_rho=1.204,
-        ambient_p=101.325e3,
-        ambient_gamma=1.4,
-        progress_queue=None,
+        ambient_rho: float = 1.204,
+        ambient_p: float = 101.325e3,
+        ambient_gamma: float = 1.4,
         **_,
     ):
         """
@@ -300,9 +299,6 @@ class Recoilless(DelegatesPropellant):
         self.z_0, _ = dekker(
             lambda z: self.propellant.f_psi_z(z) - self.psi_0, 0, 1, x_tol=tol, y_rel_tol=tol, y_abs_tol=tol**2
         )
-
-        if progress_queue is not None:
-            progress_queue.put(1)
 
         record = []
         if any((step < 0, tol < 0)):
@@ -512,9 +508,6 @@ class Recoilless(DelegatesPropellant):
             for (z, (t_bar, l_bar, v_bar, eta, tau)) in ztlvet_record
         )
 
-        if progress_queue is not None:
-            progress_queue.put(10)
-
         if is_burn_out_contained:
             logger.info("integrated to burnout point.")
         else:
@@ -559,9 +552,6 @@ class Recoilless(DelegatesPropellant):
             eta_err=eta_err,
             tau_err=tau_err,
         )
-
-        if progress_queue is not None:
-            progress_queue.put(20)
 
         t_bar_f = None
         if z_b > 1.0 and z_e >= 1.0:  # fracture point exist and is contained
@@ -621,9 +611,6 @@ class Recoilless(DelegatesPropellant):
                 eta_err=eta_err_b,
                 tau_err=tau_err_b,
             )
-
-        if progress_queue is not None:
-            progress_queue.put(30)
 
         """
         Subscript p indicate peak pressure
@@ -764,8 +751,7 @@ class Recoilless(DelegatesPropellant):
                     tau_err=tau_err,
                 )
 
-        if progress_queue is not None:
-            progress_queue.put(100)
+        logger.info(f"sampled for {step} points.")
 
         """
         sort the data points
@@ -839,8 +825,10 @@ class Recoilless(DelegatesPropellant):
         if self.material is None:
             logger.warning("material is not specified, skipping structural calculation.")
         else:
+
             try:
                 self.get_structural(recoilless_result, step, tol)
+
             except Exception:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 logger.error("exception occured during structural calculation:")
@@ -1125,6 +1113,8 @@ class Recoilless(DelegatesPropellant):
 
         recoilless_result.outline = hull
         recoilless_result.tubeMass = tube_mass + nozzle_mass
+
+        logger.info("conducted structural calculation.")
 
     @staticmethod
     def get_ar(gamma, pr):

@@ -10,17 +10,12 @@ from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumType
 from math import pi
 
-GEOMETRIES = {}
-
 
 class Geometry(ABC):
+    all_geometries = set()
 
-    def __init__(self, desc: str):
-        GEOMETRIES[desc] = self
-
-    @property
-    @abstractmethod
-    def desc(self) -> str: ...
+    def __init__(self):
+        Geometry.all_geometries.add(self)
 
     @abstractmethod
     def get_form_function_coefficients(self, r1: float, r2: float) -> tuple[float, float, float, float, float, float]:
@@ -31,6 +26,14 @@ class Geometry(ABC):
         """
         ...
 
+    @staticmethod
+    def get_desc_geometry_dict() -> dict:
+        desc_geometry_dict = {}
+        for geometry in Geometry.all_geometries:
+            desc_geometry_dict[geometry.desc] = geometry
+
+        return desc_geometry_dict
+
 
 class ABCEnum(ABCMeta, EnumType):
     pass
@@ -38,10 +41,6 @@ class ABCEnum(ABCMeta, EnumType):
 
 class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
     """table 1-4 from ref[1] page 33"""
-
-    @property
-    def desc(self) -> str:
-        return self._desc
 
     def __init__(
         self,
@@ -55,8 +54,8 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
         b_factors: tuple[float, float],
     ):
 
-        super().__init__(desc)
-        self._desc = desc
+        super().__init__()
+        self.desc = desc
         self.A, self.B, self.C = A, B, C
         self.rho_div, self.n_hole, self.a_factors, self.b_factors = rho_div, n_hole, a_factors, b_factors
 
@@ -89,13 +88,13 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
         # first phase of burning rate parameters, Z from 0 to 1
         chi, labda, mu = (q + 2 * p) / q * beta, (n - 1 - 2 * p) / (q + 2 * p) * beta, -(n - 1) / (q + 2 * p) * beta**2
 
-        Z_b = (e_1 + rho) / e_1  # second phase burning Z upper limit
+        z_b = (e_1 + rho) / e_1  # second phase burning Z upper limit
         psi_s = chi * (1 + labda + mu)
-        # second phase of burning rate parameters, Z from 1 to Z_b
-        chi_s = (1 - psi_s * Z_b**2) / (Z_b - Z_b**2)
+        # second phase of burning rate parameters, Z from 1 to z_b
+        chi_s = (1 - psi_s * z_b**2) / (z_b - z_b**2)
         labda_s = psi_s / chi_s - 1
 
-        return chi, labda, mu, chi_s, labda_s, Z_b
+        return chi, labda, mu, chi_s, labda_s, z_b
 
     # fmt: off
     SEVEN_PERF_CYLINDER = ("SEVEN_PERF_CYLINDER", 1, 7, 0, 0.2956, 7, (0, 0), (3, 8))
@@ -112,8 +111,8 @@ class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
     """table 1-3 from ref[1] page 23"""
 
     def __init__(self, desc: str, alpha: int, beta: int):
-        super().__init__(desc)
-        self._desc = desc
+        super().__init__()
+        self.desc = desc
         self.alpha = alpha
         self.beta = beta
 
@@ -142,10 +141,6 @@ class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
 
         return chi, labda, mu, 0, 0, 1
 
-    @property
-    def desc(self) -> str:
-        return self._desc
-
     def __str__(self):
         return self.desc
 
@@ -157,7 +152,7 @@ class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
 
 class Composition:
 
-    all_composition_dict = {}
+    all_compositions = []
 
     def __init__(
         self,
@@ -171,9 +166,7 @@ class Composition:
         pressure_exponent: float,
         adiabatic_flame_temperature: float = 0,
     ):
-        self.name = name
-        self.desc = desc
-
+        self.name, self.desc = name, desc
         self.f = force
         """
         Propellant force is related to the flame temperature
@@ -195,25 +188,31 @@ class Composition:
     def __str__(self):
         return self.name
 
-    @classmethod
-    def read_file(cls, fileName):
-        composition = []
-        with open(fileName, newline="", encoding="utf-8") as csvfile:
-            prop_reader = csv.reader(csvfile, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL)
+    @staticmethod
+    def read_file(file_name: str):
+        compositions = []
+        with open(file_name, newline="", encoding="utf-8") as csvfile:
+            sniffer = csv.Sniffer()
+            content = csvfile.read()
+            dialect = sniffer.sniff(content)
+            has_header = sniffer.has_header(content)
+            csvfile.seek(0)
 
-            skip_first_line = True
+            print(dialect)
 
+            prop_reader = csv.reader(csvfile, dialect=dialect)
             for prop in prop_reader:
-                if skip_first_line:
-                    skip_first_line = False
+                if has_header:
+                    has_header = False
                     continue
+                print(prop)
                 name, desc, adb, density, force, covolume, pressure_exp, burn_rate_coef, flame_temp = prop
 
                 reduced_adiabatic_index = float(adb) - 1
 
-                new_comp = cls(
+                new_comp = Composition(
                     name,
-                    desc,
+                    str(desc).replace("\\n", "\n"),
                     float(force),
                     float(covolume),
                     float(density),
@@ -222,12 +221,10 @@ class Composition:
                     float(pressure_exp),
                     float(flame_temp) if flame_temp else None,
                 )
+                compositions.append(new_comp)
 
-                composition.append(new_comp)
-
-        compo_dict = {i.name: i for i in composition}
-        cls.all_composition_dict.update(compo_dict)
-        return {i.name: i for i in composition}
+        Composition.all_compositions = compositions
+        return Composition.get_name_composition_dict()
 
     def get_lbr(self, p):
         """
@@ -245,6 +242,14 @@ class Composition:
         else:
             # infinite pressure ratio, basically vacuum
             return (2 * self.f / self.theta) ** 0.5
+
+    @staticmethod
+    def get_name_composition_dict() -> dict:
+        name_composition_dict = {}
+        for composition in Composition.all_compositions:
+            name_composition_dict[composition.name] = composition
+
+        return name_composition_dict
 
 
 class Propellant:

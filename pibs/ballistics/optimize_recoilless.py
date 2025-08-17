@@ -463,7 +463,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
         )
         return e_1, l_bar_g * l_0
 
-    def find_min_v(self, charge_mass_ratio, **_):
+    def find_min_v(self, charge_mass_ratio: float, max_guess: int = MAX_GUESSES, **_):
         """
         find the minimum volume solution.
         """
@@ -491,7 +491,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
             return e_1, (l_g + l_0), l_g
 
         records = []
-        for i in range(MAX_GUESSES):
+        for i in range(max_guess):
             start_probe = uniform(tol, 1 - tol)
             try:
                 _, lt_i, lg_i = f(start_probe)
@@ -500,9 +500,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
             except ValueError:
                 pass
         else:
-            raise ValueError(
-                "Unable to find any valid load" + " fraction with {:d} random samples.".format(MAX_GUESSES)
-            )
+            raise ValueError(f"Unable to find any valid load fraction with {max_guess:d} random samples.")
 
         logger.info(f"valid Δ/ρ = {start_probe:.3%}.")
 
@@ -561,7 +559,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
         """
         Step 2, gss to min.
         """
-        logger.info(f"solution constrained to Δ/ρ between {low:.3%} and {high:.3%}")
+        logger.info(f"solution constrained Δ/ρ : {low:.3%} - {high:.3%}")
         lf_low, lf_high = gss(lambda lf: f(lf)[1], low, high, y_rel_tol=tol, findMin=True)
         lf = 0.5 * (lf_high + lf_low)
         e_1, l_t, l_g = f(lf)

@@ -24,7 +24,7 @@ if __name__ == "__main__":
         "--add-data",
         "pibs/ui;ui/",
         "--exclude-module",
-        "pyinstaller",
+        "pibs.ballistics.therm",
     ]
     # use this for dist
     PyInstaller.__main__.run(options + ["--onefile"])

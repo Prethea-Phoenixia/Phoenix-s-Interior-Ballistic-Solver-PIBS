@@ -676,8 +676,6 @@ class Gun(DelegatesPropellant):
         populate data for output purposes
         """
 
-        logger.info(f"sampling for {step} points.")
-
         if dom == DOMAIN_TIME:
             (z_j, l_bar_j, v_bar_j, t_bar_j) = (z_0, 0, 0, 0)
             for j in range(step):
@@ -729,8 +727,8 @@ class Gun(DelegatesPropellant):
                     z_err=z_err,
                     v_bar_err=v_bar_err,
                 )
-        else:
-            raise ValueError("dom not handled.")
+
+        logger.info(f"sampled for {step} points.")
 
         """
         sort the data points
@@ -814,6 +812,7 @@ class Gun(DelegatesPropellant):
         if self.material is None:
             logger.warning("material is not specified, skipping structural calculation.")
         else:
+
             try:
                 self.get_structural(gun_result, step, tol)
 
@@ -994,6 +993,8 @@ class Gun(DelegatesPropellant):
 
         gun_result.outline = hull
         gun_result.tubeMass = v * self.material.rho
+
+        logger.info("conducted structural calculation.")
 
     @staticmethod
     def vrho_k(x_s, p_s, s_s, sigma, tol, k_max=None, k_min=None, index=0, p_ref=None):

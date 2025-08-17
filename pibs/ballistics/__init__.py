@@ -49,7 +49,6 @@ GunTypes = Union[Literal["CONVENTIONAL", "RECOILLESS"], str]
 MAX_GUESSES = 100
 # maximum iteration to correct for chambrage effects.
 MAX_ITER = 10
-# MIN_TOL = 1e-6  # based on experience
 
 from .gun import (
     GenericEntry,
@@ -62,5 +61,5 @@ from .gun import (
 from .material import Material
 from .optimize_gun import Constrained
 from .optimize_recoilless import ConstrainedRecoilless
-from .prop import GEOMETRIES, Composition, MultPerfGeometry, Propellant, SimpleGeometry
+from .prop import Composition, Geometry, MultPerfGeometry, Propellant, SimpleGeometry
 from .recoilless import Recoilless
