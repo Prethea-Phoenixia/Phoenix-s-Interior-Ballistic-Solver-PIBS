@@ -18,13 +18,13 @@ requires-python = ">3.8"
 readme = "README.md"
 license = "unlicense"
 license-files = ["LICENSE"]
-dependencies = ["matplotlib", "matplotlib-label-lines", "tabulate"] # pip install .
+dependencies = ["matplotlib", "matplotlib-label-lines", "tabulate", "psutil"] # pip install .
 authors = [{name = "Jinpeng Zhai", email = "914962409@qq.com"}]
 keywords = ["interior ballistics"]
 classifiers = ["Development Status :: 4 - Beta", "Programming Language :: Python"]
 
 [project.optional-dependencies]
-dev = ["black", "isort", "pysocks", "pyinstaller"]
+dev = ["black", "isort", "pysocks", "pyinstaller"] # pip install .[dev]
 
 [project.urls]
 Repository = "https://github.com/Prethea-Phoenixia/Phoenix-s-Interior-Ballistic-Solver-PIBS"

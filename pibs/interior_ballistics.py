@@ -444,24 +444,16 @@ class InteriorBallisticsFrame(LocalizedFrame):
             plot_frm.columnconfigure(i, weight=1)
 
         j = 1
-        k = 0
-        self.plot_avg_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotAvgP", row=j, col=k)
-        k += 1
-        self.plot_base_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotBaseP", row=j, col=k)
-        k += 1
-        self.plot_breech_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotBreechP", row=j, col=k)
-        k += 1
-        self.plot_stag_p = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotStagP", row=j, col=k)
-        j += 1
+        self.plot_avg_p, self.plot_base_p, self.plot_breech_p, self.plot_stag_p = (
+            self.add_localized_label_check(parent=plot_frm, label_loc_key=label, desc_label_key=None, row=j, col=k)
+            for k, label in enumerate(("plotAvgP", "plotBaseP", "plotBreechP", "plotStagP"))
+        )
 
-        k = 0
-        self.plot_vel = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotVel", row=j, col=k)
-        k += 1
-        self.plot_nozzle_v = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotNozzleV", row=j, col=k)
-        k += 1
-        self.plot_burnup = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotBurnup", row=j, col=k)
-        k += 1
-        self.plot_eta = self.add_localized_label_check(parent=plot_frm, label_loc_key="plotEta", row=j, col=k)
+        j += 1
+        self.plot_vel, self.plot_nozzle_v, self.plot_burnup, self.plot_eta = (
+            self.add_localized_label_check(parent=plot_frm, label_loc_key=label, desc_label_key=None, row=j, col=k)
+            for k, label in enumerate(("plotVel", "plotNozzleV", "plotBurnup", "plotEta"))
+        )
 
         for check in (
             self.plot_avg_p,
@@ -511,12 +503,16 @@ class InteriorBallisticsFrame(LocalizedFrame):
         j = 1
         k = 0
         self.trace_hull, k = (
-            self.add_localized_label_check(parent=aux_frm, row=j, col=k, label_loc_key="traceHull", default=1),
+            self.add_localized_label_check(
+                parent=aux_frm, row=j, col=k, label_loc_key="traceHull", default=True, desc_label_key=None
+            ),
             k + 1,
         )
 
         self.trace_press, k = (
-            self.add_localized_label_check(parent=aux_frm, row=j, col=k, label_loc_key="tracePress"),
+            self.add_localized_label_check(
+                parent=aux_frm, row=j, col=k, label_loc_key="tracePress", desc_label_key=None
+            ),
             k + 1,
         )
 
@@ -573,6 +569,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="kPa",
                 default="101.325",
                 validation=validation_nn,
+                dtype=float,
             ),
             j + 1,
         )
@@ -584,13 +581,19 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="kg/m³",
                 default="1.204",
                 validation=validation_nn,
+                dtype=float,
             ),
             j + 1,
         )
 
         self.amb_gamma, j = (
             self.add_localized_3_input(
-                parent=env_frm, row=j, label_loc_key="ambGamLabel", default="1.400", validation=validation_nn
+                parent=env_frm,
+                row=j,
+                label_loc_key="ambGamLabel",
+                default="1.400",
+                validation=validation_nn,
+                dtype=float,
             ),
             j + 1,
         )
@@ -616,7 +619,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 parent=op_frm,
                 row=i,
                 columnspan=3,
-                default=0,
+                default=False,
                 label_loc_key="consButton",
                 desc_label_key="consButton",
                 tooltip_loc_key="useConsText",
@@ -638,7 +641,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 parent=cons_frm,
                 row=j,
                 columnspan=3,
-                default=0,
+                default=False,
                 label_loc_key="lockButton",
                 desc_label_key="lockButton",
                 tooltip_loc_key="lockText",
@@ -652,7 +655,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 parent=cons_frm,
                 row=j,
                 columnspan=3,
-                default=0,
+                default=False,
                 desc_label_key="minTVButton",
                 label_loc_key="minTVButton",
                 tooltip_loc_key="optLFText",
@@ -669,6 +672,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="m/s",
                 default="1000.0",
                 validation=validation_nn,
+                dtype=float,
             ),
             j + 1,
         )
@@ -682,6 +686,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="350.0",
                 validation=validation_nn,
                 tooltip_loc_key="pTgtText",
+                dtype=float,
             ),
             j + 1,
         )
@@ -699,6 +704,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="1.0",
                 validation=validation_nn,
                 color="red",
+                dtype=float,
             ),
             j + 1,
         )
@@ -711,6 +717,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="100.0",
                 validation=validation_nn,
                 color="red",
+                dtype=float,
             ),
             j + 1,
         )
@@ -813,6 +820,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text=unit,
                 validation=validation,
                 row=j,
+                dtype=float,
             )
             for j, (locKey, default, unit, validation) in enumerate(
                 (
@@ -853,6 +861,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="mm",
                 default="50.0",
                 validation=validation_nn,
+                dtype=float,
             ),
             i + 1,
         )
@@ -865,6 +874,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="mm",
                 default="3500.0",
                 validation=validation_nn,
+                dtype=float,
             ),
             i + 1,
         )
@@ -877,6 +887,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="kg",
                 default="2.0",
                 validation=validation_nn,
+                dtype=float,
             ),
             i + 1,
         )
@@ -890,6 +901,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="0.5",
                 validation=validation_nn,
                 tooltip_loc_key="chgText",
+                dtype=float,
             ),
             i + 1,
         )
@@ -924,8 +936,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.specs = Text(
             self.prop_frame,
             wrap="word",
-            height=20,
-            width=30,
+            height=25,
+            width=0,
             yscrollcommand=spec_scroll.set,
             xscrollcommand=spec_h_scroll.set,
             font=(FONTNAME, FONTSIZE),
@@ -969,6 +981,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="mm",
                 default="1.0",
                 validation=validation_nn,
+                dtype=float,
             ),
             j + 1,
         )
@@ -982,6 +995,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="1.0",
                 validation=validation_nn,
                 tooltip_loc_key="",
+                dtype=float,
             ),
             j + 1,
         )
@@ -994,6 +1008,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="x",
                 default="2.5",
                 validation=validation_nn,
+                dtype=float,
             ),
             j + 1,
         )
@@ -1026,6 +1041,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="1.0",
                 unit_text="x",
                 validation=validation_nn,
+                dtype=float,
             ),
             k + 1,
         )
@@ -1046,6 +1062,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="x",
                 label_loc_key="auxWebRatio",
                 validation=validation_nn,
+                dtype=float,
             ),
             k + 1,
         )
@@ -1059,6 +1076,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 desc_label_key="Auxiliary 1/α",
                 validation=validation_nn,
                 tooltip_loc_key="",
+                dtype=float,
             ),
             k + 1,
         )
@@ -1071,9 +1089,14 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="2.5",
                 desc_label_key="Auxiliary 1/β",
                 validation=validation_nn,
+                dtype=float,
             ),
             k + 1,
         )
+
+        self.swap_button = ttk.Button(self.grain_frm, text=self.get_loc_str("swapLabel"), command=self.swap)
+        self.swap_button.grid(row=j, column=0, columnspan=3, sticky="nsew")
+        j += 1
 
         self.use_cv = self.add_localized_dropdown(
             parent=specs_frame,
@@ -1091,6 +1114,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="L",
                 default="1.0",
                 validation=validation_nn,
+                dtype=float,
             ),
             i + 1,
         )
@@ -1103,6 +1127,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="kg/m³",
                 default="0.0",
                 validation=validation_nn,
+                dtype=float,
             ),
             i + 1,
         )
@@ -1116,6 +1141,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="0.0",
                 validation=validation_ce,
                 tooltip_loc_key="ldfText",
+                dtype=float,
             ),
             i + 1,
         )
@@ -1133,6 +1159,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="1.5",
                 validation=validation_nn,
                 tooltip_loc_key="clrText",
+                dtype=float,
             ),
             i + 1,
         )
@@ -1146,6 +1173,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="3.0",
                 validation=validation_ce,
                 tooltip_loc_key="dgcText",
+                dtype=float,
             ),
             i + 1,
         )
@@ -1159,6 +1187,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="30.0",
                 validation=validation_nn,
                 tooltip_loc_key="stpText",
+                dtype=float,
             ),
             i + 1,
         )
@@ -1172,6 +1201,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="4.0",
                 validation=validation_nn,
                 tooltip_loc_key="nozzExpText",
+                dtype=float,
             ),
             i + 1,
         )
@@ -1185,6 +1215,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 default="92.0",
                 validation=validation_ce,
                 tooltip_loc_key="nozzEffText",
+                dtype=float,
             ),
             i + 1,
         )
@@ -1216,6 +1247,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="kg/m³",
                 default="7850.0",
                 validation=validation_nn,
+                dtype=float,
             ),
             j + 1,
         )
@@ -1227,6 +1259,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 unit_text="MPa",
                 default="1000.0",
                 validation=validation_nn,
+                dtype=float,
             ),
             j + 1,
         )
@@ -1238,6 +1271,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 label_loc_key="sffLabel",
                 default="1.35",
                 validation=validation_nn,
+                dtype=float,
             ),
             j + 1,
         )
@@ -1442,8 +1476,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
             for key, value in file_dict.items():
                 try:
                     loc_dict[key].set(value)
-                except KeyError:
-                    pass
+                except KeyError as e:
+                    self.handle_errors(e)
 
             if DESCRIPTION in file_dict.keys():  # update description from file.
                 self.description.delete(1.0, "end")
@@ -1549,6 +1583,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.calc_button.config(text=self.get_loc_str("calcLabel"))
         self.guide_button.config(text=self.get_loc_str("guideLabel"))
+        self.swap_button.config(text=self.get_loc_str("swapLabel"))
 
         self.tab_parent.tab(self.plot_tab, text=self.get_loc_str("plotTab"))
         self.tab_parent.tab(self.table_tab, text=self.get_loc_str("tableTab"))
@@ -2302,13 +2337,13 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.prop = Propellant(
                 composition=compo,
                 main_geom=geom,
-                main_r1=float(self.grain_r1.get()),
-                main_r2=float(self.grain_r2.get()),
+                main_r1=self.grain_r1.get(),
+                main_r2=self.grain_r2.get(),
                 aux_geom=aux_geom,
-                web_ratio=float(self.aux_web_ratio.get()),
-                mass_ratio=float(self.aux_mass_ratio.get()) if self.use_aux_grain.get() else 0.0,
-                aux_r1=float(self.aux_grain_r1.get()),
-                aux_r2=float(self.aux_grain_r2.get()),
+                web_ratio=self.aux_web_ratio.get(),
+                mass_ratio=self.aux_mass_ratio.get() if self.use_aux_grain.get() else 0.0,
+                aux_r1=self.aux_grain_r1.get(),
+                aux_r2=self.aux_grain_r2.get(),
             )
 
         except Exception as e:
@@ -2531,6 +2566,29 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         except Exception as e:
             messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+
+    def swap(self):
+        ## this swaps the primary and auxiliary charge.
+        try:
+            # cache the values for swapping.
+            main_geom, aux_geom = self.geom.get(), self.aux_geom.get()
+            main_r1, main_r2 = self.grain_r1.get(), self.grain_r2.get()
+            aux_r1, aux_r2 = self.aux_grain_r1.get(), self.aux_grain_r2.get()
+            web_ratio, mass_ratio = self.aux_web_ratio.get(), self.aux_mass_ratio.get()
+
+            self.grain_r1.set(aux_r1)
+            self.grain_r2.set(aux_r2)
+            self.aux_grain_r1.set(main_r1)
+            self.aux_grain_r2.set(main_r2)
+
+            self.aux_web_ratio.set(1.0 / web_ratio)
+            self.aux_mass_ratio.set(1.0 / mass_ratio)
+
+            self.geom.set(aux_geom)
+            self.aux_geom.set(main_geom)
+
+        except ValueError as e:
+            self.handle_errors(e)
 
 
 def calculate(job_queue, log_queue, kwargs):

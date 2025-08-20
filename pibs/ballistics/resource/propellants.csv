@@ -1,5 +1,5 @@
 type,description,adiabatic index,density kg/m^3,force J/kg,covolume m^3/kg,pressure exponent,burnrate coefficient m/s/Pa^n,isochoric adb flame temp K
-P-5 BPfl,High Nitrogen Single Base\n*-------- High Nitrated Pyroxylin\n 2.2 - 4.1% Dimethacrylate (Bis-Triethylene Glycol) Phthalate\n 1.4 - 3.2% Volatile\n 1.0 - 2.0% Diphenyl Amine\n 0.1 - 0.5% Potassium Sulphate\n 0.05-0.15% Graphite.,1.23,1575,990000,1.0e-3,1.0,7.1951e-10,
+P-5 BPfl,High Nitrogen Single Base\n*---------- High Nitrated Pyroxylin\n 2.2 - 4.1% Dimethacrylate (Bis-Triethylene Glycol) Phthalate\n 1.4 - 3.2% Volatile\n 1.0 - 2.0% Diphenyl Amine\n 0.1 - 0.5% Potassium Sulphate\n 0.05-0.15% Graphite.,1.23,1575,990000,1.0e-3,1.0,7.1951e-10,
 Pyroxylin,Pyroxylin (nitrocellulose) propellant with values typically used to model multiple-perforated grains,1.25,1600,950000,1.0e-3,0.83,8.366e-8,
 Pyroxylin (Low Nitration),Low Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains.,1.25,1600,855000,1.0e-3,0.83,2.014e-8,
 Pyroxylin (High Nitration),High Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains.,1.25,1600,1017500,1.0e-3,0.83,2.094e-8,2970

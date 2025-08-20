@@ -5,6 +5,8 @@ from itertools import repeat
 from math import inf
 from typing import Optional
 
+import psutil
+
 from .ballistics import (
     CONVENTIONAL,
     POINT_BURNOUT,
@@ -159,7 +161,7 @@ def guide_graph(*_, **kwargs):
             kv.update({"load_fraction": load_fraction, "charge_mass_ratio": charge_mass_ratio})
             parameters.append(kv)
 
-    processes = os.cpu_count()
+    processes = psutil.cpu_count(logical=False)
     logger.info(f"dispatching {processes:}-process for constructing guidance diagram.")
 
     # parallel implementation

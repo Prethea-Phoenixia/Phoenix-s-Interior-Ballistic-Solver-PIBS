@@ -198,14 +198,11 @@ class Composition:
             has_header = sniffer.has_header(content)
             csvfile.seek(0)
 
-            print(dialect)
-
             prop_reader = csv.reader(csvfile, dialect=dialect)
             for prop in prop_reader:
                 if has_header:
                     has_header = False
                     continue
-                print(prop)
                 name, desc, adb, density, force, covolume, pressure_exp, burn_rate_coef, flame_temp = prop
 
                 reduced_adiabatic_index = float(adb) - 1
