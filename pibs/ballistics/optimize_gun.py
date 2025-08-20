@@ -292,7 +292,7 @@ conditions is {v_j:.4g} m/s."
             else:
                 z_i = z_0
 
-            z_1, z_2 = gss(lambda z: _f_p_z(z)[0], z_i, z_j, y_rel_tol=tol, y_abs_tol=tol**2, findMin=False)
+            z_1, z_2 = gss(lambda z: _f_p_z(z)[0], z_i, z_j, y_rel_tol=tol, y_abs_tol=tol**2, find_min=False)
             z_p = 0.5 * (z_1 + z_2)
 
             p_bar_p, *vals = _f_p_z(z_p)
@@ -539,7 +539,7 @@ conditions is {v_j:.4g} m/s."
         """
 
         logger.info(f"solution constrained to Δ/ρ : {low:.3%} - {high:.3%}")
-        lf_low, lf_high = gss(lambda load_fraction: f(load_fraction)[1], low, high, x_tol=tol, findMin=True)
+        lf_low, lf_high = gss(lambda load_fraction: f(load_fraction)[1], low, high, x_tol=tol, find_min=True)
         lf = 0.5 * (lf_high + lf_low)
         e_1, l_t, l_g = f(lf)
         logger.info(f"Optimal Δ/ρ = {lf:.2f}")

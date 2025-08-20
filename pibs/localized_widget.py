@@ -548,7 +548,7 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         self.check_widget.grid()
 
     def get(self) -> bool:
-        return self.check_var.get()
+        return bool(self.check_var.get())
 
     def set(self, value):
         self.check_var.set(value)

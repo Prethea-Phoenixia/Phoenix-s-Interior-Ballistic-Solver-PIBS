@@ -93,7 +93,7 @@ def unloadfont(fontpath, private=True, enumerable=False):
     return bool(RemoveFontResourceEx(byref(pathbuf), flags, 0))
 
 
-def toSI(v, dec=4, unit=None, useSN=False):
+def to_si(v, dec=4, unit=None, useSN=False):
     if v is None:
         return "N/A"
     elif isinstance(v, int) or isinstance(v, float):
@@ -233,7 +233,7 @@ def dot_aligned(matrix, units, use_sn, strip_ws=True):
         snums = []
         for n in seq:
             if isinstance(n, int) or isinstance(n, float) or n is None:
-                vstr = toSI(n, unit=unit, useSN=isSN)
+                vstr = to_si(n, unit=unit, useSN=isSN)
                 snums.append(vstr.strip() if strip_ws else vstr)
             elif isinstance(n, str):
                 snums.append(n)
@@ -299,7 +299,7 @@ def detect_darkmode_in_windows() -> bool:
 
 
 if __name__ == "__main__":
-    print(toSI(1e-4).strip())
+    print(to_si(1e-4).strip())
     from math import pi
 
     print(round_sig(pi))

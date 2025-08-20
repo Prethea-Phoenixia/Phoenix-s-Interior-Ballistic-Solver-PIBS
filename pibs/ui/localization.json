@@ -79,14 +79,14 @@
 				"Time",
 				"Travel",
 				"Burnup",
+				"Outflow F.",
 				"Velocity",
 				"Outflow V.",
 				"Lock Pres.",
 				"Stag. Pres.",
 				"Avg. Pres.",
 				"Shot Pres.",
-				"Avg. Temp.",
-				"Outflow F."
+				"Avg. Temp."
 			]
 		},
 		"consButton": "Constrain Design",

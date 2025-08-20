@@ -649,7 +649,7 @@ class Recoilless(DelegatesPropellant):
 
             t_bar_tol = tol * min(t for t in (t_bar_e, t_bar_b, t_bar_f) if t)
 
-            t_bar_1, t_bar_2 = gss(g, 0, t_bar_e if t_bar_b is None else t_bar_b, x_tol=t_bar_tol, findMin=False)
+            t_bar_1, t_bar_2 = gss(g, 0, t_bar_e if t_bar_b is None else t_bar_b, x_tol=t_bar_tol, find_min=False)
 
             t_bar = 0.5 * (t_bar_1 + t_bar_2)
 
@@ -788,10 +788,32 @@ class Recoilless(DelegatesPropellant):
             p_line.append(PressureProbePoint(l + l_c, ps))
             p_trace.append(PressureTraceEntry(dtag, temp, p_line))
 
-            data.append(RecoillessTableEntry(dtag, t, l, psi, v, vb, pb, p0, p, ps, temp, eta))
+            data.append(
+                RecoillessTableEntry(
+                    tag=dtag,
+                    time=t,
+                    travel=l,
+                    burnup=psi,
+                    velocity=v,
+                    outflow_velocity=vb,
+                    breech_pressure=pb,
+                    stag_pressure=p0,
+                    avg_pressure=p,
+                    shot_pressure=ps,
+                    temperature=temp,
+                    outflow_fraction=eta,
+                )
+            )
             error.append(
                 RecoillessErrorEntry(
-                    etag, t_err, l_err, psi_err, v_err, None, None, None, p_err, None, temp_err, eta_err
+                    tag=etag,
+                    time=t_err,
+                    travel=l_err,
+                    burnup=psi_err,
+                    velocity=v_err,
+                    avg_pressure=p_err,
+                    temperature=temp_err,
+                    outflow_fraction=eta_err,
                 )
             )
 
@@ -813,7 +835,22 @@ class Recoilless(DelegatesPropellant):
             p_line.append(PressureProbePoint(l + l_c, ps))
             p_trace.append(PressureTraceEntry(SAMPLE, temp, p_line))
 
-            data.append(RecoillessTableEntry(SAMPLE, t, l, psi, v, vb, pb, p0, p, ps, temp, eta))
+            data.append(
+                RecoillessTableEntry(
+                    tag=SAMPLE,
+                    time=t,
+                    travel=l,
+                    burnup=psi,
+                    velocity=v,
+                    outflow_velocity=vb,
+                    breech_pressure=pb,
+                    stag_pressure=p0,
+                    avg_pressure=p,
+                    shot_pressure=ps,
+                    temperature=temp,
+                    outflow_fraction=eta,
+                )
+            )
             error.append(RecoillessErrorEntry("L"))
 
         data, error, p_trace = zip(
@@ -1161,8 +1198,6 @@ if __name__ == "__main__":
     d_0 = 4*2e_1+3*d_0 = 11 * e_1
     """
 
-    from tabulate import tabulate
-
     compositions = Composition.read_file("data/propellants.csv")
 
     M17 = compositions["M17"]
@@ -1186,18 +1221,3 @@ if __name__ == "__main__":
         chambrage=1.0,
     )
     record = []
-
-    print("\nnumerical: time")
-    print(
-        tabulate(
-            test.integrate(10, 1e-3, dom=DOMAIN_TIME).get_raw_table_data(),
-            headers=("tag", "t", "l", "psi", "v", "vb", "pb", "p0", "p", "ps", "T", "eta"),
-        )
-    )
-    print("\nnumerical: length")
-    print(
-        tabulate(
-            test.integrate(10, 1e-3, dom=DOMAIN_LEN).get_raw_table_data(),
-            headers=("tag", "t", "l", "psi", "v", "vb", "pb", "p0", "p", "ps", "T", "eta"),
-        )
-    )

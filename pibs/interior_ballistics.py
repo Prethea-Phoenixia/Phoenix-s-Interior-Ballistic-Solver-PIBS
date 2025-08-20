@@ -73,7 +73,7 @@ from .misc import (
     loadfont,
     resolvepath,
     round_sig,
-    toSI,
+    to_si,
     unloadfont,
     validate_ce,
     validate_nn,
@@ -1823,28 +1823,28 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.te.set(f"{eta_t * 100:.2f} %")
             self.be.set(f"{eta_b * 100:.2f} %")
             self.pe.set(f"{eta_p * 100:.2f} %")
-            self.va.set(toSI(self.gun.v_j, unit="m/s"))
+            self.va.set(to_si(self.gun.v_j, unit="m/s"))
             self.lx.set(
                 (
-                    toSI(self.gun.l_g / caliber, unit=self.get_loc_str("calLabel")),
-                    toSI((self.gun.l_g + self.gun.l_c) / caliber, unit=self.get_loc_str("calLabel")),
+                    to_si(self.gun.l_g / caliber, unit=self.get_loc_str("calLabel")),
+                    to_si((self.gun.l_g + self.gun.l_c) / caliber, unit=self.get_loc_str("calLabel")),
                 )
             )
-            self.ammo.set(toSI(self.gun.l_c, unit="m"))
+            self.ammo.set(to_si(self.gun.l_c, unit="m"))
             ps = self.gun_result.read_table_data(POINT_PEAK_SHOT).shot_pressure
-            self.pa.set(toSI(ps * self.gun.s / self.gun.m, unit="m/s²"))
+            self.pa.set(to_si(ps * self.gun.s / self.gun.m, unit="m/s²"))
             tube_mass = self.gun_result.tubeMass
             self.gm.set(format_mass(tube_mass))
             peak_average_entry = self.gun_result.read_table_data(POINT_PEAK_AVG)
             peak_breech_entry = self.gun_result.read_table_data(POINT_PEAK_BREECH)
             self.pp.set(
                 (
-                    f"{toSI(peak_average_entry.avg_pressure, unit='Pa'):}" + self.get_loc_str("mean"),
-                    f"{toSI(peak_breech_entry.breech_pressure, unit='Pa'):}" + self.get_loc_str("breech"),
+                    f"{to_si(peak_average_entry.avg_pressure, unit='Pa'):}" + self.get_loc_str("mean"),
+                    f"{to_si(peak_breech_entry.breech_pressure, unit='Pa'):}" + self.get_loc_str("breech"),
                 )
             )
             muzzle_entry = self.gun_result.read_table_data(POINT_EXIT)
-            self.mv.set(toSI(muzzle_entry.velocity, unit="m/s"))
+            self.mv.set(to_si(muzzle_entry.velocity, unit="m/s"))
             try:
                 burnout_entry = self.gun_result.read_table_data(POINT_BURNOUT)
                 self.bop.set(f"{burnout_entry.travel / self.gun.l_g * 1e2:.2f} %")
@@ -1884,13 +1884,23 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
                 xs, vs, vxs, pas, pss, pbs, p0s, psis, etas = [], [], [], [], [], [], [], [], []
 
-                for entry in self.gun_result.get_raw_table_data():
-                    tag, (time, l, psi, v, pb, p, ps, temp, vx, px, p0, eta) = "", repeat(0.0, 12)
+                for entry in self.gun_result.table_data:
+                    tag, (time, l, psi, v, pb, p, ps, temp, vx, p0, eta) = "", repeat(0.0, 11)
 
-                    if gun_type == CONVENTIONAL:
-                        tag, time, l, psi, v, pb, p, ps, temp = entry
-                    elif gun_type == RECOILLESS:
-                        tag, time, l, psi, v, vx, px, p0, p, ps, temp, eta = entry
+                    tag = entry.tag
+                    time = entry.time
+                    l = entry.travel
+                    psi = entry.burnup
+                    v = entry.velocity
+                    pb = entry.breech_pressure
+
+                    if gun_type == RECOILLESS:
+                        vx = entry.outflow_velocity
+                        p0 = entry.stag_pressure
+                        eta = entry.outflow_fraction
+
+                    p = entry.avg_pressure
+                    ps = entry.shot_pressure
 
                     if tag == self.p_control.get():
                         x_peak = (time * 1e3) if dom == DOMAIN_TIME else l
@@ -1906,7 +1916,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                     vxs.append(vx)
                     pas.append(p / 1e6)
                     pss.append(ps / 1e6)
-                    pbs.append(max(px / 1e6, pb / 1e6))
+                    pbs.append(pb / 1e6)
                     p0s.append(p0 / 1e6)
                     psis.append(psi)
                     etas.append(eta)
@@ -2107,8 +2117,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
         for p in (100e6, 200e6, 300e6):
             self.specs.insert(
                 "end",
-                "{:>12}".format(toSI(compo.get_lbr(p), unit="m/s", dec=3))
-                + " @ {:>12}\n".format(toSI(p, unit="Pa", dec=3)),
+                "{:>12}".format(to_si(compo.get_lbr(p), unit="m/s", dec=3))
+                + " @ {:>12}\n".format(to_si(p, unit="Pa", dec=3)),
             )
 
         # for line in compo.desc.split("\\n"):
@@ -2200,25 +2210,63 @@ class InteriorBallisticsFrame(LocalizedFrame):
         if self.gun is None:
             return
 
+        table_data, error_data = [], []
         try:
             gun_type = self.kwargs["typ"]
-            table_data, error_data = self.gun_result.get_raw_table_data(), self.gun_result.get_raw_error_data()
-        except AttributeError:
-            gun_type = self.type_optn.get_obj()
-            table_data, error_data = [], []
+            if gun_type == CONVENTIONAL:
+                table_data, error_data = (
+                    [
+                        (
+                            entry.tag,
+                            entry.time,
+                            entry.travel,
+                            entry.burnup,
+                            entry.velocity,
+                            entry.breech_pressure,
+                            entry.avg_pressure,
+                            entry.shot_pressure,
+                            entry.temperature,
+                        )
+                        for entry in data
+                    ]
+                    for data in (self.gun_result.table_data, self.gun_result.error_data)
+                )
+                use_sn = False, False, False, True, False, False, False, False, True
+                units = None, "s", "m", None, "m/s", "Pa", "Pa", "Pa", "K"
 
+            elif gun_type == RECOILLESS:
+                table_data, error_data = (
+                    [
+                        (
+                            entry.tag,
+                            entry.time,
+                            entry.travel,
+                            entry.burnup,
+                            entry.outflow_fraction,
+                            entry.velocity,
+                            entry.outflow_velocity,
+                            entry.breech_pressure,
+                            entry.stag_pressure,
+                            entry.avg_pressure,
+                            entry.shot_pressure,
+                            entry.temperature,
+                        )
+                        for entry in data
+                    ]
+                    for data in (self.gun_result.table_data, self.gun_result.error_data)
+                )
+
+                use_sn = False, False, False, True, True, False, False, False, False, False, False, True
+                units = None, "s", "m", None, None, "m/s", "m/s", "Pa", "Pa", "Pa", "Pa", "K"
+
+            # table_data, error_data = self.gun_result.get_raw_table_data(), self.gun_result.get_raw_error_data()
+        except AttributeError as e:
+            self.handle_errors(e)
+
+        # translate the tags.
         loc_table_data = []
         for i, line in enumerate(table_data):
             loc_table_data.append((self.get_loc_str(line[0]), *line[1:]))
-
-        if gun_type == CONVENTIONAL:
-            use_sn = False, False, False, True, False, False, False, False, True
-            units = None, "s", "m", None, "m/s", "Pa", "Pa", "Pa", "K"
-        elif gun_type == RECOILLESS:
-            use_sn = False, False, False, True, False, False, False, False, False, False, True, True
-            units = None, "s", "m", None, "m/s", "m/s", "Pa", "Pa", "Pa", "Pa", "K", None
-        else:
-            raise ValueError("unknown gun types")
 
         loc_table_data = dot_aligned(loc_table_data, units=units, use_sn=use_sn)
         error_data = dot_aligned(error_data, units=units, use_sn=use_sn)
@@ -2384,7 +2432,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             )
 
     def ctrl_callback(self, *_):
-        if self.solve_W_Lg.get() == 0:
+        if not self.solve_W_Lg.get():
             self.v_tgt.disable()
             self.p_tgt.disable()
 
@@ -2396,7 +2444,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.tbl_mm.enable()
 
         else:
-            if self.lock_Lg.get() == 1:
+            if self.lock_Lg.get():
                 self.v_tgt.disable()
                 self.opt_lf.disable()
                 self.tbl_mm.enable()
@@ -2405,7 +2453,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 self.opt_lf.enable()
                 self.tbl_mm.disable()
 
-            if self.opt_lf.get() == 1:
+            if self.opt_lf.get():
                 self.lock_Lg.disable()
             else:
                 self.lock_Lg.enable()
@@ -2680,19 +2728,15 @@ def main(loc: str = None):
     multiprocessing.freeze_support()
     root_logger.info("Initializing")
 
-    # this allows us to set our own taskbar icon
-    windll.shell32.SetCurrentProcessExplicitAppUserModelID("Phoenix.Interior.Ballistics.Solver")
-
     # this tells windows that our program will handle scaling ourselves
-    win_release = platform.release()
-    if win_release in ("8", "10", "11"):
-        windll.shcore.SetProcessDpiAwareness(1)
-    elif win_release in ("7", "Vista"):
-        windll.user32.SetProcessDPIAware()
-    else:
-        print("Unknown release: ", win_release, ", skipping DPI handling")
+    if platform.system() == "Windows":
+        win_release = platform.release()
+        if win_release in ("8", "10", "11"):
+            windll.shcore.SetProcessDpiAwareness(1)
+        elif win_release in ("7", "Vista"):
+            windll.user32.SetProcessDPIAware()
 
-    loc = locale.windows_locale[windll.kernel32.GetUserDefaultUILanguage()] if not loc else loc
+        loc = loc if loc else locale.windows_locale[windll.kernel32.GetUserDefaultUILanguage()]
 
     loadfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"), True, True)
     font_manager.fontManager.addfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"))

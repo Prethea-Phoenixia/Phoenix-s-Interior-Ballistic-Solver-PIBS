@@ -321,7 +321,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
                     record.sort()
                     return _f_p_bar(z, l_bar, v_bar, eta, tau)
 
-                z_1, z_2 = gss(_f_p_z, z_i, z_j, y_rel_tol=tol, findMin=False)
+                z_1, z_2 = gss(_f_p_z, z_i, z_j, y_rel_tol=tol, find_min=False)
                 z_p = 0.5 * (z_1 + z_2)
 
                 p_bar_p = _f_p_z(z_p)
@@ -560,7 +560,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
         Step 2, gss to min.
         """
         logger.info(f"solution constrained Δ/ρ : {low:.3%} - {high:.3%}")
-        lf_low, lf_high = gss(lambda lf: f(lf)[1], low, high, y_rel_tol=tol, findMin=True)
+        lf_low, lf_high = gss(lambda lf: f(lf)[1], low, high, y_rel_tol=tol, find_min=True)
         lf = 0.5 * (lf_high + lf_low)
         e_1, l_t, l_g = f(lf)
         logger.info(f"Optimal Δ/ρ = {lf:.2f}")

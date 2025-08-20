@@ -13,13 +13,7 @@ from .prop import Propellant
 
 
 @dataclass
-class HasGetRawLine:
-    def get_raw_line(self):
-        return list(asdict(self).values())
-
-
-@dataclass
-class GenericEntry(HasGetRawLine):
+class GenericEntry:
     tag: str
     time: float
     travel: float
@@ -32,7 +26,7 @@ class GenericEntry(HasGetRawLine):
 
 
 @dataclass
-class GenericErrorEntry(HasGetRawLine):
+class GenericErrorEntry:
     tag: str
     time: float | None = None
     travel: float | None = None
@@ -63,27 +57,6 @@ class GenericResult:
                 return tableEntry
         raise ValueError("no entry with tag")
 
-    def get_raw_table_data(self):
-        raw_lines = []
-        for gunTableEntry in self.table_data:
-            raw_lines.append(gunTableEntry.get_raw_line())
-
-        return raw_lines
-
-    def get_raw_error_data(self):
-        raw_lines = []
-        for gunErrorEntry in self.error_data:
-            raw_lines.append(gunErrorEntry.get_raw_line())
-
-        return raw_lines
-
-    def get_raw_pressure_trace(self):
-        raw_lines = []
-        for pressureProbePoint in self.pressure_trace:
-            raw_lines.append(pressureProbePoint.get_raw_line())
-
-        return raw_lines
-
     def get_eff(self) -> tuple[float, float, float]:
         """
         te: thermal efficiency
@@ -92,7 +65,6 @@ class GenericResult:
         """
         vg = self.read_table_data(POINT_EXIT).velocity
         p_max = self.read_table_data(POINT_PEAK_AVG).avg_pressure
-
         te = (vg / self.gun.v_j) ** 2
         be = te / self.gun.phi
         pe = 0.5 * self.gun.phi * self.gun.m * vg**2 / (p_max * self.gun.s * self.gun.l_g)
@@ -100,7 +72,7 @@ class GenericResult:
 
 
 @dataclass
-class PressureTraceEntry(HasGetRawLine):
+class PressureTraceEntry:
     tag: str
     temperature: float
     pressure_trace: list[PressureProbePoint]
@@ -113,7 +85,7 @@ class PressureProbePoint:
 
 
 @dataclass
-class OutlineEntry(HasGetRawLine):
+class OutlineEntry:
     x: float
     r_in: float
     r_ex: float

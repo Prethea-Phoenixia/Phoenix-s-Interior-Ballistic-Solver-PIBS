@@ -172,11 +172,7 @@ class Gun(DelegatesPropellant):
             )
 
         self.p_a_bar, self.c_a_bar, self.labda_1, self.labda_2 = 0.0, 0.0, 0.0, 0.0
-        self.v_j = 0.0
-        self.b = 0.0
-        self.phi = 0.0
-        self.k_1 = 0.0
-
+        self.v_j, self.b, self.phi, self.k_1 = 0.0, 0.0, 0.0, 0.0
         self.z_0, self.psi_0 = 0, 0
 
     def f_p_bar(self, z, l_bar, v_bar) -> float:
@@ -633,7 +629,7 @@ class Gun(DelegatesPropellant):
             """
             t_bar_tol = tol * min(t for t in (t_bar_e, t_bar_b, t_bar_f) if t is not None)
 
-            t_bar_1, t_bar_2 = gss(f, 0, t_bar_e if t_bar_b is None else t_bar_b, x_tol=t_bar_tol, findMin=False)
+            t_bar_1, t_bar_2 = gss(f, 0, t_bar_e if t_bar_b is None else t_bar_b, x_tol=t_bar_tol, find_min=False)
 
             t_bar = 0.5 * (t_bar_1 + t_bar_2)
 
@@ -762,8 +758,28 @@ class Gun(DelegatesPropellant):
             p_line.append(PressureProbePoint(l + self.l_c, ps))
             p_trace.append(PressureTraceEntry(dtag, temp, p_line))
 
-            table_entry = GunTableEntry(dtag, t, l, psi, v, pb, p, ps, temp)
-            error_entry = GunErrorEntry("L", t_err, l_err, psi_err, v_err, None, p_err, None, None)
+            table_entry = GunTableEntry(
+                tag=dtag,
+                time=t,
+                travel=l,
+                burnup=psi,
+                velocity=v,
+                breech_pressure=pb,
+                avg_pressure=p,
+                shot_pressure=ps,
+                temperature=temp,
+            )
+            error_entry = GunErrorEntry(
+                tag="L",
+                time=t_err,
+                travel=l_err,
+                burnup=psi_err,
+                velocity=v_err,
+                breech_pressure=None,
+                avg_pressure=p_err,
+                shot_pressure=None,
+                temperature=None,
+            )
             data.append(table_entry)
             error.append(error_entry)
 
@@ -792,7 +808,17 @@ class Gun(DelegatesPropellant):
             p_line.append(PressureProbePoint(l + self.l_c, ps))
             p_trace.append(PressureTraceEntry(COMPUTE, temp, p_line))
 
-            table_entry = GunTableEntry(COMPUTE, t, l, psi, v, pb, p, ps, temp)
+            table_entry = GunTableEntry(
+                tag=COMPUTE,
+                time=t,
+                travel=l,
+                burnup=psi,
+                velocity=v,
+                breech_pressure=pb,
+                avg_pressure=p,
+                shot_pressure=ps,
+                temperature=temp,
+            )
             error_entry = GunErrorEntry("L")
             data.append(table_entry)
             error.append(error_entry)
@@ -898,11 +924,11 @@ class Gun(DelegatesPropellant):
         )
         p_probes = [0] * len(x_probes)
 
-        for gunTableEntry in gun_result.table_data:
-            l = gunTableEntry.travel
-            v = gunTableEntry.velocity
-            p_s = gunTableEntry.shot_pressure
-            p_b = gunTableEntry.breech_pressure
+        for gun_table_entry in gun_result.table_data:
+            l = gun_table_entry.travel
+            v = gun_table_entry.velocity
+            p_s = gun_table_entry.shot_pressure
+            p_b = gun_table_entry.breech_pressure
             for i, x in enumerate(x_probes):
                 if (x - l_c) <= l:
                     p_x, _ = self.to_px_u(l, p_s, p_b, v, x)
@@ -997,7 +1023,16 @@ class Gun(DelegatesPropellant):
         logger.info("conducted structural calculation.")
 
     @staticmethod
-    def vrho_k(x_s, p_s, s_s, sigma, tol, k_max=None, k_min=None, index=0, p_ref=None):
+    def vrho_k(
+        x_s: list[float],  # probe location
+        p_s: list[float],  # probe pressure
+        s_s: list[float],  # probe cross-section area
+        sigma: float,  # yield strength
+        tol: float,  # tolerance
+        k_max: float = None,  # maximum autofrettage
+        k_min: float = None,  # minimum autofrettage
+        p_ref=None,  # manually specify maximum pressure
+    ):
         def f(m):
             rho_s = []
             v = 0
@@ -1086,19 +1121,19 @@ class Gun(DelegatesPropellant):
             to finding the minimum auto-frettaged mass.
             """
             try:
-                m_k, _ = dekker(lambda m: f(m)[1][index] if m != m_opt else -1, m_min, m_opt, y=k_max, y_rel_tol=tol)
+                m_k, _ = dekker(lambda m: f(m)[1][0] if m != m_opt else -1, m_min, m_opt, y=k_max, y_rel_tol=tol)
                 m_min = max(m_k, m_min)
             except ValueError:
                 pass
 
         if k_min is not None:
             try:
-                m_k, _ = dekker(lambda m: f(m)[1][index] if m != m_opt else -1, m_min, m_opt, y=k_min, y_rel_tol=tol)
+                m_k, _ = dekker(lambda m: f(m)[1][0] if m != m_opt else -1, m_min, m_opt, y=k_min, y_rel_tol=tol)
                 m_max = min(m_k, m_max)
             except ValueError:
                 pass
 
-        m_best, _ = gss(lambda m: f(m)[0], m_min, m_max, y_rel_tol=tol, findMin=True)
+        m_best, _ = gss(lambda m: f(m)[0], m_min, m_max, y_rel_tol=tol, find_min=True)
         return f(m_best)
 
     @staticmethod
@@ -1128,8 +1163,6 @@ if __name__ == "__main__":
     """standard 7 hole cylinder has d_0=e_1, hole dia = 0.5 * arc width
     d_0 = 4*2e_1+3*d_0 = 11 * e_1
     """
-    from tabulate import tabulate
-
     compositions = Composition.read_file("prop/propellants.csv")
 
     M17 = compositions["M17"]
@@ -1155,10 +1188,3 @@ if __name__ == "__main__":
     )
 
     result = test.integrate(0, 1e-3, dom=DOMAIN_TIME, sol=SOL_LAGRANGE)
-
-    print(
-        tabulate(
-            result.get_raw_table_data(),
-            headers=("tag", "t", "l", "phi", "v", "pb", "p", "ps", "T", "eta"),
-        )
-    )

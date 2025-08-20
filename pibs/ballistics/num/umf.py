@@ -54,10 +54,18 @@ invphi2 = (3 - math.sqrt(5)) / 2  # 1 / phi^2
 
 FLOAT_MIN = 1e-16
 
-# fmt: off
+
 def gss(
-    f, a, b, x_tol=FLOAT_MIN, y_rel_tol=0, y_abs_tol=FLOAT_MIN,
-    findMin=True, it=1e4, debug=False, f_report=None,
+    f,
+    a,
+    b,
+    x_tol=FLOAT_MIN,
+    y_rel_tol=0,
+    y_abs_tol=FLOAT_MIN,
+    find_min=True,
+    it=1e4,
+    debug=False,
+    f_report=None,
 ):
     """Golden-section search. improved from the example
     given on wikipedia. Reuse half the evaluations.
@@ -68,8 +76,6 @@ def gss(
 
     a----c--d----b
     """
-    # fmt: on
-
     record = []
 
     (a, b) = (min(a, b), max(a, b))
@@ -87,7 +93,7 @@ def gss(
     else:
         n = math.inf
     n = min(n, it)
-    n = max(n, 1) # at least one iteration should be ran
+    n = max(n, 1)  # at least one iteration should be ran
 
     c = a + invphi2 * h
     d = a + invphi * h
@@ -99,7 +105,7 @@ def gss(
         if f_report is not None:
             f_report(k / n)
 
-        if (yc < yd and findMin) or (yc > yd and not findMin):
+        if (yc < yd and find_min) or (yc > yd and not find_min):
             # a---c---d  b
             b = d
             d = c
@@ -149,7 +155,7 @@ def gss(
         for line in record:
             print("{:>4}{:>24}{:>24}".format(*line))
 
-    if (yc < yd and findMin) or (yc > yd and not findMin):
+    if (yc < yd and find_min) or (yc > yd and not find_min):
         return a, d
     else:
         return c, b
