@@ -256,6 +256,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.root.bind("<Control-o>", lambda *_: self.load_gun())
         self.root.bind("<Control-O>", lambda *_: self.load_gun())
 
+        design_menu.add_command(
+            label=self.get_loc_str("loadPresetLabel"), command=lambda: self.load_gun(initialdir=resolvepath("examples"))
+        )
+
         design_menu.add_command(label=self.get_loc_str("resetLabel"), command=self.on_reset, accelerator="Ctrl+N")
         self.root.bind("<Control-N>", lambda *_: self.on_reset())
         self.root.bind("<Control-n>", lambda *_: self.on_reset())
@@ -1456,9 +1460,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         except Exception as e:
             messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
 
-    def load_gun(self):
+    def load_gun(self, initialdir: str = None):
         file_name = filedialog.askopenfilename(
-            title=self.get_loc_str("loadLabel"), filetypes=(("JSON File", "*.json"),), defaultextension=".json"
+            title=self.get_loc_str("loadLabel"),
+            filetypes=(("JSON File", "*.json"),),
+            defaultextension=".json",
+            initialdir=initialdir,
         )
         if file_name == "":
             messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
@@ -1560,17 +1567,16 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.design_menu.entryconfig(0, label=self.get_loc_str("saveLabel"))
         self.design_menu.entryconfig(1, label=self.get_loc_str("loadLabel"))
-        self.design_menu.entryconfig(2, label=self.get_loc_str("resetLabel"))
-        self.design_menu.entryconfig(3, label=self.get_loc_str("calcLabel"))
-
-        self.design_menu.entryconfig(4, label=self.get_loc_str("guideLabel"))
+        self.design_menu.entryconfig(2, label=self.get_loc_str("loadPresetLabel"))
+        self.design_menu.entryconfig(3, label=self.get_loc_str("resetLabel"))
+        self.design_menu.entryconfig(4, label=self.get_loc_str("calcLabel"))
+        self.design_menu.entryconfig(5, label=self.get_loc_str("guideLabel"))
 
         self.data_menu.entryconfig(0, label=self.get_loc_str("exportMain"))
         self.data_menu.entryconfig(1, label=self.get_loc_str("exportAux"))
         self.data_menu.entryconfig(2, label=self.get_loc_str("exportGeom"))
         self.data_menu.entryconfig(3, label=self.get_loc_str("exportGuide"))
         self.data_menu.entryconfig(4, label=self.get_loc_str("exportLabel"))
-
         self.data_menu.entryconfig(5, label=self.get_loc_str("reloadPropellant"))
 
         self.debug_menu.entryconfig(0, label=self.get_loc_str("enableLabel"))
@@ -2075,7 +2081,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
             h_trace = self.gun_result.outline
 
             if h_trace is not None and self.trace_hull.get():
-                x_hull, r_in, r_out = zip(*[trace.get_raw_line() for trace in h_trace])
+
+                x_hull, r_in, r_out = zip(*[(entry.x, entry.r_in, entry.r_ex) for entry in h_trace])
                 r_in, r_out = [r * 1e3 for r in r_in], [r * 1e3 for r in r_out]
 
                 self.aux_ax_h.plot(x_hull, r_in, c="tab:blue")
@@ -2207,61 +2214,57 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
     def update_table(self):
         self.tv.delete(*self.tv.get_children())
-        if self.gun is None:
+        if not self.gun:
             return
 
-        table_data, error_data = [], []
-        try:
-            gun_type = self.kwargs["typ"]
-            if gun_type == CONVENTIONAL:
-                table_data, error_data = (
-                    [
-                        (
-                            entry.tag,
-                            entry.time,
-                            entry.travel,
-                            entry.burnup,
-                            entry.velocity,
-                            entry.breech_pressure,
-                            entry.avg_pressure,
-                            entry.shot_pressure,
-                            entry.temperature,
-                        )
-                        for entry in data
-                    ]
-                    for data in (self.gun_result.table_data, self.gun_result.error_data)
-                )
-                use_sn = False, False, False, True, False, False, False, False, True
-                units = None, "s", "m", None, "m/s", "Pa", "Pa", "Pa", "K"
+        gun_type = self.kwargs["typ"]
+        table_data, error_data, use_sn, units = [], [], (), ()
 
-            elif gun_type == RECOILLESS:
-                table_data, error_data = (
-                    [
-                        (
-                            entry.tag,
-                            entry.time,
-                            entry.travel,
-                            entry.burnup,
-                            entry.outflow_fraction,
-                            entry.velocity,
-                            entry.outflow_velocity,
-                            entry.breech_pressure,
-                            entry.stag_pressure,
-                            entry.avg_pressure,
-                            entry.shot_pressure,
-                            entry.temperature,
-                        )
-                        for entry in data
-                    ]
-                    for data in (self.gun_result.table_data, self.gun_result.error_data)
-                )
+        if gun_type == CONVENTIONAL:
+            table_data, error_data = (
+                [
+                    (
+                        entry.tag,
+                        entry.time,
+                        entry.travel,
+                        entry.burnup,
+                        entry.velocity,
+                        entry.breech_pressure,
+                        entry.avg_pressure,
+                        entry.shot_pressure,
+                        entry.temperature,
+                    )
+                    for entry in data
+                ]
+                for data in (self.gun_result.table_data, self.gun_result.error_data)
+            )
+            use_sn = False, False, False, True, False, False, False, False, True
+            units = None, "s", "m", None, "m/s", "Pa", "Pa", "Pa", "K"
 
-                use_sn = False, False, False, True, True, False, False, False, False, False, False, True
-                units = None, "s", "m", None, None, "m/s", "m/s", "Pa", "Pa", "Pa", "Pa", "K"
+        elif gun_type == RECOILLESS:
+            table_data, error_data = (
+                [
+                    (
+                        entry.tag,
+                        entry.time,
+                        entry.travel,
+                        entry.burnup,
+                        entry.outflow_fraction,
+                        entry.velocity,
+                        entry.outflow_velocity,
+                        entry.breech_pressure,
+                        entry.stag_pressure,
+                        entry.avg_pressure,
+                        entry.shot_pressure,
+                        entry.temperature,
+                    )
+                    for entry in data
+                ]
+                for data in (self.gun_result.table_data, self.gun_result.error_data)
+            )
 
-            # table_data, error_data = self.gun_result.get_raw_table_data(), self.gun_result.get_raw_error_data()
-        except AttributeError as e:
-            self.handle_errors(e)
+            use_sn = False, False, False, True, True, False, False, False, False, False, False, True
+            units = None, "s", "m", None, None, "m/s", "m/s", "Pa", "Pa", "Pa", "Pa", "K"
 
         # translate the tags.
         loc_table_data = []

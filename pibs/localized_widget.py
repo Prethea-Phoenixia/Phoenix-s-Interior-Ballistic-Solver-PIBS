@@ -485,7 +485,7 @@ class LocLabelFrame(ttk.LabelFrame, Localizable):
             self.loc_tooltip_var = None
 
         self.tooltip_loc_key = tooltip_loc_key
-        if all_localized:
+        if isinstance(all_localized, list):
             all_localized.append(self)
 
     def localize(self):

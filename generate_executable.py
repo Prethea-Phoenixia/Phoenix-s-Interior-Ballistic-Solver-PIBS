@@ -23,6 +23,8 @@ if __name__ == "__main__":
         "pibs/ballistics/resource;ballistics/resource/",
         "--add-data",
         "pibs/ui;ui/",
+        "--add-data",
+        "pibs/examples;examples/",
         "--exclude-module",
         "pibs.ballistics.therm",
     ]

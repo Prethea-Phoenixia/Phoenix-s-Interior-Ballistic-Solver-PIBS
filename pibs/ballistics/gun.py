@@ -633,7 +633,7 @@ class Gun(DelegatesPropellant):
 
             t_bar = 0.5 * (t_bar_1 + t_bar_2)
 
-            (_, (z, l_bar, v_bar), (z_err, l_bar_err, v_bar_err)) = rkf78(
+            _, (z, l_bar, v_bar), (z_err, l_bar_err, v_bar_err) = rkf78(
                 self.ode_t, (z_0, 0, 0), 0, t_bar, rel_tol=tol, abs_tol=tol**2
             )
             t_bar_err = 0.5 * t_bar_tol
@@ -1027,81 +1027,82 @@ class Gun(DelegatesPropellant):
         x_s: list[float],  # probe location
         p_s: list[float],  # probe pressure
         s_s: list[float],  # probe cross-section area
-        sigma: float,  # yield strength
+        sigma_yield: float,  # yield strength
         tol: float,  # tolerance
         k_max: float = None,  # maximum autofrettage
         k_min: float = None,  # minimum autofrettage
         p_ref=None,  # manually specify maximum pressure
     ):
-        def f(m):
-            rho_s = []
-            v = 0
-            for p in p_s:
-                sigma_max = Gun.sigma_vm(m, p, m, sigma)
-                """
-                the limit as k -> +inf for the stress is:
-
-                lim sigma_tr =
-                 k-> +inf
-                  sigma * [1 - (1 + 2 ln(m))/m**2 ] + 2p/m**2
-                """
-                if sigma > sigma_max:
-                    rho = m
-                else:
-                    rho, _ = secant(
-                        lambda k: Gun.sigma_vm(k, p, m, sigma),
-                        m + tol,
-                        m + 2 * tol,
-                        y=sigma,
-                        x_min=m,
-                        y_rel_tol=tol,
-                    )
-
-                rho_s.append(rho)
-
-            for i in range(len(x_s) - 1):
-                x_0, x_1 = x_s[i], x_s[i + 1]
-                s_0, s_1 = s_s[i], s_s[i + 1]
-                rho_0, rho_1 = rho_s[i], rho_s[i + 1]
-                dv = 0.5 * ((rho_0**2 - 1) * s_0 + (rho_1**2 - 1) * s_1) * (x_1 - x_0)
-                v += dv
-            return v, rho_s
 
         if p_ref is not None:
             p_max = p_ref
         else:
             p_max = max(p_s)
 
-        def sigma_min(m):
-            return (sigma * (1 - (1 + 2 * log(m)) / m**2) + 2 * p_max / m**2) * (3**0.5 * 0.5)
-
-        m_opt = exp(max(p_s) / sigma * 3**0.5 * 0.5)
         # optimal autofrettage for this pressure
+        m_opt = exp(p_max / sigma_yield * 3**0.5 * 0.5)
 
-        if sigma_min(m_opt) > sigma:
+        def sigma_min(m):
+            return (sigma_yield * (1 - (1 + 2 * log(m)) / m**2) + 2 * p_max / m**2) * (3**0.5 * 0.5)
+
+        if sigma_min(m_opt) > sigma_yield:
             """if the minimum junction stress at the optimal autofrettage
             fraction cannot be achieved down to material yield even as
             the thickness goes to infinity, raise an error and abort
             calculation"""
             raise ValueError(
                 "Plastic-elastic junction stress exceeds material "
-                + f"yield ({sigma * 1e-6:.3f} MPa) for autofrettaged construction."
+                + f"yield ({sigma_yield * 1e-6:.3f} MPa) for autofrettaged construction."
             )
 
-        elif sigma_min(1) > sigma:
+        elif sigma_min(1) > sigma_yield:
             """if the minimum junction stress at an autofrettage fraction
             of 1 exceeds material yield, implies a certain amount of
             autofrettaging is required to contain the pressure"""
-            m_min, _ = dekker(sigma_min, 1, m_opt, y=sigma, y_rel_tol=tol)
+            m_min, _ = dekker(sigma_min, 1, m_opt, y=sigma_yield, y_rel_tol=tol)
 
             """safety, fudge code to ensure a valid minimum autofrettage
             fraction is found.
             """
-            while sigma_min(m_min) > sigma:
+            while sigma_min(m_min) > sigma_yield:
                 m_min *= 1 + tol**2
 
         else:
             m_min = 1 + tol**2
+
+        def f(m: float):
+            rhos = []
+            v = 0
+            for p in p_s:
+                sigma_max = Gun.sigma_von_mises(m, p, m, sigma_yield)
+                """
+                the limit as k -> +inf for the stress is:
+
+                lim sigma_tresca =
+                 k-> +inf
+                  sigma * [1 - (1 + 2 ln(m))/m**2 ] + 2p/m**2
+                """
+                if sigma_max < sigma_yield:
+                    rho = m
+                else:
+                    rho, _ = secant(
+                        lambda k: Gun.sigma_von_mises(k, p, m, sigma_yield),
+                        m,
+                        m * 2,
+                        y=sigma_yield,
+                        x_min=m,
+                        y_rel_tol=tol,
+                    )
+
+                rhos.append(rho)
+
+            for i in range(len(x_s) - 1):
+                x_0, x_1 = x_s[i], x_s[i + 1]
+                s_0, s_1 = s_s[i], s_s[i + 1]
+                rho_0, rho_1 = rhos[i], rhos[i + 1]
+                dv = 0.5 * ((rho_0**2 - 1) * s_0 + (rho_1**2 - 1) * s_1) * (x_1 - x_0)
+                v += dv
+            return v, rhos
 
         m_max = m_opt
         if k_max is not None:
@@ -1137,7 +1138,7 @@ class Gun(DelegatesPropellant):
         return f(m_best)
 
     @staticmethod
-    def sigma_vm(k, p, m, sigma):
+    def sigma_von_mises(k, p, m, sigma):
         """
         k   : probing point, radius ratio
         p   : working pressure (from within)
