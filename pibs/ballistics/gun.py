@@ -113,7 +113,7 @@ class Gun(DelegatesPropellant):
         caliber,
         shot_mass: float,
         propellant: Propellant,
-        grain_size: float,
+        web: float,  # 2e_1
         charge_mass: float,
         chamber_volume: float,
         start_pressure: float,
@@ -132,7 +132,7 @@ class Gun(DelegatesPropellant):
                 caliber <= 0,
                 shot_mass <= 0,
                 charge_mass <= 0,
-                grain_size <= 0,
+                web <= 0,
                 chamber_volume <= 0,
                 length_gun <= 0,
                 chambrage < 1,
@@ -148,7 +148,7 @@ class Gun(DelegatesPropellant):
 
         self.caliber = caliber
 
-        self.e_1 = 0.5 * grain_size
+        self.e_1 = 0.5 * web
         self.s = (0.5 * caliber) ** 2 * pi
         self.m = shot_mass
         self.omega = charge_mass
@@ -1179,7 +1179,7 @@ if __name__ == "__main__":
         caliber=0.05,
         shot_mass=1.0,
         propellant=M17SHC,
-        grain_size=6.66e-3,
+        web=6.66e-3,
         charge_mass=cm,
         chamber_volume=cm / M17SHC.rho_p / lf,
         start_pressure=30e6,

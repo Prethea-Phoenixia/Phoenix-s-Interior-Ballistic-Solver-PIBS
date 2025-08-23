@@ -345,7 +345,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
             dp_bar_probe = _f_p_e_1(probe_web)[0]
 
         e_1, e_1_2 = dekker(
-            lambda web: _f_p_e_1(web)[0], probe_web, 0.5 * probe_web, y_abs_tol=p_bar_d * tol
+            lambda x: _f_p_e_1(x)[0], probe_web, 0.5 * probe_web, y_abs_tol=p_bar_d * tol
         )  # this is the e_1 that satisifies the pressure specification.
 
         """

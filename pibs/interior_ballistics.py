@@ -252,9 +252,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.root.bind("<Control-s>", lambda *_: self.save())
         self.root.bind("<Control-S>", lambda *_: self.save())
 
-        design_menu.add_command(label=self.get_loc_str("loadLabel"), command=self.load_gun, accelerator="Ctrl+O")
-        self.root.bind("<Control-o>", lambda *_: self.load_gun())
-        self.root.bind("<Control-O>", lambda *_: self.load_gun())
+        design_menu.add_command(label=self.get_loc_str("loadLabel"), command=self.load_gun, accelerator="Ctrl+L")
+        self.root.bind("<Control-l>", lambda *_: self.load_gun())
+        self.root.bind("<Control-L>", lambda *_: self.load_gun())
 
         design_menu.add_command(
             label=self.get_loc_str("loadPresetLabel"), command=lambda: self.load_gun(initialdir=resolvepath("examples"))
@@ -1656,7 +1656,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             "caliber": caliber,
             "shot_mass": float(self.sht_kg.get()),
             "propellant": self.prop,
-            "grain_size": float(self.web_mm.get()) * 1e-3,
+            "web": float(self.web_mm.get()) * 1e-3,
             "charge_mass": charge_mass,
             "charge_mass_ratio": float(self.chg_kg.get()) / float(self.sht_kg.get()),
             "chamber_volume": chamber_volume,
@@ -1769,7 +1769,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         if gun:
             if constrain:
-                webmm = round_sig(self.kwargs["grain_size"] * 1e3, n=sigfig)
+                webmm = round_sig(self.kwargs["web"] * 1e3, n=sigfig)
                 self.web_mm.set(webmm)
 
                 if not lock:
@@ -2678,7 +2678,7 @@ def calculate(job_queue, log_queue, kwargs):
                 else:
                     raise ValueError("unknown gun type")
 
-            kwargs.update({"grain_size": 2 * e_1})
+            kwargs.update({"web": 2 * e_1})
 
             if not lock:
                 kwargs.update({"length_gun": l_g})

@@ -68,7 +68,7 @@ class Recoilless(DelegatesPropellant):
         caliber: float,
         shot_mass: float,
         propellant: Propellant,
-        grain_size: float,
+        web: float,  # 2e_1
         charge_mass: float,
         chamber_volume: float,
         start_pressure: float,
@@ -89,7 +89,7 @@ class Recoilless(DelegatesPropellant):
                 caliber <= 0,
                 shot_mass <= 0,
                 charge_mass <= 0,
-                grain_size <= 0,
+                web <= 0,
                 chamber_volume <= 0,
                 length_gun <= 0,
                 nozzle_expansion < 1,
@@ -106,7 +106,7 @@ class Recoilless(DelegatesPropellant):
         self.propellant = propellant
         self.caliber = caliber
 
-        e_1 = 0.5 * grain_size
+        e_1 = 0.5 * web
         self.s = (caliber / 2) ** 2 * pi
         self.m = shot_mass
         self.omega = charge_mass
@@ -1005,77 +1005,77 @@ class Recoilless(DelegatesPropellant):
         for i in range(len(p_probes)):
             p_probes[i] *= self.ssf
 
-        """
-        subscript k denote the end of the chamber
-        subscript b denote the throat of nozzle
-        subscript a denote the nozzle base.
-
-        beta is the half angle of the constriction section
-        alpha is the half angle of the expansion section
-        """
-        beta = 45
-        l_b = (r_b - r_t) / tan(beta * pi / 180)
-        alpha = 15
-        l_a = (r_n - r_t) / tan(alpha * pi / 180)
-
-        p_entry = p_probes[0]
-
-        neg_x_probes = (
-            [-l_b - l_a + l_a * i / step for i in range(step)]
-            + [-l_b - tol * l_a]
-            + [-l_b + l_b * i / step for i in range(step)]
-            + [0]
-        )
-        neg_p_probes = []
-        neg_s_probes = []
-
-        r_probes = []
-
-        for x in neg_x_probes:
-            if x < -l_b:
-                k = (x + l_b + l_a) / l_a
-                r = k * r_t + (1 - k) * r_n
-                p = Recoilless.get_pr(gamma, (r / r_t) ** 2, tol)[1] * p_entry
-
-            else:
-                k = (x + l_b) / l_b
-                r = k * r_b + (1 - k) * r_t
-                p = Recoilless.get_pr(gamma, (r / r_t) ** 2, tol)[0] * p_entry
-
-            if p > 3**-0.5 * sigma:
-                raise ValueError(
-                    f"Limit to conventional construction ({sigma * 1e-6:.3f} MPa)" + " exceeded in nozzle."
-                )
-
-            r_probes.append(r)
-            neg_p_probes.append(p)
-            neg_s_probes.append(pi * r**2)
-
-        if self.is_af:
-            v_n, rho_n = Gun.vrho_k(neg_x_probes, neg_p_probes, neg_s_probes, sigma, tol)
-
-        else:
-            v_n, rho_n = 0, []
-
-            for p in neg_p_probes:
-                y = p / sigma
-                rho = ((1 + y * (4 - 3 * y**2) ** 0.5) / (1 - 3 * y**2)) ** 0.5
-                rho_n.append(rho)
-
-            for i in range(len(neg_x_probes) - 1):
-                x_0, x_1 = neg_x_probes[i], neg_x_probes[i + 1]
-                h = x_1 - x_0
-                s_0, s_1 = neg_s_probes[i], neg_s_probes[i + 1]
-                rho_0, rho_1 = rho_n[i], rho_n[i + 1]
-                dv = 0.5 * ((rho_0**2 - 1) * s_0 + (rho_1**2 - 1) * s_1) * h
-                v_n += dv
+        # """
+        # subscript k denote the end of the chamber
+        # subscript b denote the throat of nozzle
+        # subscript a denote the nozzle base.
+        #
+        # beta is the half angle of the constriction section
+        # alpha is the half angle of the expansion section
+        # """
+        # beta = 45
+        # l_b = (r_b - r_t) / tan(beta * pi / 180)
+        # alpha = 15
+        # l_a = (r_n - r_t) / tan(alpha * pi / 180)
+        #
+        # p_entry = p_probes[0]
+        #
+        # neg_x_probes = (
+        #     [-l_b - l_a + l_a * i / step for i in range(step)]
+        #     + [-l_b - tol * l_a]
+        #     + [-l_b + l_b * i / step for i in range(step)]
+        #     + [0]
+        # )
+        # neg_p_probes = []
+        # neg_s_probes = []
+        #
+        # r_probes = []
+        #
+        # for x in neg_x_probes:
+        #     if x < -l_b:
+        #         k = (x + l_b + l_a) / l_a
+        #         r = k * r_t + (1 - k) * r_n
+        #         p = Recoilless.get_pr(gamma, (r / r_t) ** 2, tol)[1] * p_entry
+        #
+        #     else:
+        #         k = (x + l_b) / l_b
+        #         r = k * r_b + (1 - k) * r_t
+        #         p = Recoilless.get_pr(gamma, (r / r_t) ** 2, tol)[0] * p_entry
+        #
+        #     if p > 3**-0.5 * sigma:
+        #         raise ValueError(
+        #             f"Limit to conventional construction ({sigma * 1e-6:.3f} MPa)" + " exceeded in nozzle."
+        #         )
+        #
+        #     r_probes.append(r)
+        #     neg_p_probes.append(p)
+        #     neg_s_probes.append(pi * r**2)
+        #
+        # if self.is_af:
+        #     v_n, rho_n = Gun.vrho_k(neg_x_probes, neg_p_probes, neg_s_probes, sigma, tol)
+        #
+        # else:
+        #     v_n, rho_n = 0, []
+        #
+        #     for p in neg_p_probes:
+        #         y = p / sigma
+        #         rho = ((1 + y * (4 - 3 * y**2) ** 0.5) / (1 - 3 * y**2)) ** 0.5
+        #         rho_n.append(rho)
+        #
+        #     for i in range(len(neg_x_probes) - 1):
+        #         x_0, x_1 = neg_x_probes[i], neg_x_probes[i + 1]
+        #         h = x_1 - x_0
+        #         s_0, s_1 = neg_s_probes[i], neg_s_probes[i + 1]
+        #         rho_0, rho_1 = rho_n[i], rho_n[i + 1]
+        #         dv = 0.5 * ((rho_0**2 - 1) * s_0 + (rho_1**2 - 1) * s_1) * h
+        #         v_n += dv
 
         hull = []
+        #
+        # for x, r, rho in zip(neg_x_probes, r_probes, rho_n):
+        #     hull.append(OutlineEntry(x, r, r * rho))
 
-        for x, r, rho in zip(neg_x_probes, r_probes, rho_n):
-            hull.append(OutlineEntry(x, r, r * rho))
-
-        nozzle_mass = v_n * self.material.rho
+        # nozzle_mass = v_n * self.material.rho
 
         rho_probes = []
         v = 0
@@ -1091,7 +1091,9 @@ class Recoilless(DelegatesPropellant):
             i = step + 1
             x_c, p_c = x_probes[:i], p_probes[:i]  # c for chamber
             x_b, p_b = x_probes[i:], p_probes[i:]  # b for barrel
-            v_c, rho_c = Gun.vrho_k(x_c, p_c, [s * chi_k for _ in x_c], sigma, tol, k_min=rho_n[-1])  # c for chamber
+            # v_c, rho_c = Gun.vrho_k(x_c, p_c, [s * chi_k for _ in x_c], sigma, tol, k_min=rho_n[-1])  # c for chamber
+
+            v_c, rho_c = Gun.vrho_k(x_c, p_c, [s * chi_k for _ in x_c], sigma, tol)
             v_b, rho_b = Gun.vrho_k(
                 x_b, p_b, [s for _ in x_b], sigma, tol, k_max=rho_c[-1] * chi_k**0.5, p_ref=max(p_c)
             )  # b for bore
@@ -1149,7 +1151,7 @@ class Recoilless(DelegatesPropellant):
                 hull.append(OutlineEntry(x, r_s, rho * r_s))
 
         recoilless_result.outline = hull
-        recoilless_result.tubeMass = tube_mass + nozzle_mass
+        recoilless_result.tubeMass = tube_mass  # + nozzle_mass
 
         logger.info("conducted structural calculation.")
 
@@ -1212,7 +1214,7 @@ if __name__ == "__main__":
         caliber=0.082,
         shot_mass=2,
         propellant=M1C,
-        grain_size=4e-4,
+        web=4e-4,
         charge_mass=0.3,
         chamber_volume=0.3 / M1C.rho_p / lf,
         start_pressure=10e6,

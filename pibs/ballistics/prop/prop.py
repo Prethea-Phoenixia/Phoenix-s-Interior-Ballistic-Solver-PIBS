@@ -12,10 +12,10 @@ from math import pi
 
 
 class Geometry(ABC):
-    all_geometries = set()
+    all_geometries = list()
 
     def __init__(self):
-        Geometry.all_geometries.add(self)
+        Geometry.all_geometries.append(self)
 
     @abstractmethod
     def get_form_function_coefficients(self, r1: float, r2: float) -> tuple[float, float, float, float, float, float]:
@@ -37,6 +37,49 @@ class Geometry(ABC):
 
 class ABCEnum(ABCMeta, EnumType):
     pass
+
+
+class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
+    """table 1-3 from ref[1] page 23"""
+
+    def __init__(self, desc: str, alpha: int, beta: int):
+        super().__init__()
+        self.desc = desc
+        self.alpha = alpha
+        self.beta = beta
+
+    def get_form_function_coefficients(self, r1: float, r2: float) -> tuple[float, float, float, float, float, float]:
+        """
+        alpha = e1 / b
+        beta = e1 / c
+        """
+
+        if self.alpha >= 0:
+            alpha = self.alpha
+        else:
+            alpha = 1.0 / r1
+
+        if self.beta >= 0:
+            beta = self.beta
+        else:
+            beta = 1.0 / r2
+
+        if (alpha != 0 and not (1.0 >= alpha >= beta)) or (alpha == 0 and not (1.0 >= beta)):
+            raise ValueError("Specified geometry is impossible.")
+
+        chi = 1 + alpha + beta
+        labda = -(alpha + beta + alpha * beta) / (1 + alpha + beta)
+        mu = alpha * beta / (1.0 + alpha + beta)
+
+        return chi, labda, mu, 0.0, 0.0, 1.0
+
+    def __str__(self):
+        return self.desc
+
+    SPHERE = ("SPHERE", 1, 1)  # 立方体, alpha = beta = 1
+    CYLINDER = ("CYLINDER", 1, -1)  # 方棍, alpha = 1, 1 > beta
+    TUBE = ("TUBE", 0, -1)  # 管状, alpha = 0, 1 > beta
+    STRIP = ("STRIP", -1, -1)  # 带状, 1 > alpha >= beta
 
 
 class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
@@ -67,9 +110,9 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
         Parameters:
         -----------
         r1: float
-            perforation diameter/web
+            perforation diameter/web. d_0 / (2e_1)
         r2: float
-            length/width of grain.
+            length/diameter (width) of grain.
         """
         web = 1
         e_1, d_0 = web / 2, web * r1
@@ -105,49 +148,6 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
     NINETEEN_PERF_HEXAGON = ("NINETEEN_PERF_HEXAGON", 18 / pi, 19, 18 * (3 * 3**0.5 - 1) / pi, 0.1864, 19, (1, 2), (1, 2))
     NINETEEN_PERF_ROUNDED_HEXAGON = ("NINETEEN_PERF_ROUNDED_HEXAGON", 3**0.5 + 12 / pi, 19, 3 - 3**0.5 + 12 * (4 * 3**0.5 - 1) / pi, 0.1977, 19, (1, 2), (1, 2))
     # fmt: on
-
-
-class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
-    """table 1-3 from ref[1] page 23"""
-
-    def __init__(self, desc: str, alpha: int, beta: int):
-        super().__init__()
-        self.desc = desc
-        self.alpha = alpha
-        self.beta = beta
-
-    def get_form_function_coefficients(self, r1: float, r2: float) -> tuple[float, float, float, float, float, float]:
-        """
-        alpha = e1 / b
-        beta = e1 / c
-        """
-
-        if self.alpha > 0:
-            alpha = self.alpha
-        else:
-            alpha = 1 / r1
-
-        if self.beta > 0:
-            beta = self.beta
-        else:
-            beta = 1 / r2
-
-        if not ((alpha != 0 and 1 >= alpha >= beta) or (alpha == 0 and 1 >= beta)):
-            raise ValueError("Specified geometry is impossible.")
-
-        chi = 1 + alpha + beta
-        labda = -(alpha + beta + alpha * beta) / (1 + alpha + beta)
-        mu = alpha * beta / (1 + alpha + beta)
-
-        return chi, labda, mu, 0, 0, 1
-
-    def __str__(self):
-        return self.desc
-
-    SPHERE = ("SPHERE", 1, 1)  # 立方体, alpha = beta = 1
-    CYLINDER = ("CYLINDER", 1, -1)  # 方棍, alpha = 1, 1 > beta
-    TUBE = ("TUBE", 0, -1)  # 管状, alpha = 0, 1 > beta
-    STRIP = ("STRIP", -1, -1)  # 带状, 1 > alpha >= beta
 
 
 class Composition:
@@ -324,7 +324,7 @@ class Propellant:
         if z_i <= 1.0:
             return chi * (1 + 2 * labda * z_i + 3 * mu * z_i**2)
         elif z_i <= z_b:
-            return 1 + 2 * labda_s * z_i
+            return chi_s * (1 + 2 * labda_s * z_i)
         else:
             return 0.0
 
@@ -341,6 +341,7 @@ class Propellant:
     def f_sigma_z(self, z: float) -> float:
         z_main, z_aux = z, z / self.web_ratio
         sigma_main, sigma_aux = self.f_sigma(z_main, self.main_params), self.f_sigma(z_aux, self.aux_params)
+
         return sigma_main / (self.mass_ratio + 1) + sigma_aux * self.mass_ratio / (self.mass_ratio + 1)
 
     def f_psi_z(self, z: float) -> float:
