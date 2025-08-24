@@ -2146,7 +2146,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             if geom == SimpleGeometry.SPHERE:
                 r1.remove()
                 r2.remove()
-            elif geom == SimpleGeometry.CYLINDER:
+            elif geom == SimpleGeometry.CYLINDER or geom == SimpleGeometry.TUBE:
                 r1.remove()
                 r2.restore()
             else:
@@ -2173,16 +2173,19 @@ class InteriorBallisticsFrame(LocalizedFrame):
             elif geom == SimpleGeometry.CYLINDER:
                 if web:
                     web.localize("diamLabel", "diaText")
-
-                # r1.reLocalize("", "")
                 r2.localize("ltdLabel", "cylLRText")
+
+            elif geom == SimpleGeometry.TUBE:
+                if web:
+                    web.localize("arcLabel", "arcText")
+                r2.localize("ltarcLabel", "ltarcText")
 
             else:
                 if web:
                     web.localize("athLabel", "arcText")
 
+                r1.localize("pdtarcLabel", "pdtarcText")
                 r2.localize("ltdLabel", "perfLRText")
-                r1.localize("pdtalLabel", "pDiaRText")
 
         self.callback()
 

@@ -91,11 +91,8 @@ class Loc12Disp(LocalizableWidget):
         ttk.Label(parent, text=unit_text).grid(
             row=row + 1, column=col + (0 if reverse else 1), sticky="nsew", padx=2, pady=2
         )
-        if tooltip_loc_key:
-            self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
-            create_tool_tip(lb, self.loc_tooltip_var, font=font)
-        else:
-            self.loc_tooltip_var = None
+        self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
+        create_tool_tip(lb, self.loc_tooltip_var, font=font)
 
         self.label_loc_key = label_loc_key
         self.label_widget = lb
@@ -111,10 +108,10 @@ class Loc12Disp(LocalizableWidget):
         if new_loc_key:
             self.label_loc_key = new_loc_key
         self.label_widget.config(text=self.loc_func(self.label_loc_key))
-        if self.loc_tooltip_var is not None:
-            if new_tooltip_key is not None:
-                self.tooltip_loc_key = new_tooltip_key
-            self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
+
+        if new_tooltip_key:
+            self.tooltip_loc_key = new_tooltip_key
+        self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
     def set(self, val) -> None:
         self.entry_var.set(val)
@@ -208,11 +205,9 @@ class Loc2Input(LocalizableWidget, Descriptive):
         lb = ttk.Label(parent, text=loc_func(label_loc_key), width=label_width, anchor=anchor)
 
         lb.grid(row=row, column=col + (1 if reverse else 0), sticky="nsew", padx=2, pady=2)
-        if tooltip_loc_key:
-            self.loc_tooltip_var = StringVar(parent, value=loc_func(tooltip_loc_key))
-            create_tool_tip(lb, self.loc_tooltip_var, font=font)
-        else:
-            self.loc_tooltip_var = None
+
+        self.loc_tooltip_var = StringVar(parent, value=loc_func(tooltip_loc_key))
+        create_tool_tip(lb, self.loc_tooltip_var, font=font)
 
         parent.rowconfigure(row, weight=0)
         e = StringVar(parent)
@@ -247,11 +242,9 @@ class Loc2Input(LocalizableWidget, Descriptive):
         if new_loc_key:
             self.label_loc_key = new_loc_key
         self.label_widget.config(text=self.loc_func(self.label_loc_key))
-
-        if self.loc_tooltip_var:
-            if new_tooltip_key:
-                self.tooltip_loc_key = new_tooltip_key
-            self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
+        if new_tooltip_key:
+            self.tooltip_loc_key = new_tooltip_key
+        self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
     def remove(self):
         self.label_widget.grid_remove()
@@ -395,11 +388,9 @@ class LocDropdown(LocalizableWidget, Descriptive):
         )
 
         self.tooltip_loc_key = tooltip_loc_key
-        if tooltip_loc_key:
-            self.loc_tooltip_var = StringVar(parent, value=loc_func(tooltip_loc_key))
-            create_tool_tip(self.widget, self.loc_tooltip_var, font=font)
-        else:
-            self.loc_tooltip_var = None
+
+        self.loc_tooltip_var = StringVar(parent, value=loc_func(tooltip_loc_key))
+        create_tool_tip(self.widget, self.loc_tooltip_var, font=font)
 
         self.widget.option_add("*TCombobox*Listbox.Justify", "center")
         self.widget.current(0)
@@ -409,9 +400,7 @@ class LocDropdown(LocalizableWidget, Descriptive):
         self.loc_str_obj_dict = {self.loc_func(k): v for k, v in self.str_obj_dict.items()}
         self.widget.config(values=tuple(self.loc_str_obj_dict.keys()))
         self.widget.current(index)
-
-        if self.loc_tooltip_var:
-            self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
+        self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
     def get(self) -> str:
         return str(self.get_obj())
@@ -478,11 +467,8 @@ class LocLabelFrame(ttk.LabelFrame, Localizable):
         self.loc_key = label_loc_key
         self.loc_func = loc_func
 
-        if tooltip_loc_key:
-            self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
-            create_tool_tip(self, self.loc_tooltip_var, font=font)
-        else:
-            self.loc_tooltip_var = None
+        self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
+        create_tool_tip(self, self.loc_tooltip_var, font=font)
 
         self.tooltip_loc_key = tooltip_loc_key
         if isinstance(all_localized, list):
@@ -490,8 +476,7 @@ class LocLabelFrame(ttk.LabelFrame, Localizable):
 
     def localize(self):
         self.config(text=self.loc_func(self.loc_key))
-        if self.loc_tooltip_var:
-            self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
+        self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
 
 class LocLabelCheck(LocalizableWidget, Descriptive):
@@ -518,11 +503,8 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         self.check_widget = ttk.Checkbutton(parent, text=loc_func(label_loc_key), variable=self.check_var, width=width)
         self.check_widget.grid(row=row, column=col, sticky="nsew", columnspan=columnspan, padx=2, pady=2)
 
-        if tooltip_loc_key:
-            self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
-            create_tool_tip(self.check_widget, self.loc_tooltip_var, font=font)
-        else:
-            self.loc_tooltip_var = None
+        self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
+        create_tool_tip(self.check_widget, self.loc_tooltip_var, font=font)
 
         self.label_loc_key = label_loc_key
         self.desc_label_key = desc_label_key
@@ -532,8 +514,7 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         if new_loc_key:
             self.label_loc_key = new_loc_key
         self.check_widget.config(text=self.loc_func(self.label_loc_key))
-        if self.loc_tooltip_var:
-            self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
+        self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
     def disable(self):
         self.check_widget.config(state="disabled")
