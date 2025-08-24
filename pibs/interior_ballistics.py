@@ -1483,8 +1483,16 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
             for key, value in file_dict.items():
                 try:
-                    loc_dict[key].set(value)
-                except KeyError as e:
+                    if isinstance(value, bool) or isinstance(value, str):
+                        loc_dict[key].set(value)
+                except KeyError:
+                    pass
+
+            for key, value in file_dict.items():
+                try:
+                    if isinstance(value, float) or isinstance(value, int):
+                        loc_dict[key].set(value)
+                except KeyError:
                     pass
 
             if DESCRIPTION in file_dict.keys():  # update description from file.
@@ -2488,13 +2496,13 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 for trace in entry.var.trace_info():
                     entry.var.trace_remove(*trace)
 
-            if val_name == str(self.cvL.var):
+            if val_name == str(self.cvL.var) if val_name else self.use_cv.get_obj() == USE_CV:
                 self.lf.set(round_sig(w / cv / rho * 1e5, n=sigfig))
                 self.ld.set(round_sig(w / cv * 1e3, n=sigfig))
-            elif val_name == str(self.lf.var):
+            elif val_name == str(self.lf.var) if val_name else self.use_cv.get_obj() == USE_LF:
                 self.cvL.set(round_sig(w / rho / lf * 1e5, n=sigfig))
                 self.ld.set(round_sig(lf * rho * 1e-2, n=sigfig))
-            elif val_name == str(self.ld.var):
+            elif val_name == str(self.ld.var) if val_name else self.use_cv.get_obj() == USE_LD:
                 self.lf.set(round_sig(ld / rho * 1e2, n=sigfig))
                 self.cvL.set(round_sig(w / ld * 1e3, n=sigfig))
 
@@ -2747,10 +2755,13 @@ def main(loc: str = None):
     if platform.system() == "Windows":
         win_release = platform.release()
         if win_release in ("8", "10", "11"):
+            # noinspection PyUnresolvedReferences
             windll.shcore.SetProcessDpiAwareness(1)
         elif win_release in ("7", "Vista"):
+            # noinspection PyUnresolvedReferences
             windll.user32.SetProcessDPIAware()
 
+        # noinspection PyUnresolvedReferences
         loc = loc if loc else locale.windows_locale[windll.kernel32.GetUserDefaultUILanguage()]
 
     loadfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"), True, True)
