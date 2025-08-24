@@ -227,7 +227,7 @@ class Loc2Input(LocalizableWidget, Descriptive):
 
         self.default = default
         self.label_widget = lb
-        self.input_var = e
+        self.var = e
         self.input_widget = en
 
         self.row = row
@@ -255,16 +255,13 @@ class Loc2Input(LocalizableWidget, Descriptive):
         self.input_widget.grid()
 
     def reset(self, *_) -> None:
-        self.input_var.set(self.default)
+        self.var.set(self.default)
 
     def get(self) -> Any:
-        return self.dtype(self.input_var.get())
+        return self.dtype(self.var.get())
 
     def set(self, val) -> None:
-        self.input_var.set(val)
-
-    def trace_add(self, *args) -> None:
-        self.input_var.trace_add(*args)
+        self.var.set(val)
 
     def disable(self) -> None:
         self.input_widget.config(state="disabled")
@@ -371,7 +368,7 @@ class LocDropdown(LocalizableWidget, Descriptive):
 
         super().__init__(loc_func=loc_func, all_localized=all_localized)
         self.nominal_state = "readonly"
-        self.text_var = StringVar(parent)
+        self.var = StringVar(parent)
 
         self.loc_func = loc_func
         self.desc_label_key = desc_label_key
@@ -381,7 +378,7 @@ class LocDropdown(LocalizableWidget, Descriptive):
 
         self.widget = ttk.Combobox(
             parent,
-            textvariable=self.text_var,
+            textvariable=self.var,
             values=tuple(self.loc_str_obj_dict.keys()),
             justify="center",
             state=self.nominal_state,
@@ -396,7 +393,7 @@ class LocDropdown(LocalizableWidget, Descriptive):
         self.widget.current(0)
 
     def localize(self):
-        index = self.widget["values"].index(self.text_var.get())
+        index = self.widget["values"].index(self.var.get())
         self.loc_str_obj_dict = {self.loc_func(k): v for k, v in self.str_obj_dict.items()}
         self.widget.config(values=tuple(self.loc_str_obj_dict.keys()))
         self.widget.current(index)
@@ -406,7 +403,7 @@ class LocDropdown(LocalizableWidget, Descriptive):
         return str(self.get_obj())
 
     def get_obj(self):
-        return self.loc_str_obj_dict[self.text_var.get()]
+        return self.loc_str_obj_dict[self.var.get()]
 
     def set_by_str(self, string):
         """
@@ -426,7 +423,7 @@ class LocDropdown(LocalizableWidget, Descriptive):
         self.widget.grid(**kwargs)
 
     def trace_add(self, *args):
-        self.text_var.trace_add(*args)
+        self.var.trace_add(*args)
 
     def disable(self):
         self.widget.configure(state="disabled")
@@ -498,9 +495,9 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         super().__init__(loc_func=loc_func, all_localized=all_localized)
         self.default = default
         self.nominal_state = "normal"
-        self.check_var = BooleanVar(value=default)
+        self.var = BooleanVar(value=default)
         self.loc_func = loc_func
-        self.check_widget = ttk.Checkbutton(parent, text=loc_func(label_loc_key), variable=self.check_var, width=width)
+        self.check_widget = ttk.Checkbutton(parent, text=loc_func(label_loc_key), variable=self.var, width=width)
         self.check_widget.grid(row=row, column=col, sticky="nsew", columnspan=columnspan, padx=2, pady=2)
 
         self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
@@ -529,13 +526,13 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         self.check_widget.grid()
 
     def get(self) -> bool:
-        return bool(self.check_var.get())
+        return bool(self.var.get())
 
     def set(self, value):
-        self.check_var.set(value)
+        self.var.set(value)
 
     def trace_add(self, *args):
-        self.check_var.trace_add(*args)
+        self.var.trace_add(*args)
 
     def inhibit(self):
         self.nominal_state = self.check_widget.cget("state")
@@ -553,7 +550,7 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
             return self.loc_func(self.label_loc_key, True)
 
     def reset(self) -> None:
-        self.check_var.set(self.default)
+        self.var.set(self.default)
 
 
 def warn(func):

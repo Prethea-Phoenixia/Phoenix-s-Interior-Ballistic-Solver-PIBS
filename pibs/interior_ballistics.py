@@ -215,6 +215,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             root, font=font, menubar=menubar, default_lang=default_lang, localization_dict=localization_dict
         )
 
+        self.cvldlf_traces = []
         self.font = font
         self.job_queue, self.guide_job_queue, self.log_queue = Queue(), Queue(), Queue()
         self.process, self.guide_process, self.kwargs, self.gun_result = None, None, None, None
@@ -1152,7 +1153,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.use_cv.trace_add("write", self.cvldlf_callback)
         for widget in (self.cvL, self.lf, self.ld, self.chg_kg, self.acc_exp):
-            widget.trace_add("write", self.cvldlf_consistency_callback)
+            widget.var.trace_add("write", self.cvldlf_consistency_callback)
 
         self.clr, i = (
             self.add_localized_3_input(
@@ -1304,7 +1305,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_grain_r2,
             self.type_optn,
         ):
-            entry.trace_add("write", self.callback)
+            entry.var.trace_add("write", self.callback)
 
         ## geom plot
         with mpl.rc_context(CONTEXT):
@@ -1484,7 +1485,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 try:
                     loc_dict[key].set(value)
                 except KeyError as e:
-                    self.handle_errors(e)
+                    pass
 
             if DESCRIPTION in file_dict.keys():  # update description from file.
                 self.description.delete(1.0, "end")
@@ -2182,7 +2183,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
             else:
                 if web:
-                    web.localize("athLabel", "arcText")
+                    web.localize("arcLabel", "arcText")
 
                 r1.localize("pdtarcLabel", "pdtarcText")
                 r2.localize("ltdLabel", "perfLRText")
@@ -2473,7 +2474,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         for entry in (self.aux_grain_r1, self.aux_grain_r2, self.aux_web_ratio, self.aux_mass_ratio, self.aux_geom):
             entry.disable() if self.use_aux_grain.get() == 0 else entry.enable()
 
-    def cvldlf_consistency_callback(self, *_):
+    def cvldlf_consistency_callback(self, val_name="", *_):
         prop = self.drop_prop.get_obj()
         try:
             sigfig = int(self.acc_exp.get()) + 1
@@ -2483,15 +2484,22 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ld = float(self.ld.get())
             rho = prop.rho_p
 
-            if self.use_cv.get_obj() == USE_CV:  # use chamber volume
+            for entry in (self.cvL, self.lf, self.ld):
+                for trace in entry.var.trace_info():
+                    entry.var.trace_remove(*trace)
+
+            if val_name == str(self.cvL.var):
                 self.lf.set(round_sig(w / cv / rho * 1e5, n=sigfig))
                 self.ld.set(round_sig(w / cv * 1e3, n=sigfig))
-            elif self.use_cv.get_obj() == USE_LF:  # using load fraction
+            elif val_name == str(self.lf.var):
                 self.cvL.set(round_sig(w / rho / lf * 1e5, n=sigfig))
                 self.ld.set(round_sig(lf * rho * 1e-2, n=sigfig))
-            elif self.use_cv.get_obj() == USE_LD:
+            elif val_name == str(self.ld.var):
                 self.lf.set(round_sig(ld / rho * 1e2, n=sigfig))
                 self.cvL.set(round_sig(w / ld * 1e3, n=sigfig))
+
+            for entry in (self.cvL, self.lf, self.ld):
+                entry.var.trace_add("write", self.cvldlf_consistency_callback)
 
         except (ZeroDivisionError, ValueError):
             return
@@ -2623,6 +2631,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
     def swap(self):
         ## this swaps the primary and auxiliary charge.
+        sigfig = int(self.acc_exp.get()) + 1
         try:
             # cache the values for swapping.
             main_geom, aux_geom = self.geom.get(), self.aux_geom.get()
@@ -2635,8 +2644,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_grain_r1.set(main_r1)
             self.aux_grain_r2.set(main_r2)
 
-            self.aux_web_ratio.set(1.0 / web_ratio)
-            self.aux_mass_ratio.set(1.0 / mass_ratio)
+            self.aux_web_ratio.set(round_sig(1.0 / web_ratio, n=sigfig))
+            self.aux_mass_ratio.set(round_sig(1.0 / mass_ratio, n=sigfig))
 
             self.geom.set(aux_geom)
             self.aux_geom.set(main_geom)

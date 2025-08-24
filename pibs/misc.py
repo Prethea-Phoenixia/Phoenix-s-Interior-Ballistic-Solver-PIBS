@@ -212,7 +212,7 @@ def format_float_input(event, var):
     # v = event.widget.get()
     v = var.get()
     if v == "" or v == ".":
-        var.set(event.widget.default)
+        var.set(0.0)
     else:
         var.set(float(v))
 
@@ -221,7 +221,7 @@ def format_int_input(event, var):
     # v = event.widget.get()
     v = var.get()
     if v == "":
-        var.set(event.widget.default)
+        var.set(0)
     else:
         var.set(int(v))
 
