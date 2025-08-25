@@ -196,11 +196,11 @@ class PIBS(Tk):
         self.minsize(self.winfo_width(), self.winfo_height())  # set minimum size
         self.is_fullscreen = False
 
-        self.bind("<F4>", lambda *_: self.toggle_fullscreen())
+        # self.bind("<F4>", lambda *_: self.toggle_fullscreen())
 
-    def toggle_fullscreen(self):
-        self.wm_attributes("-fullscreen", self.is_fullscreen)
-        self.is_fullscreen = not self.is_fullscreen
+    # def toggle_fullscreen(self):
+    #     self.wm_attributes("-fullscreen", self.is_fullscreen)
+    #     self.is_fullscreen = not self.is_fullscreen
 
     def quit(self):
         # explicitly unload the font at the end of program.
@@ -224,9 +224,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.force_update_on_theme_widget = []
 
         self.menubar = menubar
-
-        # file_menu = Menu(menubar)
-        # menubar.add_cascade(label=self.get_loc_str("fileLabel"), menu=file_menu)
 
         data_menu = Menu(menubar)
         menubar.add_cascade(label=self.get_loc_str("dataLabel"), menu=data_menu)
@@ -309,7 +306,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         desc_scroll = ttk.Scrollbar(name_frm, orient="vertical")
         desc_scroll.grid(row=1, column=1, sticky="nsew")
         self.description = Text(
-            name_frm, wrap="word", height=3, width=80, yscrollcommand=desc_scroll.set, font=(FONTNAME, FONTSIZE)
+            name_frm, wrap="word", height=5, width=80, yscrollcommand=desc_scroll.set, font=(FONTNAME, FONTSIZE)
         )
         self.description.grid(row=1, column=0, sticky="nsew")
 
