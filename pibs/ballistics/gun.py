@@ -151,14 +151,14 @@ class Gun(DelegatesPropellant):
         self.e_1 = 0.5 * web
         self.s = (0.5 * caliber) ** 2 * pi
         self.m = shot_mass
-        self.omega = charge_mass
+        self.w = charge_mass
         self.vol_0 = chamber_volume
         self.p_0 = start_pressure
         self.l_g = length_gun
         self.chi_k = chambrage  # ration of l_0 / l_chamber
         self.l_0 = self.vol_0 / self.s
         self.l_c = self.l_0 / self.chi_k
-        self.delta = self.omega / self.vol_0
+        self.delta = self.w / self.vol_0
 
         self.phi_1 = 1 / (1 - drag_coefficient)  # drag work coefficient
         self.material = structural_material
@@ -177,18 +177,13 @@ class Gun(DelegatesPropellant):
 
     def f_p_bar(self, z, l_bar, v_bar) -> float:
         psi = self.f_psi_z(z)
-
         l_psi_bar = 1 - self.delta * ((1 - psi) / self.rho_p + (self.alpha * psi))
-
         p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
 
-        return p_bar
+        return max(p_bar, self.p_a_bar)
 
     def ode_t(self, _, z, l_bar, v_bar, __) -> tuple[float, float, float]:
-        psi = self.f_psi_z(z)
-
-        l_psi_bar = 1 - self.delta / self.rho_p - self.delta * (self.alpha - 1 / self.rho_p) * psi
-        p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
+        p_bar = self.f_p_bar(z, l_bar, v_bar)
 
         if self.c_a_bar != 0 and v_bar > 0:
             k = self.k_1  # gamma
@@ -211,10 +206,7 @@ class Gun(DelegatesPropellant):
         the 1/v_bar pose a starting problem that prevent us from using it from
         initial condition."""
 
-        psi = self.f_psi_z(z)
-
-        l_psi_bar = 1 - self.delta / self.rho_p - self.delta * (self.alpha - 1 / self.rho_p) * psi
-        p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
+        p_bar = self.f_p_bar(z, l_bar, v_bar)
 
         if self.c_a_bar != 0 and v_bar > 0:
             k = self.k_1  # gamma
@@ -231,10 +223,7 @@ class Gun(DelegatesPropellant):
         return dt_bar, dz, dv_bar
 
     def ode_z(self, z, t_bar, l_bar, v_bar, _):
-        psi = self.f_psi_z(z)
-
-        l_psi_bar = 1 - self.delta / self.rho_p - self.delta * (self.alpha - 1 / self.rho_p) * psi
-        p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
+        p_bar = self.f_p_bar(z, l_bar, v_bar)
 
         if self.c_a_bar != 0 and v_bar > 0:
             k = self.k_1  # gamma
@@ -266,7 +255,7 @@ class Gun(DelegatesPropellant):
         if self.T_v:
             r = self.f / self.T_v
             l_psi = self.l_0 * (1 - self.delta / self.rho_p - self.delta * (self.alpha * -1 / self.rho_p) * psi)
-            return self.s * p * (l + l_psi) / (self.omega * psi * r)
+            return self.s * p * (l + l_psi) / (self.w * psi * r)
         else:
             return None
 
@@ -321,8 +310,11 @@ class Gun(DelegatesPropellant):
         All solutions assumes gas velocity increasing linearlly from 0
         at breech face and shot velocity at shot base.
         """
+        ambient_p = max(ambient_p, 1)
+        ambient_gamma = max(ambient_gamma, 1)
 
         self.psi_0 = (1 / self.delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
+
         if self.psi_0 <= 0:
             raise ValueError(
                 "Initial burnup fraction is solved to be negative."
@@ -344,15 +336,15 @@ class Gun(DelegatesPropellant):
         if any((step < 0, tol < 0)):
             raise ValueError("Invalid integration specification")
 
-        if any((ambient_p < 0, ambient_rho < 0, ambient_gamma < 1)):
+        if ambient_rho < 0:
             raise ValueError("Invalid ambient condition")
 
         if sol == SOL_LAGRANGE:
             labda_1, labda_2 = 0.5, 1 / 3
         elif sol == SOL_PIDDUCK:
-            labda_1, labda_2 = pidduck(self.omega / (self.phi_1 * self.m), self.theta + 1, tol)
+            labda_1, labda_2 = pidduck(self.w / (self.phi_1 * self.m), self.theta + 1, tol)
         elif sol == SOL_MAMONTOV:
-            labda_1, labda_2 = pidduck(self.omega / (self.phi_1 * self.m), 1, tol)
+            labda_1, labda_2 = pidduck(self.w / (self.phi_1 * self.m), 1, tol)
         else:
             raise ValueError("Unknown Solution")
 
@@ -361,7 +353,7 @@ class Gun(DelegatesPropellant):
         labda = self.l_g / self.l_0
         cc = 1 - (1 - 1 / self.chi_k) * log(labda + 1) / labda  # chambrage correction factor
 
-        self.phi = self.phi_1 + labda_2 * self.omega / self.m * cc
+        self.phi = self.phi_1 + labda_2 * self.w / self.m * cc
         """
         见《枪炮内弹道学》（金，2014）p.70 式
         """
@@ -369,11 +361,11 @@ class Gun(DelegatesPropellant):
         self.b = (
             self.s**2
             * self.e_1**2
-            / (self.f * self.phi * self.omega * self.m * self.u_1**2)
+            / (self.f * self.phi * self.w * self.m * self.u_1**2)
             * (self.f * self.delta) ** (2 * (1 - self.n))
         )
 
-        self.v_j = (2 * self.f * self.omega / (self.theta * self.phi * self.m)) ** 0.5
+        self.v_j = (2 * self.f * self.w / (self.theta * self.phi * self.m)) ** 0.5
 
         t_scale = self.l_0 / self.v_j
         p_scale = self.f * self.delta
@@ -865,11 +857,9 @@ class Gun(DelegatesPropellant):
         labda_1_prime = self.labda_1 * (1 / self.chi_k + labda_g) / (1 + labda_g)
         labda_2_prime = self.labda_2 * (1 / self.chi_k + labda_g) / (1 + labda_g)
 
-        factor_s = 1 + labda_2_prime * (self.omega / (self.phi_1 * self.m))  # factor_b = P/P_b = phi / phi_1
+        factor_s = 1 + labda_2_prime * (self.w / (self.phi_1 * self.m))  # factor_b = P/P_b = phi / phi_1
 
-        factor_b = (self.phi_1 * self.m + labda_2_prime * self.omega) / (
-            self.phi_1 * self.m + labda_1_prime * self.omega
-        )
+        factor_b = (self.phi_1 * self.m + labda_2_prime * self.w) / (self.phi_1 * self.m + labda_1_prime * self.w)
 
         return p / factor_s, p / factor_b
 
@@ -932,6 +922,7 @@ class Gun(DelegatesPropellant):
             for i, x in enumerate(x_probes):
                 if (x - l_c) <= l:
                     p_x, _ = self.to_px_u(l, p_s, p_b, v, x)
+                    # noinspection PyTypeChecker
                     p_probes[i] = max(p_probes[i], p_x)
                 else:
                     break

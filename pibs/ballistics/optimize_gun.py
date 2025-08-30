@@ -64,6 +64,9 @@ class Constrained(DelegatesPropellant):
         if any((design_pressure <= 0, design_velocity <= 0)):
             raise ValueError("Invalid design constraint")
 
+        ambient_p = max(ambient_p, 1)
+        ambient_gamma = max(ambient_gamma, 1)
+
         self.s = (caliber / 2) ** 2 * pi
         self.m = shot_mass
         self.p_0 = start_pressure
@@ -123,9 +126,9 @@ class Constrained(DelegatesPropellant):
         f_psi_z = self.f_psi_z
         tol = self.tol
 
-        omega = m * charge_mass_ratio
-        v_0 = omega / (rho_p * load_fraction)
-        delta = omega / v_0
+        w = m * charge_mass_ratio
+        v_0 = w / (rho_p * load_fraction)
+        delta = w / v_0
         l_0 = v_0 / s
         gamma = theta + 1
 
@@ -141,17 +144,17 @@ class Constrained(DelegatesPropellant):
             if self.sol == SOL_LAGRANGE:
                 labda_1, labda_2 = 1 / 2, 1 / 3
             elif self.sol == SOL_PIDDUCK:
-                labda_1, labda_2 = pidduck(omega / (phi_1 * m), gamma, tol)
+                labda_1, labda_2 = pidduck(w / (phi_1 * m), gamma, tol)
             elif self.sol == SOL_MAMONTOV:
-                labda_1, labda_2 = pidduck(omega / (phi_1 * m), 1, tol)
+                labda_1, labda_2 = pidduck(w / (phi_1 * m), 1, tol)
             else:
                 raise ValueError("Unknown Solution")
 
-        phi = phi_1 + labda_2 * omega / m * cc
-        v_j = (2 * f * omega / (theta * phi * m)) ** 0.5
+        phi = phi_1 + labda_2 * w / m * cc
+        v_j = (2 * f * w / (theta * phi * m)) ** 0.5
         v_bar_d = v_d / v_j
 
-        if self.ambient_rho != 0:
+        if self.ambient_rho:
             c_a_bar = (self.ambient_gamma * self.ambient_p / self.ambient_rho) ** 0.5 / v_j
             p_a_bar = self.ambient_p / (f * delta)
         else:
@@ -171,7 +174,7 @@ conditions is {v_j:.4g} m/s."
         def _f_p_bar(z, l_bar, v_bar):
             psi = f_psi_z(z)
             l_psi_bar = 1 - delta / rho_p - delta * (alpha - 1 / rho_p) * psi
-            p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
+            p_bar = max((psi - v_bar**2) / (l_bar + l_psi_bar), p_a_bar)
 
             if self.control == POINT_PEAK_AVG:
                 return p_bar
@@ -180,8 +183,8 @@ conditions is {v_j:.4g} m/s."
                 labda_1_prime = labda_1 * prime
                 labda_2_prime = labda_2 * prime
 
-                factor_s = 1 + labda_2_prime * (omega / (phi_1 * m))
-                factor_b = (phi_1 * m + labda_2_prime * omega) / (phi_1 * m + labda_1_prime * omega)
+                factor_s = 1 + labda_2_prime * (w / (phi_1 * m))
+                factor_b = (phi_1 * m + labda_2_prime * w) / (phi_1 * m + labda_1_prime * w)
 
                 if self.control == POINT_PEAK_SHOT:
                     return p_bar / factor_s
@@ -221,7 +224,7 @@ conditions is {v_j:.4g} m/s."
             or until the system develops 2x design pressure.
             """
 
-            b = s**2 * e_1**2 / (f * phi * omega * m * u_1**2) * (f * delta) ** (2 * (1 - n))
+            b = s**2 * e_1**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
             def _ode_z(z, _, l_bar, v_bar, __):
                 """burnup domain ode of internal ballistics"""
@@ -333,7 +336,7 @@ conditions is {v_j:.4g} m/s."
         step 2, find the requisite muzzle length to achieve design velocity
         """
 
-        b = s**2 * e_1**2 / (f * phi * omega * m * u_1**2) * (f * delta) ** (2 * (1 - n))
+        b = s**2 * e_1**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
         def _ode_v(v_bar, _, z, l_bar, __):
             psi = f_psi_z(z)

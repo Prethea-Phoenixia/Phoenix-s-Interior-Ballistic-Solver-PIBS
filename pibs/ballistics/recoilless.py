@@ -4,7 +4,7 @@ import logging
 import sys
 import traceback
 from dataclasses import dataclass
-from math import inf, pi, tan
+from math import inf, pi
 
 from pibs.ballistics.material import Material
 
@@ -80,6 +80,7 @@ class Recoilless(DelegatesPropellant):
         structural_material: Material = None,
         structural_safety_factor: float = 1.1,
         autofrettage: bool = True,
+        # traveling_charge: bool = True,
         **_,
     ):
         super().__init__(propellant=propellant)
@@ -105,11 +106,12 @@ class Recoilless(DelegatesPropellant):
 
         self.propellant = propellant
         self.caliber = caliber
+        # self.is_tc = traveling_charge
 
         e_1 = 0.5 * web
         self.s = (caliber / 2) ** 2 * pi
         self.m = shot_mass
-        self.omega = charge_mass
+        self.w = charge_mass
         self.V_0 = chamber_volume
         self.p_0 = start_pressure
         self.l_g = length_gun
@@ -120,11 +122,11 @@ class Recoilless(DelegatesPropellant):
         self.l_0 = self.V_0 / self.s
         self.l_c = self.l_0 / self.chi_k
 
-        self.Delta = self.omega / self.V_0
+        self.Delta = self.w / self.V_0
         self.phi_1 = 1 / (1 - drag_coefficient)  # drag work coefficient
-        self.phi = self.phi_1 + self.omega / (3 * self.m)
+        self.phi = self.phi_1 + self.w / (3 * self.m)
 
-        self.v_j = (2 * self.f * self.omega / (self.theta * self.phi * self.m)) ** 0.5
+        self.v_j = (2 * self.f * self.w / (self.theta * self.phi * self.m)) ** 0.5
 
         self.material = structural_material
         self.ssf = structural_safety_factor
@@ -153,7 +155,7 @@ class Recoilless(DelegatesPropellant):
         self.B = (
             self.s**2
             * e_1**2
-            / (self.f * self.phi * self.omega * self.m * self.u_1**2)
+            / (self.f * self.phi * self.w * self.m * self.u_1**2)
             * (self.f * self.Delta) ** (2 * (1 - self.n))
         )
 
@@ -166,7 +168,7 @@ class Recoilless(DelegatesPropellant):
 
         phi_2 = 1
         self.c_a = (
-            (0.5 * self.theta * self.phi * self.m / self.omega) ** 0.5
+            (0.5 * self.theta * self.phi * self.m / self.w) ** 0.5
             * gamma**0.5
             * (2 / (gamma + 1)) ** (0.5 * (gamma + 1) / self.theta)
             * phi_2
@@ -181,7 +183,7 @@ class Recoilless(DelegatesPropellant):
 
         p_bar = tau / (l_bar + l_psi_bar) * (psi - eta)
 
-        return p_bar
+        return max(p_bar, self.p_a_bar)
 
     def ode_t(self, _, z, l_bar, v_bar, eta, tau, __):
         psi = self.f_psi_z(z)
@@ -192,7 +194,7 @@ class Recoilless(DelegatesPropellant):
             k = self.k_1  # gamma
             v_r = v_bar / self.c_a_bar
             p_d_bar = (
-                +0.25 * k * (k + 1) * v_r**2 + k * v_r * (1 + (0.25 * (k + 1)) ** 2 * v_r**2) ** 0.5
+                0.25 * k * (k + 1) * v_r**2 + k * v_r * (1 + (0.25 * (k + 1)) ** 2 * v_r**2) ** 0.5
             ) * self.p_a_bar
         else:
             p_d_bar = 0
@@ -201,6 +203,8 @@ class Recoilless(DelegatesPropellant):
 
         dl_bar = v_bar
         dv_bar = self.theta * 0.5 * (p_bar - p_d_bar)
+
+        # dv_bar /= (1 + self.w / self.m * (1 - psi)) if self.is_tc else 1
 
         deta = self.c_a * self.s_j_bar * p_bar * tau**-0.5  # deta / dt_bar
         dtau = ((1 - tau) * (dpsi * dz) - 2 * v_bar * dv_bar - self.theta * tau * deta) / (psi - eta)  # dtau/dt_bar
@@ -228,7 +232,9 @@ class Recoilless(DelegatesPropellant):
             p_d_bar = 0
 
         dz = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n / v_bar
-        dv_bar = self.theta * 0.5 * (p_bar - p_d_bar) / v_bar  # dv_bar/dl_bar
+        dv_bar = self.theta * 0.5 * (p_bar - p_d_bar) / v_bar
+        # dv_bar /= (1 + self.w / self.m * (1 - psi)) if self.is_tc else 1
+        # dv_bar/dl_bar
         dt_bar = 1 / v_bar  # dt_bar / dl_bar
 
         deta = self.c_a * self.s_j_bar * p_bar * tau**-0.5 * dt_bar  # deta / dl_bar
@@ -254,6 +260,7 @@ class Recoilless(DelegatesPropellant):
         dt_bar = (2 * self.B / self.theta) ** 0.5 * p_bar**-self.n
         dl_bar = v_bar * dt_bar
         dv_bar = 0.5 * self.theta * (p_bar - p_d_bar) * dt_bar
+        # dv_bar /= (1 + self.w / self.m * (1 - psi)) if self.is_tc else 1
         deta = self.c_a * self.s_j_bar * p_bar * tau**-0.5 * dt_bar  # deta / dZ
         dtau = ((1 - tau) * dpsi - 2 * v_bar * dv_bar - self.theta * tau * deta) / (psi - eta)
 
@@ -283,6 +290,9 @@ class Recoilless(DelegatesPropellant):
         errors.
         """
 
+        ambient_p = max(ambient_p, 1)
+        ambient_gamma = max(ambient_gamma, 1)
+
         self.psi_0 = (1 / self.Delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
         if self.psi_0 <= 0:
             raise ValueError(
@@ -304,7 +314,7 @@ class Recoilless(DelegatesPropellant):
         if any((step < 0, tol < 0)):
             raise ValueError("Invalid integration specification")
 
-        if any((ambient_p < 0, ambient_rho < 0, ambient_gamma < 1)):
+        if ambient_rho < 0:
             raise ValueError("Invalid ambient condition")
 
         gamma = self.theta + 1
@@ -397,6 +407,7 @@ class Recoilless(DelegatesPropellant):
 
         # noinspection PyUnusedLocal
         def abort(x, ys, record):
+
             z, (_, l_bar, v_bar, eta, tau) = x, ys
             p_bar = self.f_p_bar(z, l_bar, eta, tau)
 
@@ -419,6 +430,7 @@ class Recoilless(DelegatesPropellant):
                     abs_tol=tol**2,
                     abort_func=abort,
                     record=ztlvet_record_i,
+                    debug=True,
                 )
 
                 p_bar_j = self.f_p_bar(z_j, l_bar_j, eta_j, tau_j)
@@ -895,28 +907,28 @@ class Recoilless(DelegatesPropellant):
         P0  : Stagnation point pressure
         vb  : Rearward flow velocity at the rear of chamber
         """
-        y = self.omega * eta
+        y = self.w * eta
         m_dot = self.c_a * self.v_j * self.S_j * p / (self.f * tau**0.5)
         # mass flow rate, rearward
         sb = self.s * self.chi_k
-        vb = m_dot * (self.V_0 + self.s * l) / (sb * (self.omega - y))
+        vb = m_dot * (self.V_0 + self.s * l) / (sb * (self.w - y))
         # velocity impinging upon the rear of the breech before nozzle constriction
 
         h_1 = vb / v if v != 0 else inf
-        h_2 = 2 * self.phi_1 * self.m / (self.omega - y) + 1
+        h_2 = 2 * self.phi_1 * self.m / (self.w - y) + 1
         h = min(h_1, h_2)
 
-        ps = p / (1 + (self.omega - y) / (3 * self.phi_1 * self.m) * (1 - 0.5 * h))  # shot base pressure
-        p0 = ps * (1 + (self.omega - y) / (2 * self.phi_1 * self.m) * (1 + h) ** -1)  # stagnation point pressure
-        pb = ps * (1 + (self.omega - y) / (2 * self.phi_1 * self.m) * (1 - h)) if h == h_1 else 0  # breech pressure
+        ps = p / (1 + (self.w - y) / (3 * self.phi_1 * self.m) * (1 - 0.5 * h))  # shot base pressure
+        p0 = ps * (1 + (self.w - y) / (2 * self.phi_1 * self.m) * (1 + h) ** -1)  # stagnation point pressure
+        pb = ps * (1 + (self.w - y) / (2 * self.phi_1 * self.m) * (1 - h)) if h == h_1 else 0  # breech pressure
         # l0 = H / (1 + H) * l  # location of the stagnation point
         return ps, p0, pb, vb
 
     def to_px(self, l, v, vb, ps, eta, x):
         m = self.m
-        omega = self.omega
+        w = self.w
         phi_1 = self.phi_1
-        y = self.omega * eta
+        y = self.w * eta
 
         """
         convert x, the physical displacement from breech bottom, to
@@ -935,10 +947,10 @@ class Recoilless(DelegatesPropellant):
             z = (l_0 * a_0 + (x - l_0) * a_1) / (l_0 * a_0 + l_1 * a_1)
 
         h_1 = vb / v if v != 0 else inf
-        h_2 = 2 * phi_1 * self.m / (self.omega - y) + 1
+        h_2 = 2 * phi_1 * self.m / (self.w - y) + 1
         h = min(h_1, h_2)
 
-        px = ps * (1 + (omega - y) / (2 * phi_1 * m) * (1 + h) * (1 - z**2) - (omega - y) / (phi_1 * m) * h * (1 - z))
+        px = ps * (1 + (w - y) / (2 * phi_1 * m) * (1 + h) * (1 - z**2) - (w - y) / (phi_1 * m) * h * (1 - z))
         return px
 
     @staticmethod

@@ -264,9 +264,9 @@ class Propellant:
     ):
         """
         for propellant i = 1, 2:
-            Z_i = e_i / e_1i
+            Z_i = e_i / e_0_i
             psi_i = ff_i(Z_i)
-            dZ_i / dt = u_1i p ^ n_i / e_1i
+            dZ_i / dt = u_1 p ^ n_i / e_0_i
 
         In sum:
                         n

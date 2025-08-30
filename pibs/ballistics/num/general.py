@@ -128,34 +128,34 @@ def intg(f, l, u, tol=1e-3):
 
     tol = abs(tol)  # ensure positive
 
-    k = 1  # iteration counter
-    i = 0  # integral counter
-    c = 0  # trend counter, No. of iterations with reducing delta.
-    d = math.inf  # delta, change per iteration
+    it = 1  # iteration counter
+    integral = 0  # integral counter
+    count = 0  # trend counter, No. of iterations with reducing delta.
+    delta = math.inf  # delta, change per iteration
 
-    while c < 3:
-        di = 0  # change to integral
-        for i in range(1, 2**k, 2):
-            v = -1 + 2 ** (1 - k) * i
+    while count < 3:
+        increment = 0  # change to integral
+        for i in range(1, 2**it, 2):
+            v = -1 + 2 ** (1 - it) * i
             u = 1.5 * v - 0.5 * v**3
-            di += f(a * u + b) * (1 - v**2)
+            increment += f(a * u + b) * (1 - v**2)
 
-        di *= 1.5 * a * 2 ** (1 - k)
-        i1 = i * 0.5 + di
-        d = abs(i1 - i)
-        i = i1
-        k += 1
+        increment *= 1.5 * a * 2 ** (1 - it)
+        next_integral = integral * 0.5 + increment
 
-        if d < tol * (abs(i) + tol):
-            c += 1
+        delta = abs(next_integral - integral)
+        integral = next_integral
+        it += 1
+
+        if delta < tol * (abs(integral) + tol):
+            count += 1
         else:
-            c = 0
+            count = 0
 
-    return i, d
+    return integral, delta
 
 
 if __name__ == "__main__":
-    print(cubic(1, 1, 2, 3))
 
     import sys
     import trace

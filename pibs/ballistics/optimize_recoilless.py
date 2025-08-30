@@ -40,6 +40,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
         ambient_p: float = 101.325e3,
         ambient_gamma: float = 1.4,
         control: Points = POINT_PEAK_AVG,
+        traveling_charge: bool = True,
         **_,
     ):
         # constants for constrained designs
@@ -64,6 +65,9 @@ class ConstrainedRecoilless(DelegatesPropellant):
         if any((design_pressure <= 0, design_velocity <= 0)):
             raise ValueError("Invalid design constraint")
 
+        ambient_p = max(ambient_p, 1)
+        ambient_gamma = max(ambient_gamma, 1)
+
         self.s = (0.5 * caliber) ** 2 * pi
         self.m = shot_mass
         self.propellant = propellant
@@ -86,6 +90,8 @@ class ConstrainedRecoilless(DelegatesPropellant):
         self.ambient_p = ambient_p
         self.ambient_gamma = ambient_gamma
         self.control = control
+
+        self.traveling_charge = traveling_charge
 
     def solve(
         self,
@@ -125,14 +131,16 @@ class ConstrainedRecoilless(DelegatesPropellant):
         sb = s * chi_k
         tol = self.tol
 
-        omega = m * charge_mass_ratio
-        v_0 = omega / (rho_p * load_fraction)
-        delta = omega / v_0
-        l_0 = v_0 / s
+        is_tc = self.traveling_charge
+
+        w = m * charge_mass_ratio
+        vol_0 = w / (rho_p * load_fraction)
+        delta = w / vol_0
+        l_0 = vol_0 / s
 
         gamma = theta + 1
 
-        phi = phi_1 + omega / (3 * m)
+        phi = phi_1 + w / (3 * m)
 
         s_j_bar = 1 / (Recoilless.get_cf(gamma, a_bar, tol) * chi_0)
         if s_j_bar > chi_k:
@@ -146,13 +154,13 @@ class ConstrainedRecoilless(DelegatesPropellant):
         k_0 = (2 / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1))) * gamma**0.5
 
         phi_2 = 1
-        c_a = (0.5 * theta * phi * m / omega) ** 0.5 * k_0 * phi_2  # flow rate value
+        c_a = (0.5 * theta * phi * m / w) ** 0.5 * k_0 * phi_2  # flow rate value
 
         """
         it is impossible to account for the chambrage effect given unspecified
         barrel length, in our formulation
         """
-        v_j = (2 * f * omega / (theta * phi * m)) ** 0.5
+        v_j = (2 * f * w / (theta * phi * m)) ** 0.5
 
         if self.ambient_rho != 0:
             c_a_bar = (self.ambient_gamma * self.ambient_p / self.ambient_rho) ** 0.5 / v_j
@@ -179,27 +187,27 @@ class ConstrainedRecoilless(DelegatesPropellant):
         def _f_p_bar(z, l_bar, v_bar, eta, tau):
             psi = f_psi_z(z)
             l_psi_bar = 1 - delta * ((1 - psi) / rho_p + alpha * (psi - eta))
-            p_bar = tau / (l_bar + l_psi_bar) * (psi - eta)
+            p_bar = max(tau / (l_bar + l_psi_bar) * (psi - eta), p_a_bar)
 
             if self.control == POINT_PEAK_AVG:
                 return p_bar
 
             else:
-                y = omega * eta
+                y = w * eta
                 m_dot = c_a * v_j * s_j * p_bar * delta / (tau**0.5)
-                vb = m_dot * (v_0 + s * l_bar * l_0) / (sb * (omega - y))
+                vb = m_dot * (vol_0 + s * l_bar * l_0) / (sb * (w - y))
 
-                h_1, h_2 = vb / (v_j * v_bar) if v_bar != 0 else inf, 2 * phi_1 * m / (omega - y) + 1
+                h_1, h_2 = vb / (v_j * v_bar) if v_bar != 0 else inf, 2 * phi_1 * m / (w - y) + 1
 
                 h = min(h_1, h_2)
 
-                p_s_bar = p_bar / (1 + (omega - y) / (3 * phi_1 * m) * (1 - 0.5 * h))
+                p_s_bar = p_bar / (1 + (w - y) / (3 * phi_1 * m) * (1 - 0.5 * h))
                 if self.control == POINT_PEAK_SHOT:
                     return p_s_bar
                 elif self.control == POINT_PEAK_STAG:
-                    return p_s_bar * (1 + (omega - y) / (2 * phi_1 * m) * (1 + h) ** -1)
+                    return p_s_bar * (1 + (w - y) / (2 * phi_1 * m) * (1 + h) ** -1)
                 elif self.control == POINT_PEAK_BREECH:
-                    return p_s_bar * (1 + (omega - y) / (2 * phi_1 * m) * (1 - h)) if h == h_1 else 0
+                    return p_s_bar * (1 + (w - y) / (2 * phi_1 * m) * (1 - h)) if h == h_1 else 0
                 else:
                     raise ValueError("tag unhandled.")
 
@@ -223,7 +231,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
             l_bar < l_bar_d,
             p_bar < 2 * p_bar_d.
             """
-            b = (s**2 * e_1**2) / (f * phi * omega * m * u_1**2) * (f * delta) ** (2 * (1 - n))
+            b = (s**2 * e_1**2) / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
             # integrate this to end of burn
 
@@ -248,6 +256,8 @@ class ConstrainedRecoilless(DelegatesPropellant):
                     dt_bar = (2 * b / theta) ** 0.5 * p_bar**-n
                     dl_bar = v_bar * dt_bar
                     dv_bar = 0.5 * theta * (p_bar - p_d_bar) * dt_bar
+
+                    dv_bar /= (1 + w / m * (1 - psi)) if is_tc else 1
 
                 else:
                     # technically speaking it is undefined in this area
@@ -371,7 +381,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
             else:
                 raise ValueError(f"Design velocity exceeded before peak pressure point (V = {v_bar_i * v_j:.4g} m/s).")
 
-        b = s**2 * e_1**2 / (f * phi * omega * m * u_1**2) * (f * delta) ** (2 * (1 - n))
+        b = s**2 * e_1**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
         def _ode_v(v_bar, _, z, l_bar, eta, tau, __):
             psi = f_psi_z(z)
@@ -390,6 +400,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 p_d_bar = 0
 
             dt_bar = 2 / (theta * (p_bar - p_d_bar))
+            dt_bar *= (1 + w / m * (1 - psi)) if is_tc else 1
 
             dz = dt_bar * (0.5 * theta / b) ** 0.5 * p_bar**n
 
@@ -475,15 +486,15 @@ class ConstrainedRecoilless(DelegatesPropellant):
         high lf -> high web
         low lf -> low web
         """
-        omega = self.m * charge_mass_ratio
+        w = self.m * charge_mass_ratio
         rho_p = self.rho_p
         s = self.s
         solve = self.solve
         tol = self.tol
 
         def f(load_fraction):
-            v_0 = omega / (rho_p * load_fraction)
-            l_0 = v_0 / s
+            vol_0 = w / (rho_p * load_fraction)
+            l_0 = vol_0 / s
 
             e_1, l_g = solve(
                 load_fraction=load_fraction, charge_mass_ratio=charge_mass_ratio, known_bore=False, suppress=True
@@ -532,6 +543,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
 
         k, n = 0, floor(log(abs(delta_high) / tol, 2)) + 1
         while abs(2 * delta_high) > tol:
+            logger.info(probe)
             try:
                 _, lt_i, lg_i = f(new_high)
                 records.append((new_high, lt_i))

@@ -457,18 +457,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             for k, label in enumerate(("plotVel", "plotNozzleV", "plotBurnup", "plotEta"))
         )
 
-        for check in (
-            self.plot_avg_p,
-            self.plot_base_p,
-            self.plot_breech_p,
-            self.plot_stag_p,
-            self.plot_vel,
-            self.plot_nozzle_v,
-            self.plot_burnup,
-            self.plot_eta,
-        ):
-            check.trace_add("write", self.update_fig_plot)
-
         plot_frm.columnconfigure(0, weight=1)
         plot_frm.rowconfigure(0, weight=1)
 
@@ -518,9 +506,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             k + 1,
         )
 
-        for check in (self.trace_hull, self.trace_press):
-            check.trace_add("write", self.update_aux_plot)
-
         aux_frm.columnconfigure(0, weight=1)
         aux_frm.rowconfigure(0, weight=1)
 
@@ -561,7 +546,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             j + 1,
         )
-        self.in_atmos.trace_add("write", self.amb_callback)
 
         self.amb_p, j = (
             self.add_localized_3_input(
@@ -628,7 +612,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             i + 1,
         )
-        self.solve_W_Lg.trace_add("write", self.ctrl_callback)
 
         cons_frm = self.add_localized_label_frame(
             op_frm, label_loc_key="consFrmLabel"
@@ -650,7 +633,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             j + 1,
         )
-        self.lock_Lg.trace_add("write", self.ctrl_callback)
 
         self.opt_lf, j = (
             self.add_localized_label_check(
@@ -664,7 +646,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             j + 1,
         )
-        self.opt_lf.trace_add("write", self.ctrl_callback)
 
         self.v_tgt, j = (
             self.add_localized_3_input(
@@ -969,10 +950,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.geom_plot_frm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         j += 1
 
-        self.geom = self.add_localized_dropdown(
+        self.main_geom = self.add_localized_dropdown(
             parent=self.grain_frm, str_obj_dict=Geometry.get_desc_geometry_dict(), desc_label_key="Grain Geometry"
         )
-        self.geom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.main_geom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         j += 1
 
         self.web_mm, j = (
@@ -1026,8 +1007,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             j + 1,
         )
-        self.use_aux_grain.trace_add("write", self.ctrl_callback)
-        self.use_aux_grain.trace_add("write", self.callback)
 
         self.aux_grain_frm = self.add_localized_label_frame(self.grain_frm, label_loc_key="auxGrainFrmLabel")
         self.aux_grain_frm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
@@ -1100,6 +1079,18 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.swap_button.grid(row=j, column=0, columnspan=3, sticky="nsew")
         j += 1
 
+        # self.is_tc, j = (
+        #     self.add_localized_label_check(
+        #         parent=self.grain_frm,
+        #         row=j,
+        #         label_loc_key="isTravelingChargeLabel",
+        #         tooltip_loc_key="travelingChargeText",
+        #         columnspan=3,
+        #         default=False,
+        #     ),
+        #     j + 1,
+        # )
+
         self.use_cv = self.add_localized_dropdown(
             parent=specs_frame,
             str_obj_dict={USE_CV: USE_CV, USE_LD: USE_LD, USE_LF: USE_LF},
@@ -1147,9 +1138,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             i + 1,
         )
-
-        self.use_cv.trace_add("write", self.cvldlf_callback)
-        self.add_cvldlf_consistency_traces()
 
         self.clr, i = (
             self.add_localized_3_input(
@@ -1285,24 +1273,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
         specs_frame.rowconfigure(i, weight=5)
 
-        self.drop_prop.trace_add("write", self.update_spec)
-        self.geom.trace_add("write", self.update_geom)
-        self.aux_geom.trace_add("write", self.update_geom)
-        self.type_optn.trace_add("write", self.type_callback)
-        self.use_material.trace_add("write", self.material_callback)
-
-        for entry in (
-            self.grain_r1,
-            self.grain_r2,
-            self.web_mm,
-            self.aux_mass_ratio,
-            self.aux_web_ratio,
-            self.aux_grain_r1,
-            self.aux_grain_r2,
-            self.type_optn,
-        ):
-            entry.var.trace_add("write", self.callback)
-
         ## geom plot
         with mpl.rc_context(CONTEXT):
             fig = Figure(dpi=96, layout="constrained")
@@ -1329,7 +1299,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         control_frm.grid(row=1, column=0, sticky="nsew")
 
         self.guide_index = IntVar(value=3)
-        self.guide_index.trace_add("write", callback=self.guide_callback)
 
         for i in range(3):
             control_frm.columnconfigure(i, weight=1)
@@ -1348,6 +1317,61 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
         self.guide_plot_burnout.grid(row=0, column=2, sticky="nsew")
 
+        self.solve_W_Lg.trace_add("write", self.ctrl_callback)
+        self.lock_Lg.trace_add("write", self.ctrl_callback)
+        self.opt_lf.trace_add("write", self.ctrl_callback)
+        self.use_aux_grain.trace_add("write", self.ctrl_callback)
+
+        self.guide_index.trace_add("write", callback=self.guide_callback)
+
+        self.in_atmos.trace_add("write", self.amb_callback)
+
+        self.drop_prop.trace_add("write", self.update_spec)
+
+        self.drop_prop.trace_add("write", self.cvldlf_consistency_callback)
+
+        self.main_geom.trace_add("write", self.update_geom)
+        self.aux_geom.trace_add("write", self.update_geom)
+
+        self.type_optn.trace_add("write", self.type_callback)
+
+        self.use_material.trace_add("write", self.material_callback)
+
+        self.use_cv.trace_add("write", self.cvldlf_callback)
+
+        self.add_cvldlf_consistency_traces()
+
+        for entry in (
+            self.main_geom,
+            self.aux_geom,
+            self.use_aux_grain,
+            self.drop_prop,
+            self.grain_r1,
+            self.grain_r2,
+            self.web_mm,
+            self.aux_mass_ratio,
+            self.aux_web_ratio,
+            self.aux_grain_r1,
+            self.aux_grain_r2,
+        ):
+
+            entry.var.trace_add("write", self.propellant_callback)
+
+        for check in (
+            self.plot_avg_p,
+            self.plot_base_p,
+            self.plot_breech_p,
+            self.plot_stag_p,
+            self.plot_vel,
+            self.plot_nozzle_v,
+            self.plot_burnup,
+            self.plot_eta,
+        ):
+            check.trace_add("write", self.update_fig_plot)
+
+        for check in (self.trace_hull, self.trace_press):
+            check.trace_add("write", self.update_aux_plot)
+
         self.amb_callback()
         self.cvldlf_callback()
         self.cvldlf_consistency_callback()
@@ -1355,7 +1379,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.ctrl_callback()
         self.material_callback()
         self.guide_callback()
-        self.callback()
+        self.propellant_callback()
 
         self.update_all()
 
@@ -1468,6 +1492,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
             messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
             return
 
+        self.remove_cvldlf_consistency_traces()
+
         try:
             loc_dict = {
                 loc.get_descriptive(): loc
@@ -1476,8 +1502,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             }
             with open(file_name, "r", encoding="utf-8") as file:
                 file_dict = json.load(file)
-
-            self.remove_cvldlf_consistency_traces()
 
             for key, value in file_dict.items():
                 try:
@@ -1616,12 +1640,13 @@ class InteriorBallisticsFrame(LocalizedFrame):
         super().change_lang()
 
     def generate_kwargs(self):
-        constrain = self.solve_W_Lg.get() == 1
-        lock = self.lock_Lg.get() == 1
-        optimize = self.opt_lf.get() == 1
-        debug = self.debug.get() == 1
-        atmosphere = self.in_atmos.get() == 1
-        autofrettage = self.material_is_af.get() == 1
+        constrain = bool(self.solve_W_Lg.get())
+        lock = bool(self.lock_Lg.get())
+        optimize = bool(self.opt_lf.get())
+        debug = bool(self.debug.get())
+        atmosphere = bool(self.in_atmos.get())
+        autofrettage = bool(self.material_is_af.get())
+        # is_tc = bool(self.is_tc.get())
 
         gun_type = self.type_optn.get_obj()
 
@@ -1691,6 +1716,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             "step_lf": float(self.guide_step_lf.get()) * 1e-2,
             "max_iter": int(self.max_iter.get()),
             "max_guess": int(self.max_guess.get()),
+            # "traveling_charge": is_tc,
         }
 
         if atmosphere:
@@ -1732,6 +1758,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.guide_button.config(state="disabled")
 
     def on_calculate(self):
+
         if self.process or self.guide_process:
             return
         self.focus()  # remove focus to force widget entry validation
@@ -2136,18 +2163,15 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 + " @ {:>12}\n".format(to_si(p, unit="Pa", dec=3)),
             )
 
-        # for line in compo.desc.split("\\n"):
-        # self.specs.insert("end", line + "\n")
         self.specs.insert("end", compo.desc)
         self.specs.config(state="disabled")
 
-        self.callback()
-        self.cvldlf_consistency_callback()  # update the chamber volume / load fraction with current data
+        # self.propellant_callback()
+        # self.cvldlf_consistency_callback()  # update the chamber volume / load fraction with current data
 
     def update_geom(self, *_):
-
         for geom, r1, r2 in zip(
-            (self.geom.get_obj(), self.aux_geom.get_obj()),
+            (self.main_geom.get_obj(), self.aux_geom.get_obj()),
             (self.grain_r1, self.aux_grain_r1),
             (self.grain_r2, self.aux_grain_r2),
         ):
@@ -2162,7 +2186,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 r2.restore()
 
         for geom, web, r1, r2 in zip(
-            (self.geom.get_obj(), self.aux_geom.get_obj()),
+            (self.main_geom.get_obj(), self.aux_geom.get_obj()),
             (self.web_mm, None),
             (self.grain_r1, self.aux_grain_r1),
             (self.grain_r2, self.aux_grain_r2),
@@ -2195,11 +2219,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 r1.localize("pdtarcLabel", "pdtarcText")
                 r2.localize("ltdLabel", "perfLRText")
 
-        self.callback()
-
     def update_geom_plot(self):
         with mpl.rc_context(CONTEXT):
-            n = 10
+            n = 100
             self.geom_ax.cla()
             prop = self.prop
             if prop is not None:
@@ -2386,12 +2408,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 # self.guideCursor = Cursor(self.guideAx, useblit=True, color=fgc, linewidth=1)
             self.guide_canvas.draw_idle()
 
-    def callback(self, *_):
+    def propellant_callback(self, *_):
         """
         updates the propellant object on write to the ratio entry fields
         and, on changing the propellant or geometrical specification.
         """
-        geom = self.geom.get_obj()
+        geom = self.main_geom.get_obj()
         aux_geom = self.aux_geom.get_obj()
         compo = self.drop_prop.get_obj()
 
@@ -2482,11 +2504,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
             entry.disable() if self.use_aux_grain.get() == 0 else entry.enable()
 
     def add_cvldlf_consistency_traces(self):
-        for entry in (self.cv_L, self.lf, self.ld, self.chg_kg):
+        for entry in (self.chg_kg, self.cv_L, self.lf, self.ld, self.chg_kg):
             entry.var.trace_add("write", self.cvldlf_consistency_callback)
 
     def remove_cvldlf_consistency_traces(self):
-        for entry in (self.cv_L, self.lf, self.ld, self.chg_kg):
+        for entry in (self.chg_kg, self.cv_L, self.lf, self.ld, self.chg_kg):
             for trace in entry.var.trace_info():
                 entry.var.trace_remove(*trace)
 
@@ -2499,20 +2521,15 @@ class InteriorBallisticsFrame(LocalizedFrame):
             lf = float(self.lf.get())
             ld = float(self.ld.get())
             rho = compo.rho_p
-
             self.remove_cvldlf_consistency_traces()
 
-            if (
-                (val_name == str(self.cv_L.var) or val_name == str(self.chg_kg.var))
-                if val_name
-                else self.use_cv.get_obj() == USE_CV
-            ):
+            if self.use_cv.get_obj() == USE_CV:
                 self.lf.set(round_sig(w / cv / rho * 1e5, n=sigfig))
                 self.ld.set(round_sig(w / cv * 1e3, n=sigfig))
-            elif val_name == str(self.lf.var) if val_name else self.use_cv.get_obj() == USE_LF:
+            elif self.use_cv.get_obj() == USE_LF:
                 self.cv_L.set(round_sig(w / rho / lf * 1e5, n=sigfig))
                 self.ld.set(round_sig(lf * rho * 1e-2, n=sigfig))
-            elif val_name == str(self.ld.var) if val_name else self.use_cv.get_obj() == USE_LD:
+            elif self.use_cv.get_obj() == USE_LD:
                 self.lf.set(round_sig(ld / rho * 1e2, n=sigfig))
                 self.cv_L.set(round_sig(w / ld * 1e3, n=sigfig))
 
@@ -2637,6 +2654,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 fig = self.guide_fig
             elif save == "geom":
                 fig = self.geom_fig
+            else:
+                raise ValueError("unknown save target.")
 
             with mpl.rc_context(CONTEXT):
                 fig.savefig(file_name, transparent=True, dpi=600)
@@ -2651,7 +2670,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         sigfig = int(self.acc_exp.get()) + 1
         try:
             # cache the values for swapping.
-            main_geom, aux_geom = self.geom.get(), self.aux_geom.get()
+            main_geom, aux_geom = self.main_geom.get(), self.aux_geom.get()
             main_r1, main_r2 = self.grain_r1.get(), self.grain_r2.get()
             aux_r1, aux_r2 = self.aux_grain_r1.get(), self.aux_grain_r2.get()
             web_ratio, mass_ratio = self.aux_web_ratio.get(), self.aux_mass_ratio.get()
@@ -2664,7 +2683,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_web_ratio.set(round_sig(1.0 / web_ratio, n=sigfig))
             self.aux_mass_ratio.set(round_sig(1.0 / mass_ratio, n=sigfig))
 
-            self.geom.set(aux_geom)
+            self.main_geom.set(aux_geom)
             self.aux_geom.set(main_geom)
 
         except ValueError as e:
