@@ -1732,6 +1732,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.guide_button.config(state="disabled")
 
     def on_calculate(self):
+
         if self.process or self.guide_process:
             return
         self.focus()  # remove focus to force widget entry validation
