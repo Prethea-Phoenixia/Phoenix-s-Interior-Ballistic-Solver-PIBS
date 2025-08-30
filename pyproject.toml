@@ -1,0 +1,31 @@
+[tool.isort]
+profile = "black"
+
+[tool.black]
+line-length = 120
+
+[tool.setuptools]
+py-modules = []
+
+[tool.setuptools.dynamic]
+version = {attr = "pibs.__version__"}
+
+[project]
+name = "pibs"
+description = "Phoenix's Interior Ballistic Solver"
+dynamic = ["version"]
+requires-python = ">3.8"
+readme = "README.md"
+license = "unlicense"
+license-files = ["LICENSE"]
+dependencies = ["matplotlib", "matplotlib-label-lines", "tabulate", "psutil"] # pip install .
+authors = [{name = "Jinpeng Zhai", email = "914962409@qq.com"}]
+keywords = ["interior ballistics"]
+classifiers = ["Development Status :: 4 - Beta", "Programming Language :: Python"]
+
+[project.optional-dependencies]
+dev = ["black", "isort", "pysocks", "pyinstaller"] # pip install .[dev]
+
+[project.urls]
+Repository = "https://github.com/Prethea-Phoenixia/Phoenix-s-Interior-Ballistic-Solver-PIBS"
+

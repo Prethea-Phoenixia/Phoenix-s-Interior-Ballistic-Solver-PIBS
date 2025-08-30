@@ -1,0 +1,77 @@
+{
+  "version": "auto-py-to-exe-configuration_v1",
+  "pyinstallerOptions": [
+    {
+      "optionDest": "noconfirm",
+      "value": true
+    },
+    {
+      "optionDest": "filenames",
+      "value": "run_pibs.py"
+    },
+    {
+      "optionDest": "onefile",
+      "value": true
+    },
+    {
+      "optionDest": "console",
+      "value": false
+    },
+    {
+      "optionDest": "icon_file",
+      "value": "pibs/ui/logo.ico"
+    },
+    {
+      "optionDest": "name",
+      "value": "pibs"
+    },
+    {
+      "optionDest": "clean_build",
+      "value": false
+    },
+    {
+      "optionDest": "debug",
+      "value": "all"
+    },
+    {
+      "optionDest": "strip",
+      "value": false
+    },
+    {
+      "optionDest": "noupx",
+      "value": false
+    },
+    {
+      "optionDest": "disable_windowed_traceback",
+      "value": false
+    },
+    {
+      "optionDest": "uac_admin",
+      "value": false
+    },
+    {
+      "optionDest": "uac_uiaccess",
+      "value": false
+    },
+    {
+      "optionDest": "argv_emulation",
+      "value": false
+    },
+    {
+      "optionDest": "bootloader_ignore_signals",
+      "value": false
+    },
+    {
+      "optionDest": "datas",
+      "value": "pibs/ballistics/resource;ballistics/resource/"
+    },
+    {
+      "optionDest": "datas",
+      "value": "pibs/ui;ui/"
+    }
+  ],
+  "nonPyinstallerOptions": {
+    "increaseRecursionLimit": false,
+    "manualArguments": ""
+  }
+}

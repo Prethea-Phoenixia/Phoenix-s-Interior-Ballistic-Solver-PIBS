@@ -1,0 +1,11 @@
+git remote add origin git@github.com:username/new_repo#!/bin/sh
+echo "activating venv ..."
+.venv/scripts/activate.bat
+echo "running black ..."
+black .
+echo "running isort ..."
+isort .
+echo "sorting locallization file ..."
+python sort_localization.py
+python generate_executable.py
+git add .
