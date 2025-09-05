@@ -16,6 +16,7 @@
 	"Chambrage Ratio (x)": 1.37,
 	"Charge / Shot Mass Step": 0.05,
 	"Charge Mass (kg)": 7.934,
+	"Combustible Cartridge": false,
 	"Constrain Design": true,
 	"Constrain Travel": true,
 	"Description": "Ballistics of 115x728R 3UBM5 round, with the 3BM6 steel core APFSDS-T shot, fired from the U-5TS tank gun (GRAU index 2A20), chiefly employed on the T-62 tank. \n\nBarrel Length:      5840 mm\nCartridge Length:    723 mm\nProjectile Travel:  5117 mm  (estimated from above)\nPeak Pressure:      3650 kgf/cm² space-mean pressure\nMuzzle Velocity:    1600 m/s \nChambrage:          1.37     from 枪炮内弹道学 (2014).\nPropellant: \nMass      Propellant  Geometry   Web      Perf Diam.  Force (from \"545\")\n1.1   kg  Pyroxylin   18/1-37.5  1.73 mm  1.89 mm     830,000 kgf-dm/kg\n2.1   kg  Pyroxylin   18/1-28.5  1.73 mm  1.88 mm     830,000 kgf-dm/kg\n4.734 kg  Pyroxylin   12/7       1.27 mm  0.44 mm     900,000 kgf-dm/kg\n\nChinese chemical analysis from captured example (vehicle T-62 №545) indicates propellant is of relatively low force, although this is not specifically mentioned in Soviet documentation",
@@ -53,5 +54,7 @@
 	"Velocity Target (m/s)": 1600.0,
 	"Web (mm)": 1.628,
 	"Web Aux / Main (x)": 0.666,
-	"Yield Strength (MPa)": 1000.0
+	"Yield Strength (MPa)": 1000.0,
+	"fʹ (kJ/kg)": 514.0,
+	"ωʹ (kg)": 0.8
 }

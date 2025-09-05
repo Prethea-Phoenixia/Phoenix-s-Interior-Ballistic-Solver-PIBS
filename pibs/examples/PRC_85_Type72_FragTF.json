@@ -16,9 +16,10 @@
 	"Chambrage Ratio (x)": 1.725,
 	"Charge / Shot Mass Step": 0.05,
 	"Charge Mass (kg)": 4.15,
+	"Combustible Cartridge": false,
 	"Constrain Design": true,
 	"Constrain Travel": true,
-	"Description": "Ballistics of the Type 1972 Anti-Aircraft Gun firing Airburst Fragmentation (Time Fuzed) shell, industrial designation WB030AP.\n\nCaliber:                85 mm\nProjectile Weight:     9.3 kg\nGun Length:           6022 mm\nBarrel Length:        5500 mm\nProjectile Travel:    4965 mm\nPropellant:           4.15 kg Pyroxylin (16/7 Rosette + 18/1-42), assumed 4:1.\nMuzzle Velocity:      1000 m/s\nPeak Pressure:  3100(3150) kgf/cm^2 (space mean), \nChamber Volume:      5.441 L\nChamber Length:       5.35 dm (interior)\nChambrage:           1.725 (estimated) ",
+	"Description": "Ballistics of the Type 1972 Anti-Aircraft Gun firing Airburst Fragmentation (Time Fuzed) shell, industrial designation WB030AP.\n\nCaliber:                85 mm\nProjectile Weight:     9.3 kg\nGun Length:           6022 mm\nBarrel Length:        5500 mm\nProjectile Travel:    4965 mm\nPropellant:           4.15 kg Pyroxylin (16/7 Rosette + 18/1-42), assumed 4:1.\nMuzzle Velocity:      1000 m/s\nPeak Pressure:  3100(3150) kgf/cm², \nChamber Volume:      5.441 L\nChamber Length:       5.35 dm (interior)\nChambrage:           1.725 (estimated) ",
 	"Expansion Ratio (x)": 4.0,
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "SEVEN_PERF_ROSETTE",
@@ -53,5 +54,7 @@
 	"Velocity Target (m/s)": 1000.0,
 	"Web (mm)": 2.025,
 	"Web Aux / Main (x)": 1.136,
-	"Yield Strength (MPa)": 1000.0
+	"Yield Strength (MPa)": 1000.0,
+	"fʹ (kJ/kg)": 750.0,
+	"ωʹ (kg)": 0.0
 }

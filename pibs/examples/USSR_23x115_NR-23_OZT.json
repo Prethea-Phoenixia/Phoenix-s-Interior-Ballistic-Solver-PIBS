@@ -16,9 +16,10 @@
 	"Chambrage Ratio (x)": 1.1,
 	"Charge / Shot Mass Step": 0.05,
 	"Charge Mass (kg)": 0.033,
+	"Combustible Cartridge": false,
 	"Constrain Design": true,
 	"Constrain Travel": true,
-	"Description": "Ballistics of the 23x115mm fired from NS-23 and NR-23 autocannons.\nNR-23 is produced as the 23mm Type 1 aircraft autocannon (Type 58 provisionally) in PRC.\n\nProjectile  Mass   Type  Velocity        C.V.     C.L.\n-- Union of Soviet Socialist Republics --\nOZT         196 g  HEIT  680 (±10) m/s   40.1 cm³  85.06 mm \nBZ          199 g  API   680 (±10) m/s   40.7 cm³  87.64 mm\n-- People's Republic of China --\nWB-602P     ... as OZT \nWB-603P     ... as BZ\n\nCharge:         33 g 4/7\nMax Pressure: 2800 kgf/cm² Space-Mean",
+	"Description": "Ballistics of the 23x115mm fired from NS-23 and NR-23 autocannons.\nNR-23 is produced as the 23mm Type 1 aircraft autocannon (Type 58 provisionally) in PRC.\n\nProjectile  Mass   Type  Velocity        C.V.     C.L.\n-- Union of Soviet Socialist Republics --\nOZT         196 g  HEIT  680 (±10) m/s   40.1 cm³  85.06 mm \nBZ          199 g  API   680 (±10) m/s   40.7 cm³  87.64 mm\n-- People's Republic of China --\nWB-602P     ... as OZT \nWB-603P     ... as BZ\n\nCharge:         33 g 4/7\nMax Pressure: 2800 kgf/cm²",
 	"Expansion Ratio (x)": 4.0,
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "SEVEN_PERF_CYLINDER",
@@ -53,5 +54,7 @@
 	"Velocity Target (m/s)": 1000.0,
 	"Web (mm)": 0.3922,
 	"Web Aux / Main (x)": 1.0,
-	"Yield Strength (MPa)": 1000.0
+	"Yield Strength (MPa)": 1000.0,
+	"fʹ (kJ/kg)": 750.0,
+	"ωʹ (kg)": 0.0
 }

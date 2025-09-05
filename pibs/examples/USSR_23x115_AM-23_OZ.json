@@ -16,9 +16,10 @@
 	"Chambrage Ratio (x)": 1.1,
 	"Charge / Shot Mass Step": 0.05,
 	"Charge Mass (kg)": 0.0378,
+	"Combustible Cartridge": false,
 	"Constrain Design": true,
 	"Constrain Travel": true,
-	"Description": "Ballistics of the 23x115mm fired from AM-23 autocannon.\nAM-23 autocannon is produced in the PRC as the 23mm Type 2 aircraft autocannon.\n\nProjectile  Mass   Type  Velocity        Charge\n-- Union of Soviet Socialist Republics --\nOZ          175 g  HEI   705 (±10) m/s   37.8 g 4/7\nBZ-A        175 g  APIT  705 (±10) m/s   39.0 g 4/7   \n-- People's Republic of China --\nWB-610P     ... as OZ\nWB-611P     ... as BZ-A\n\nChamber Length:  89.6 mm\nChamber Volume:    42 cm³\nChambrage:        1.1      estimated\nMax Pressure:    3000 kgf/cm² Space-Mean",
+	"Description": "Ballistics of the 23x115mm fired from AM-23 autocannon.\nAM-23 autocannon is produced in the PRC as the 23mm Type 2 aircraft autocannon.\n\nProjectile  Mass   Type  Velocity        Charge\n-- Union of Soviet Socialist Republics --\nOZ          175 g  HEI   705 (±10) m/s   37.8 g 4/7\nBZ-A        175 g  APIT  705 (±10) m/s   39.0 g 4/7   \n-- People's Republic of China --\nWB-610P     ... as OZ\nWB-611P     ... as BZ-A\n\nChamber Length:  89.6 mm\nChamber Volume:    42 cm³\nChambrage:        1.1 (estimated)\nMax Pressure:    3000 kgf/cm²",
 	"Expansion Ratio (x)": 4.0,
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "SEVEN_PERF_CYLINDER",
@@ -53,5 +54,7 @@
 	"Velocity Target (m/s)": 1000.0,
 	"Web (mm)": 0.4064,
 	"Web Aux / Main (x)": 1.0,
-	"Yield Strength (MPa)": 1000.0
+	"Yield Strength (MPa)": 1000.0,
+	"fʹ (kJ/kg)": 750.0,
+	"ωʹ (kg)": 0.0
 }

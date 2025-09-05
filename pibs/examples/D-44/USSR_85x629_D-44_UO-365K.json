@@ -16,9 +16,10 @@
 	"Chambrage Ratio (x)": 1.225,
 	"Charge / Shot Mass Step": 0.05,
 	"Charge Mass (kg)": 2.6,
+	"Combustible Cartridge": false,
 	"Constrain Design": true,
 	"Constrain Travel": true,
-	"Description": "Ballistics of the 85×629mmR UO-365K HE-Frag shot fired from tank gun ZiS-S-53, field gun D-44, and anti-aircraft gun M1939 (52-K).\n\nCharge Zh-365:\nPropellant  Mass      Grain Geometry  Remark\nPyroxylin   12%       18/1-42         Tubular, 1.8mm web, 420mm long. Improves ignition uniformity.\nPyroxylin   88%       14/7            7-perforated.\n\nThe entry may be manipulated to represent the ballistics for the following cases (Uncheck \"Constrain Design\"):\n\nShot       Projectile  Mass     Travel   Charge   Chamber Volume Muzzle Velocity  Remarks\nUO-365K    O-365K      9.54 kg  3592 mm  2.60 kg  3.80 L         793 (785) m/s    Parenthesis: medium-worn barrel. HE-Frag (PD)     \nOU-365     O-365       9.20 kg  Unknown  2.60 kg  3.80 L         800 (792) m/s    ... as above. AA-Frag (TF)\nUBR-365(K) BR-365(K)   9.20 kg  3587 mm  2.63 kg  3.94 L         800 (792) m/s    ... as above. APBCHE-T\nUBR-365(K) BR-365(K)   9.20 kg  3587 mm  2.63 kg  3.94 L         800 (792) m/s    ... as above. APHE-T\n\nParameters of the Weapon:\nGun Length:         4685 mm\nBarrel Length:      4145 mm\nMax Pressure:       2550 kgf/cm² (space-mean pressure, copper-crusher gauge)",
+	"Description": "Ballistics of the 85×629mmR UO-365K HE-Frag shot fired from tank gun ZiS-S-53, field gun D-44, and anti-aircraft gun M1939 (52-K).\n\nCharge Zh-365:\nPropellant  Mass      Grain Geometry  Remark\nPyroxylin   12%       18/1-42         Tubular, 1.8mm web, 420mm long. Improves ignition uniformity.\nPyroxylin   88%       14/7            7-perforated.\n\nThe entry may be manipulated to represent the ballistics for the following cases (Uncheck \"Constrain Design\"):\n\nShot       Projectile  Mass     Travel   Charge   Chamber Volume Muzzle Velocity  Remarks\nUO-365K    O-365K      9.54 kg  3592 mm  2.60 kg  3.80 L         793 (785) m/s    Parenthesis: medium-worn barrel. HE-Frag (PD)     \nOU-365     O-365       9.20 kg  Unknown  2.60 kg  3.80 L         800 (792) m/s    ... as above. AA-Frag (TF)\nUBR-365(K) BR-365(K)   9.20 kg  3587 mm  2.63 kg  3.94 L         800 (792) m/s    ... as above. APBCHE-T\nUBR-365(K) BR-365(K)   9.20 kg  3587 mm  2.63 kg  3.94 L         800 (792) m/s    ... as above. APHE-T\n\nParameters of the Weapon:\nGun Length:         4685 mm\nBarrel Length:      4145 mm\nMax Pressure:       2550 kgf/cm²",
 	"Expansion Ratio (x)": 4.0,
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "SEVEN_PERF_CYLINDER",
@@ -53,5 +54,7 @@
 	"Velocity Target (m/s)": 793.0,
 	"Web (mm)": 1.432,
 	"Web Aux / Main (x)": 1.286,
-	"Yield Strength (MPa)": 1000.0
+	"Yield Strength (MPa)": 1000.0,
+	"fʹ (kJ/kg)": 750.0,
+	"ωʹ (kg)": 0.0
 }
