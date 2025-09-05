@@ -13,7 +13,6 @@ from math import ceil, inf, log10
 from multiprocessing import Process, Queue
 from queue import Empty
 from tkinter import (
-    Frame,
     IntVar,
     Menu,
     StringVar,
@@ -24,6 +23,7 @@ from tkinter import (
     ttk,
 )
 from tkinter.font import Font
+from tkinter.ttk import Frame
 from typing import Literal
 
 import matplotlib as mpl
@@ -314,12 +314,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.force_update_on_theme_widget.append(self.description)
 
         ## left frame
-        left_frm = ttk.Frame(self)
-        left_frm.grid(row=1, column=0, sticky="nsew")
-        left_frm.columnconfigure(0, weight=1)
-        left_frm.rowconfigure(0, weight=1)
+        info_frm = Frame(self)
+        info_frm.grid(row=1, column=0, sticky="nsew")
+        info_frm.columnconfigure(0, weight=1)
+        info_frm.rowconfigure(0, weight=1)
 
-        par_frm = self.add_localized_label_frame(left_frm, label_loc_key="parFrmLabel")
+        par_frm = self.add_localized_label_frame(info_frm, label_loc_key="parFrmLabel")
         par_frm.grid(row=0, column=0, sticky="nsew")
         par_frm.columnconfigure(0, weight=1)
 
@@ -524,8 +524,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_canvas.get_tk_widget().place(relwidth=1, relheight=1)
 
         ## right frame
-        right_frm = ttk.Frame(self)
-        right_frm.grid(row=0, column=3, rowspan=2, sticky="nsew")
+        right_frm = Frame(self)
+        right_frm.grid(row=0, column=4, rowspan=2, sticky="nsew")
         right_frm.columnconfigure(0, weight=1)
         right_frm.rowconfigure(0, weight=1)
 
@@ -697,7 +697,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 row=j,
                 label_loc_key="maxLgLabel",
                 unit_text="m",
-                default="100.0",
+                default="10.0",
                 validation=validation_nn,
                 color="red",
                 dtype=float,
@@ -820,9 +820,14 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.guide_button.grid(row=6, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
+        left_frame = Frame(self)
+        left_frame.grid(row=0, column=2, rowspan=2, sticky="nsew")
+        left_frame.columnconfigure(0, weight=1)
+        left_frame.rowconfigure(0, weight=1)
+
         ## spec frame
-        specs_frame = self.add_localized_label_frame(self, label_loc_key="specFrmLabel")
-        specs_frame.grid(row=0, column=2, rowspan=2, sticky="nsew")
+        specs_frame = self.add_localized_label_frame(left_frame, label_loc_key="specFrmLabel")
+        specs_frame.grid(row=0, column=0, sticky="nsew")
         specs_frame.columnconfigure(0, weight=1)
 
         validation_nn, validation_ce = self.register(validate_nn), self.register(validate_ce)
@@ -888,208 +893,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             i + 1,
         )
-
-        self.prop_tab_parent = ttk.Notebook(specs_frame, padding=0)
-        self.prop_tab_parent.grid(row=i, column=0, columnspan=3, sticky="nsew")
-        specs_frame.rowconfigure(i, weight=1)
-
-        self.prop_tab_parent.columnconfigure(0, weight=1)
-        self.prop_tab_parent.rowconfigure(0, weight=1)
-
-        self.prop_frame = self.add_localized_label_frame(
-            self.prop_tab_parent, label_loc_key="propFrmLabel", tooltip_loc_key="specsText"
-        )
-
-        self.prop_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
-        self.prop_frame.rowconfigure(1, weight=1)
-        self.prop_frame.columnconfigure(0, weight=1)
-
-        self.drop_prop = self.add_localized_dropdown(
-            parent=self.prop_frame,
-            str_obj_dict=Composition.read_file(resolvepath("ballistics/resource/propellants.csv")),
-            desc_label_key="propFrmLabel",
-        )
-        self.drop_prop.grid(row=0, column=0, columnspan=2, sticky="nsew")
-
-        spec_scroll = ttk.Scrollbar(self.prop_frame, orient="vertical")
-        spec_scroll.grid(row=1, rowspan=2, column=1, sticky="nsew")
-        spec_h_scroll = ttk.Scrollbar(self.prop_frame, orient="horizontal")
-        spec_h_scroll.grid(row=2, column=0, sticky="nsew")
-
-        self.specs = Text(
-            self.prop_frame,
-            wrap="word",
-            height=25,
-            width=0,
-            yscrollcommand=spec_scroll.set,
-            xscrollcommand=spec_h_scroll.set,
-            font=(FONTNAME, FONTSIZE),
-        )
-        self.specs.grid(row=1, column=0, sticky="nsew")
-
-        spec_scroll.config(command=self.specs.yview)
-        spec_h_scroll.config(command=self.specs.xview)
-
-        self.force_update_on_theme_widget.append(self.specs)
-
-        self.grain_frm = self.add_localized_label_frame(self.prop_tab_parent, label_loc_key="grainFrmLabel")
-        self.grain_frm.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        i += 1
-
-        self.grain_frm.columnconfigure(0, weight=1)
-        self.grain_frm.rowconfigure(0, weight=1)
-        self.prop_tab_parent.add(self.prop_frame, text=self.get_loc_str("propFrmLabel"))
-        self.prop_tab_parent.add(self.grain_frm, text=self.get_loc_str("grainFrmLabel"))
-
-        self.prop_tab_parent.enable_traversal()
-
-        j = 0
-        self.geom_plot_frm = self.add_localized_label_frame(
-            self.grain_frm, label_loc_key="σ(Z)", style="SubLabelFrame.TLabelframe", tooltip_loc_key="geomPlotText"
-        )
-        self.geom_plot_frm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        j += 1
-
-        self.main_geom = self.add_localized_dropdown(
-            parent=self.grain_frm, str_obj_dict=Geometry.get_desc_geometry_dict(), desc_label_key="Grain Geometry"
-        )
-        self.main_geom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        j += 1
-
-        self.web_mm, j = (
-            self.add_localized_3_input(
-                parent=self.grain_frm,
-                row=j,
-                desc_label_key="Web",
-                unit_text="mm",
-                default="1.0",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
-        )
-
-        self.grain_r1, j = (
-            self.add_localized_3_input(
-                parent=self.grain_frm,
-                row=j,
-                desc_label_key="1/α",
-                unit_text="x",
-                default="1.0",
-                validation=validation_nn,
-                tooltip_loc_key="",
-                dtype=float,
-            ),
-            j + 1,
-        )
-
-        self.grain_r2, j = (
-            self.add_localized_3_input(
-                parent=self.grain_frm,
-                row=j,
-                desc_label_key="1/β",
-                unit_text="x",
-                default="2.5",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
-        )
-
-        self.use_aux_grain, j = (
-            self.add_localized_label_check(
-                parent=self.grain_frm,
-                row=j,
-                label_loc_key="useAuxGrainLabel",
-                desc_label_key="useAuxGrainLabel",
-                columnspan=3,
-                default=False,
-            ),
-            j + 1,
-        )
-
-        self.aux_grain_frm = self.add_localized_label_frame(self.grain_frm, label_loc_key="auxGrainFrmLabel")
-        self.aux_grain_frm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        j += 1
-        self.aux_grain_frm.columnconfigure(1, weight=1)
-
-        k = 0
-        self.aux_mass_ratio, k = (
-            self.add_localized_3_input(
-                parent=self.aux_grain_frm,
-                row=k,
-                label_loc_key="auxMassRatio",
-                default="1.0",
-                unit_text="x",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            k + 1,
-        )
-
-        self.aux_geom = self.add_localized_dropdown(
-            parent=self.aux_grain_frm,
-            str_obj_dict=Geometry.get_desc_geometry_dict(),
-            desc_label_key="Auxiliary Grain Geometry",
-        )
-        self.aux_geom.grid(row=k, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        k += 1
-
-        self.aux_web_ratio, k = (
-            self.add_localized_3_input(
-                parent=self.aux_grain_frm,
-                row=k,
-                default="1.0",
-                unit_text="x",
-                label_loc_key="auxWebRatio",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            k + 1,
-        )
-
-        self.aux_grain_r1, k = (
-            self.add_localized_3_input(
-                parent=self.aux_grain_frm,
-                row=k,
-                unit_text="x",
-                default="1.0",
-                desc_label_key="Auxiliary 1/α",
-                validation=validation_nn,
-                tooltip_loc_key="",
-                dtype=float,
-            ),
-            k + 1,
-        )
-
-        self.aux_grain_r2, k = (
-            self.add_localized_3_input(
-                parent=self.aux_grain_frm,
-                row=k,
-                unit_text="x",
-                default="2.5",
-                desc_label_key="Auxiliary 1/β",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            k + 1,
-        )
-
-        self.swap_button = ttk.Button(self.grain_frm, text=self.get_loc_str("swapLabel"), command=self.swap)
-        self.swap_button.grid(row=j, column=0, columnspan=3, sticky="nsew")
-        j += 1
-
-        # self.is_tc, j = (
-        #     self.add_localized_label_check(
-        #         parent=self.grain_frm,
-        #         row=j,
-        #         label_loc_key="isTravelingChargeLabel",
-        #         tooltip_loc_key="travelingChargeText",
-        #         columnspan=3,
-        #         default=False,
-        #     ),
-        #     j + 1,
-        # )
 
         self.use_cv = self.add_localized_dropdown(
             parent=specs_frame,
@@ -1222,7 +1025,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
 
         material_frame = self.add_localized_label_frame(specs_frame, label_loc_key="matFrmLabel")
-        material_frame.grid(row=i, column=0, sticky="nsew", columnspan=3)
+        material_frame.grid(row=i, column=0, sticky="nsew", columnspan=3, padx=2, pady=2)
         material_frame.columnconfigure(0, weight=1)
         i += 1
 
@@ -1271,7 +1074,115 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             i + 1,
         )
-        specs_frame.rowconfigure(i, weight=5)
+
+        ## grain frame
+
+        mid_frame = Frame(self)
+
+        mid_frame.grid(row=0, column=3, rowspan=2, sticky="nsew")
+        mid_frame.columnconfigure(0, weight=1)
+
+        i = 0
+        mid_frame.rowconfigure(i, weight=1)
+        ### propellant frame
+        self.prop_frame = self.add_localized_label_frame(
+            mid_frame, label_loc_key="propFrmLabel", tooltip_loc_key="specsText"
+        )
+        self.prop_frame.grid(row=i, column=0, columnspan=3, sticky="nsew")
+        i += 1
+        self.prop_frame.rowconfigure(1, weight=1)
+        self.prop_frame.columnconfigure(0, weight=1)
+        j = 0
+        self.drop_prop = self.add_localized_dropdown(
+            parent=self.prop_frame,
+            str_obj_dict=Composition.read_file(resolvepath("ballistics/resource/propellants.csv")),
+            desc_label_key="propFrmLabel",
+        )
+        self.drop_prop.grid(row=j, column=0, columnspan=2, sticky="nsew")
+        j += 1
+
+        spec_scroll = ttk.Scrollbar(self.prop_frame, orient="vertical")
+        spec_h_scroll = ttk.Scrollbar(self.prop_frame, orient="horizontal")
+        self.specs = Text(
+            self.prop_frame,
+            wrap="word",
+            height=0,
+            width=0,
+            yscrollcommand=spec_scroll.set,
+            xscrollcommand=spec_h_scroll.set,
+            font=(FONTNAME, FONTSIZE),
+        )
+        self.force_update_on_theme_widget.append(self.specs)
+        spec_scroll.config(command=self.specs.yview)
+        spec_h_scroll.config(command=self.specs.xview)
+
+        self.specs.grid(row=j, column=0, sticky="nsew")
+        spec_scroll.grid(row=j, rowspan=2, column=1, sticky="nsew")
+        j += 1
+
+        spec_h_scroll.grid(row=j, column=0, sticky="nsew")
+        j += 1
+
+        self.use_combustible, j = (
+            self.add_localized_label_check(
+                self.prop_frame,
+                label_loc_key="combustibleLabel",
+                tooltip_loc_key="combustibleText",
+                default=False,
+                row=j,
+                columnspan=2,
+            ),
+            j + 1,
+        )
+
+        combustible_frame = Frame(self.prop_frame)
+        combustible_frame.grid(row=j, column=0, columnspan=2, sticky="nsew")
+        j += 1
+
+        k = 0
+        self.combustible_mass_kg, k = (
+            self.add_localized_3_input(
+                combustible_frame,
+                label_loc_key="combustibleMassLabel",
+                default="0.0",
+                unit_text="kg",
+                desc_label_key="ωʹ",
+                dtype=float,
+                validation=validation_nn,
+                row=k,
+            ),
+            k + 1,
+        )
+
+        self.combustible_force_kJ__kg, k = (
+            self.add_localized_3_input(
+                combustible_frame,
+                label_loc_key="combustibleForceLabel",
+                default="750.0",
+                unit_text="kJ/kg",
+                desc_label_key="fʹ",
+                dtype=float,
+                validation=validation_nn,
+                row=k,
+            ),
+            k + 1,
+        )
+        ###
+
+        mid_frame.rowconfigure(i, weight=2)
+
+        self.grain_frm = self.add_localized_label_frame(mid_frame, label_loc_key="grainFrmLabel")
+        self.grain_frm.grid(row=i, column=0, sticky="nsew")
+        i += 1
+        self.grain_frm.columnconfigure(0, weight=1)
+        self.grain_frm.rowconfigure(0, weight=1)
+
+        j = 0
+        self.geom_plot_frm = self.add_localized_label_frame(
+            self.grain_frm, label_loc_key="σ(Z)", style="SubLabelFrame.TLabelframe", tooltip_loc_key="geomPlotText"
+        )
+        self.geom_plot_frm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        j += 1
 
         ## geom plot
         with mpl.rc_context(CONTEXT):
@@ -1282,6 +1193,136 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.geom_canvas = FigureCanvasTkAgg(fig, master=self.geom_plot_frm)
             self.geom_canvas.draw_idle()
             self.geom_canvas.get_tk_widget().place(relheight=1, relwidth=1)
+
+        self.main_geom = self.add_localized_dropdown(
+            parent=self.grain_frm, str_obj_dict=Geometry.get_desc_geometry_dict(), desc_label_key="Grain Geometry"
+        )
+        self.main_geom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        j += 1
+
+        self.web_mm, j = (
+            self.add_localized_3_input(
+                parent=self.grain_frm,
+                row=j,
+                desc_label_key="Web",
+                unit_text="mm",
+                default="1.0",
+                validation=validation_nn,
+                dtype=float,
+            ),
+            j + 1,
+        )
+
+        self.grain_r1, j = (
+            self.add_localized_3_input(
+                parent=self.grain_frm,
+                row=j,
+                desc_label_key="1/α",
+                unit_text="x",
+                default="1.0",
+                validation=validation_nn,
+                tooltip_loc_key="",
+                dtype=float,
+            ),
+            j + 1,
+        )
+
+        self.grain_r2, j = (
+            self.add_localized_3_input(
+                parent=self.grain_frm,
+                row=j,
+                desc_label_key="1/β",
+                unit_text="x",
+                default="10.0",
+                validation=validation_nn,
+                dtype=float,
+            ),
+            j + 1,
+        )
+
+        self.use_aux_grain, j = (
+            self.add_localized_label_check(
+                parent=self.grain_frm,
+                row=j,
+                label_loc_key="useAuxGrainLabel",
+                desc_label_key="useAuxGrainLabel",
+                columnspan=3,
+                default=False,
+            ),
+            j + 1,
+        )
+
+        self.aux_grain_frm = self.add_localized_label_frame(self.grain_frm, label_loc_key="auxGrainFrmLabel")
+        self.aux_grain_frm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        j += 1
+        self.aux_grain_frm.columnconfigure(1, weight=1)
+
+        k = 0
+        self.aux_mass_ratio, k = (
+            self.add_localized_3_input(
+                parent=self.aux_grain_frm,
+                row=k,
+                label_loc_key="auxMassRatio",
+                default="1.0",
+                unit_text="x",
+                validation=validation_nn,
+                dtype=float,
+            ),
+            k + 1,
+        )
+
+        self.aux_geom = self.add_localized_dropdown(
+            parent=self.aux_grain_frm,
+            str_obj_dict=Geometry.get_desc_geometry_dict(),
+            desc_label_key="Auxiliary Grain Geometry",
+        )
+        self.aux_geom.grid(row=k, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        k += 1
+
+        self.aux_web_ratio, k = (
+            self.add_localized_3_input(
+                parent=self.aux_grain_frm,
+                row=k,
+                default="1.0",
+                unit_text="x",
+                label_loc_key="auxWebRatio",
+                validation=validation_nn,
+                dtype=float,
+            ),
+            k + 1,
+        )
+
+        self.aux_grain_r1, k = (
+            self.add_localized_3_input(
+                parent=self.aux_grain_frm,
+                row=k,
+                unit_text="x",
+                default="1.0",
+                desc_label_key="Auxiliary 1/α",
+                validation=validation_nn,
+                tooltip_loc_key="",
+                dtype=float,
+            ),
+            k + 1,
+        )
+
+        self.aux_grain_r2, k = (
+            self.add_localized_3_input(
+                parent=self.aux_grain_frm,
+                row=k,
+                unit_text="x",
+                default="10.0",
+                desc_label_key="Auxiliary 1/β",
+                validation=validation_nn,
+                dtype=float,
+            ),
+            k + 1,
+        )
+
+        self.swap_button = ttk.Button(self.grain_frm, text=self.get_loc_str("swapLabel"), command=self.swap)
+        self.swap_button.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.locs.append(self.swap_button)
+        j += 1
 
         ## guide plot
         plot_frm = self.add_localized_label_frame(self.guide_tab, label_loc_key="guideFrmLabel")
@@ -1353,6 +1394,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_web_ratio,
             self.aux_grain_r1,
             self.aux_grain_r2,
+            self.use_combustible,
+            self.combustible_force_kJ__kg,
+            self.combustible_mass_kg,
+            self.chg_kg,
         ):
 
             entry.var.trace_add("write", self.propellant_callback)
@@ -1372,6 +1417,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
         for check in (self.trace_hull, self.trace_press):
             check.trace_add("write", self.update_aux_plot)
 
+        self.use_combustible.trace_add("write", self.combustible_callback)
+
         self.amb_callback()
         self.cvldlf_callback()
         self.cvldlf_consistency_callback()
@@ -1380,6 +1427,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.material_callback()
         self.guide_callback()
         self.propellant_callback()
+        self.combustible_callback()
 
         self.update_all()
 
@@ -1459,10 +1507,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             initialfile=filenameize(self.get_description()),
         )
 
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
-
         try:
             loc_val_dict = {
                 loc.get_descriptive(): loc.get()
@@ -1479,7 +1523,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             )
 
         except Exception as e:
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+            self.handle_errors(e, logging.WARNING)
 
     def load_gun(self, initialdir: str = None):
         file_name = filedialog.askopenfilename(
@@ -1488,10 +1532,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
             defaultextension=".json",
             initialdir=initialdir,
         )
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
+
+        if not file_name:
             return
 
+        self.on_reset()
         self.remove_cvldlf_consistency_traces()
 
         try:
@@ -1509,6 +1554,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
                         loc_dict[key].set(value)
                 except KeyError:
                     pass
+                except ValueError:
+                    loc_dict[key].reset()
 
             for key, value in file_dict.items():
                 try:
@@ -1516,14 +1563,15 @@ class InteriorBallisticsFrame(LocalizedFrame):
                         loc_dict[key].set(value)
                 except KeyError:
                     pass
+                except ValueError:
+                    loc_dict[key].reset()
 
             if DESCRIPTION in file_dict.keys():  # update description from file.
                 self.description.delete(1.0, "end")
                 self.description.insert("end", file_dict[DESCRIPTION].strip("\n"))
 
         except Exception as e:
-            self.handle_errors(e)
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+            self.handle_errors(e, logging.WARNING)
         finally:
             self.add_cvldlf_consistency_traces()
             self.on_calculate()
@@ -1532,14 +1580,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
         file_name = filedialog.askopenfilename(
             title=self.get_loc_str("loadLabel"), filetypes=(("Comma Separated Values File", "*.csv"),)
         )
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
+
         try:
             self.drop_prop.reset(str_obj_dict=Composition.read_file(file_name))
         except Exception as e:
-            self.handle_errors(e)
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+            self.handle_errors(e, logging.WARNING)
 
     def on_reset(self):
         for loc in self.locs:
@@ -1573,9 +1618,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         gun_type = self.kwargs["typ"]
         column_list = self.get_loc_str("columnList")[gun_type]
 
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
         try:
             with open(file_name, "w", encoding="utf-8", newline="") as csvFile:
                 csv_writer = csv.writer(csvFile, delimiter=",", quoting=csv.QUOTE_MINIMAL)
@@ -1588,7 +1630,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             )
 
         except Exception as e:
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+            self.handle_errors(e, logging.WARNING)
 
     def change_lang(self):
 
@@ -1627,9 +1669,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.tab_parent.tab(self.table_tab, text=self.get_loc_str("tableTab"))
         self.tab_parent.tab(self.errorTab, text=self.get_loc_str("errorTab"))
         self.tab_parent.tab(self.guide_tab, text=self.get_loc_str("guideTab"))
-
-        self.prop_tab_parent.tab(self.prop_frame, text=self.get_loc_str("propFrmLabel"))
-        self.prop_tab_parent.tab(self.grain_frm, text=self.get_loc_str("grainFrmLabel"))
+        #
+        # self.prop_tab_parent.tab(self.prop_frame, text=self.get_loc_str("propFrmLabel"))
+        # self.prop_tab_parent.tab(self.grain_frm, text=self.get_loc_str("grainFrmLabel"))
 
         self.guide_plot_travel.config(text=self.get_loc_str("guidePlotTravel"))
         self.guide_plot_volume.config(text=self.get_loc_str("guidePlotVolume"))
@@ -1716,7 +1758,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             "step_lf": float(self.guide_step_lf.get()) * 1e-2,
             "max_iter": int(self.max_iter.get()),
             "max_guess": int(self.max_guess.get()),
-            # "traveling_charge": is_tc,
         }
 
         if atmosphere:
@@ -1756,6 +1797,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
             self.calc_button.config(state="disabled")
             self.guide_button.config(state="disabled")
+            self.swap_button.config(state="disabled")
 
     def on_calculate(self):
 
@@ -1787,6 +1829,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
             self.calc_button.config(state="disabled")
             self.guide_button.config(state="disabled")
+            self.swap_button.config(state="disabled")
 
     def get_value(self):
         try:
@@ -1834,6 +1877,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.calc_button.config(state="normal")
         self.guide_button.config(state="normal")
+        self.swap_button.config(state="normal")
 
         for loc in self.locs:
             try:
@@ -1905,6 +1949,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.update_guide_graph()
         self.calc_button.config(state="normal")
         self.guide_button.config(state="normal")
+        self.swap_button.config(state="normal")
 
         for loc in self.locs:
             try:
@@ -2217,7 +2262,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
                     web.localize("arcLabel", "arcText")
 
                 r1.localize("pdtarcLabel", "pdtarcText")
-                r2.localize("ltdLabel", "perfLRText")
+                # r2.localize("ltdLabel", "perfLRText")
+                r2.localize("ltarcLabel", "ltarcText")
 
     def update_geom_plot(self):
         with mpl.rc_context(CONTEXT):
@@ -2428,6 +2474,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 mass_ratio=self.aux_mass_ratio.get() if self.use_aux_grain.get() else 0.0,
                 aux_r1=self.aux_grain_r1.get(),
                 aux_r2=self.aux_grain_r2.get(),
+                combustible_force=float(self.combustible_force_kJ__kg.get() * 1e3),
+                combustible_fraction=float(
+                    self.combustible_mass_kg.get() / self.chg_kg.get() if self.use_combustible.get() else 0.0
+                ),
             )
 
         except Exception as e:
@@ -2510,7 +2560,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
     def remove_cvldlf_consistency_traces(self):
         for entry in (self.chg_kg, self.cv_L, self.lf, self.ld, self.chg_kg):
             for trace in entry.var.trace_info():
-                entry.var.trace_remove(*trace)
+                ops, name = trace
+                if "cvldlf_consistency_callback" in name:
+                    entry.var.trace_remove(*trace)
 
     def cvldlf_consistency_callback(self, val_name="", *_):
         try:
@@ -2546,6 +2598,14 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.amb_p.enable() if self.in_atmos.get() else self.amb_p.disable()
         self.amb_rho.enable() if self.in_atmos.get() else self.amb_rho.disable()
         self.amb_gamma.enable() if self.in_atmos.get() else self.amb_gamma.disable()
+
+    def combustible_callback(self, *_):
+        self.combustible_mass_kg.enable() if self.use_combustible.get() else self.combustible_mass_kg.disable()
+        (
+            self.combustible_force_kJ__kg.enable()
+            if self.use_combustible.get()
+            else self.combustible_force_kJ__kg.disable()
+        )
 
     def cvldlf_callback(self, *_):
         use_cv = self.use_cv.get_obj()
@@ -2642,9 +2702,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             initialfile=filenameize(self.get_description() + " " + save),
         )
 
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
         try:
             if save == "main":
                 fig = self.fig
@@ -2663,7 +2720,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             messagebox.showinfo(self.get_loc_str("sucTitle"), self.get_loc_str("savedLocMsg") + f" {file_name:}")
 
         except Exception as e:
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+            self.handle_errors(e, logging.WARNING)
 
     def swap(self):
         ## this swaps the primary and auxiliary charge.

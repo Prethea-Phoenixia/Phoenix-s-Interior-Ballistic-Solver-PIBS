@@ -253,7 +253,13 @@ class Mixture:
 
         return speciesList
 
-    def prettyPrint(self):
+    def simple_print(self):
+        print("Mixture: {:}".format(self.name))
+        print("Sp.Impetus (Force) : {:>8.5g} J/g".format(self.f))
+        print("Flame Temperature  : {:>8.6g} K (Isochoric Adiabatic)".format(self.Tv))
+        print("Covolume           : {:>8.4g} cc/g".format(self.b))
+
+    def pretty_print(self):
         C, H, O, N = (
             self.Ci * molarMasses["C"],
             self.Hi * molarMasses["H"],

@@ -1,8 +1,40 @@
 type,description,adiabatic index,density kg/m^3,force J/kg,covolume m^3/kg,pressure exponent,burnrate coefficient m/s/Pa^n,isochoric adb flame temp K
-P-5 BPfl,High Nitrogen Single Base\n*---------- High Nitrated Pyroxylin\n 2.2 - 4.1% Dimethacrylate (Bis-Triethylene Glycol) Phthalate\n 1.4 - 3.2% Volatile\n 1.0 - 2.0% Diphenyl Amine\n 0.1 - 0.5% Potassium Sulphate\n 0.05-0.15% Graphite.,1.23,1575,990000,1.0e-3,1.0,7.1951e-10,
-Pyroxylin,Pyroxylin (nitrocellulose) propellant with values typically used to model multiple-perforated grains,1.25,1600,950000,1.0e-3,0.83,1.8e-8,""
-Pyroxylin (Low Nitration),Low Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains.,1.25,1600,855000,1.0e-3,0.83,2.014e-8,
-Pyroxylin (High Nitration),High Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains.,1.25,1600,1017500,1.0e-3,0.83,2.094e-8,""
+P-5 BPfl,"High Nitrogen Single Base\n*---------- High Nitrated Pyroxylin\n 2.2 - 4.1% Dimethacrylate (Bis-Triethylene Glycol) Phthalate\n 1.4 - 3.2% Volatile\n 1.0 - 2.0% Diphenyl Amine\n 0.1 - 0.5% Potassium Sulphate\n 0.05-0.15% Graphite. From table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.236,1600,988000,1.038e-3,1.0,7.1951e-10,2800
+Pyroxylin (BP),"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.255,1600,904000,1.098e-3,0.83,2e-8,2375
+Pyroxylin,,1.25,1600,960100,1.0e-3,0.83,1.8e-8,2800
+Pyroxylin (V/A),"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.25,1600,1016000,1.007e-3,0.83,1.9e-8,2970
+Nitrocellulose (10.9%),,1.25,1600,853623,1.0e-3,0.83,2.0e-8,2331
+Nitrocellulose (11.0%),,1.25,1600,864252,1.0e-3,0.83,2.0e-8,2372
+Nitrocellulose (11.1%),,1.25,1600,874751,1.0e-3,0.83,2.0e-8,2412
+Nitrocellulose (11.2%),,1.25,1600,885124,1.0e-3,0.83,2.0e-8,2453
+Nitrocellulose (11.3%),,1.25,1600,895363,1.0e-3,0.83,2.0e-8,2493
+Nitrocellulose (11.4%),,1.25,1600,905501,1.0e-3,0.83,2.0e-8,2534
+Nitrocellulose (11.5%),,1.25,1600,915510,1.0e-3,0.83,2.0e-8,2575
+Nitrocellulose (11.6%),,1.25,1600,925371,1.0e-3,0.83,2.0e-8,2615
+Nitrocellulose (11.7%),,1.25,1600,935076,1.0e-3,0.83,2.0e-8,2656
+Nitrocellulose (11.8%),,1.25,1600,944643,1.0e-3,0.83,2.0e-8,2697
+Nitrocellulose (11.9%),,1.25,1600,954066,1.0e-3,0.83,2.0e-8,2738
+Nitrocellulose (12.0%),,1.25,1600,963347,1.0e-3,0.83,2.0e-8,2779
+Nitrocellulose (12.1%),,1.25,1600,972504,1.0e-3,0.83,2.0e-8,2820
+Nitrocellulose (12.2%),,1.25,1600,981532,1.0e-3,0.83,2.0e-8,2860
+Nitrocellulose (12.3%),,1.25,1600,990402,1.0e-3,0.83,2.0e-8,2901
+Nitrocellulose (12.4%),,1.25,1600,999078,1.0e-3,0.83,2.0e-8,2942
+Nitrocellulose (12.5%),,1.25,1600,1007587,1.0e-3,0.83,2.0e-8,2982
+Nitrocellulose (12.6%),,1.25,1600,1015924,1.0e-3,0.83,2.0e-8,3023
+Nitrocellulose (12.7%),,1.25,1600,1024082,1.0e-3,0.83,2.0e-8,3063
+Nitrocellulose (12.8%),,1.25,1600,1032057,1.0e-3,0.83,2.0e-8,3103
+Nitrocellulose (12.9%),,1.25,1600,1039879,1.0e-3,0.83,2.0e-8,3143
+Nitrocellulose (13.0%),,1.25,1600,1047498,1.0e-3,0.83,2.0e-8,3182
+Nitrocellulose (13.1%),,1.25,1600,1054882,1.0e-3,0.83,2.0e-8,3221
+Nitrocellulose (13.2%),,1.25,1600,1062031,1.0e-3,0.83,2.0e-8,3260
+Nitrocellulose (13.3%),,1.25,1600,1068957,1.0e-3,0.83,2.0e-8,3298
+ZT,"64.0% Nitrocellulose (13.15% Nitration)\n16.0% Nitroglycerin\n11.0% TEGN\n 6.5% DNT\n 2.0% Centralite\n0.5% TiO2\nDeveloped as TG-110",1.2375,1600,1078550,1.0e-3,1.0,0.83e-9,3136
+ZT-12A,"60.0% Nitrocellulose\n28.0% Nitroglycerin\n 9.5% TEGN\n 2.0% Centralite\n 0.5% TiO2\nThermalchemical properties assumed the same as TG-115/ZT-2",1.23,1600,1127800,1.0e-3,0.67,5e-7,3381
+DG-2,"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.255,1520,933000,1.133e-3,0.83,2e-8,2370
+DG-3,"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.25,1520,968000,1.113e-3,0.83,2e-8,2505
+DG-4,"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.243,1520,1004000,1.085e-3,0.83,2e-8,2655
+NDT-3,"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.255,1540,961000,1.131e-3,0.83,2e-8,2525
+APTs-235P,"34.1% Nitrocellulose (low N)\n33.7% Nitroglycerin\n27.0% Tetraazadecalin\n 1.2% Centralite\nAdopted thermochemical value reference table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1.",1.25,1630,1101000,1.02e-3,0.83,2.094e-8,3060
 M1,Single Base\nAMCP 706-150\nADA043778\n*85.00% Nitrocellulose (13.15%N)\n 10.00% Dinitrotloluene\n  5.00% Dibutylphthalate\n  1.00% Diphenylamine,1.2593,1569,911700,1.104e-3,0.951,1.078e-9,2417
 M2,Double Base\nAMCP 706-150\nADA043778\n*77.45% Nitrocellulose (13.25%N)\n*19.50% Nitroglycerin\n  1.40% Barium Nitrate\n  0.75% Potassium Nitrate\n  0.60% Ethyl Centralite\n  0.30% Graphite,1.2238,1652,1076000,1.008e-3,0.933,3.540e-9,3319
 M5,Double Base\nAMCP 706-150\nADA043778\n*81.95% Nitrocellulose (13.25%N)\n*15.00% Nitroglycerin\n  1.40% Barium Nitrate\n  0.75% Potassium Nitrate\n  0.60% Ethyl Centralite\n  0.30% Graphite,1.2238,1650,1061000,9.942e-4,0.948,2.504e-9,3245
@@ -14,6 +46,7 @@ M30,Triple Base\nTM 9-1300-214\nADA060027\n*47.70% Nitroguanidine\n*28.00% Nitro
 M31,Triple Base\nTM 9-1300-214\nADA147802\n*54.70% Nitroguanidine\n*20.00% Nitrocellulose (12.60%N)\n*19.00% Nitroglycerin\n  4.50% Dibutylphthalate\n  1.50% Ethyl Centralite\n  0.30% Cryolite,1.2527,1640,998300,1.115e-3,0.78787,2.5451e-8,2599
 M31A1E1,Triple Base\nADA292677\nM31 values used when unavailable\n*54.70% Nitroguanidine\n*21.50% Nitrocellulose (12.60%N)\n*18.00% Nitroglycerin\n  3.00% Dibutylphthalate\n  1.50% Ethyl Centralite\n  1.25% Potassium Sulphate,1.2527,1640,986000,1.115e-3,0.68,7.533e-9,2615
 JA2 [ADA18175],Modified Double Base\nADA18175 A Propulsion System Comparison Study for the 120-mm Anti-Armor Cannon; case Solid JA-2 for IBHVG-2\n*59.50% Nitrocellulose (13.20%N)\n*24.80% Diethylene Glycol Dinitrate\n*14.90% Nitroglycerin\n  0.70% Akardite II\n  0.10% Graphite,1.225,1578,1140000,0.996e-3,0.95,2.667e-9,3410
+RPD-380,"Modified Double Base\n(2009) Clint B. Conner, William R. Anderson, Modeling the combustion of JA2 and solid propellants of similar composition, Proceedings of the Combustion Institute (32) 2131 - 2137\n*58.90% Nitrocellulose (13.14%N)\n*25.30% Nitroglycerin\n*15.00% Diethylene Glycol Dinitrate\n  0.70% Akardite II",1.213,1578,1156000,0.996e-3,0.95,2.667e-9,3613
 XM39,Nitramine\nHsien (1998)\nARL-TR-2551\nCovolume is calculated @ 0.2g/cc\n 76.00% (5um RDX) Hexogen\n 12.00% Cellulose Acetate Butyrate\n  7.60% Acetyl Triethyl Citrate\n  4.00% Nitrocellulose (12.60%N)\n  0.40% Ethyl Centralite,1.268,1636,1057100,1.026e-3,0.92,1.4737e-9,2636
 M43,Nitramine\nHsien (1998)\nARL-TR-2551\nCovolume is calculated @ 0.2g/cc\n 76.00% (5um RDX) Hexogen\n 12.00% Cellulose Acetate Butyrate\n  7.60% Butyrateis-(dinitropropyl)acetal\n  4.00% Nitrocellulose (12.60%N)\n  0.40% Ethyl Centralite,1.259,1655,1173000,0.9917e-4,0.82,1.022e-8,3052
 ATK PRD20,RDX/NENA Multi Base\nUS Patent 6241833 (90F/32C)\nCovolume is calculated @ 0.2g/cc\n*41.90% Nitrocellulose (12.60%N)\n*25.71% (5 um RDX) Hexogen\n*14.00% Methyl NENA\n*10.00% Ethyl NENA\n *7.69% Nitroglycerin\n  0.70% others,1.2366,1624,1205600,0.9342e-03,0.986,1.010e-9,3372

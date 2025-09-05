@@ -40,7 +40,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
         ambient_p: float = 101.325e3,
         ambient_gamma: float = 1.4,
         control: Points = POINT_PEAK_AVG,
-        traveling_charge: bool = True,
+        traveling_charge: bool = False,
         **_,
     ):
         # constants for constrained designs
@@ -145,9 +145,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
         s_j_bar = 1 / (Recoilless.get_cf(gamma, a_bar, tol) * chi_0)
         if s_j_bar > chi_k:
             raise ValueError(
-                "Achieving recoiless condition necessitates"
-                + " a larger throat area than could be fit into"
-                + " breech face."
+                "Achieving recoilless condition necessitates a larger throat area than could be fit into breech face."
             )
         s_j = s_j_bar * s
 
@@ -241,7 +239,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 dpsi = f_sigma_z(z)  # dpsi/dZ
 
                 l_psi_bar = 1 - delta * ((1 - psi) / rho_p + alpha * (psi - eta))
-                p_bar = tau / (l_bar + l_psi_bar) * (psi - eta)
+                p_bar = max(tau / (l_bar + l_psi_bar) * (psi - eta), p_a_bar)
 
                 if c_a_bar != 0 and v_bar > 0:
                     v_r = v_bar / c_a_bar
@@ -256,7 +254,6 @@ class ConstrainedRecoilless(DelegatesPropellant):
                     dt_bar = (2 * b / theta) ** 0.5 * p_bar**-n
                     dl_bar = v_bar * dt_bar
                     dv_bar = 0.5 * theta * (p_bar - p_d_bar) * dt_bar
-
                     dv_bar /= (1 + w / m * (1 - psi)) if is_tc else 1
 
                 else:
@@ -339,8 +336,8 @@ class ConstrainedRecoilless(DelegatesPropellant):
 
                 return p_bar_p - p_bar_d, record[i][0], *record[i][-1]
 
-        dp_bar_probe, z, *_ = _f_p_e_1(self.min_web)
-        probe_web = self.min_web
+        dp_bar_probe, z, *_ = _f_p_e_1(0.5 * self.min_web)
+        probe_web = 0.5 * self.min_web
 
         if dp_bar_probe < 0:
             raise ValueError(
@@ -355,8 +352,8 @@ class ConstrainedRecoilless(DelegatesPropellant):
             dp_bar_probe = _f_p_e_1(probe_web)[0]
 
         e_1, e_1_2 = dekker(
-            lambda x: _f_p_e_1(x)[0], probe_web, 0.5 * probe_web, y_abs_tol=p_bar_d * tol
-        )  # this is the e_1 that satisifies the pressure specification.
+            lambda x: _f_p_e_1(x)[0], probe_web, 0.5 * probe_web, y_rel_tol=tol
+        )  # this is the e_1 that satisfies the pressure specification.
 
         """
         e_1 and e_2 brackets the true solution
@@ -388,7 +385,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
             dpsi = f_sigma_z(z)  # dpsi/dZ
 
             l_psi_bar = 1 - delta * ((1 - psi) / rho_p + alpha * (psi - eta))
-            p_bar = tau / (l_bar + l_psi_bar) * (psi - eta)
+            p_bar = max(tau / (l_bar + l_psi_bar) * (psi - eta), p_a_bar)
 
             if c_a_bar != 0 and v_bar > 0:
                 v_r = v_bar / c_a_bar
@@ -543,7 +540,6 @@ class ConstrainedRecoilless(DelegatesPropellant):
 
         k, n = 0, floor(log(abs(delta_high) / tol, 2)) + 1
         while abs(2 * delta_high) > tol:
-            logger.info(probe)
             try:
                 _, lt_i, lg_i = f(new_high)
                 records.append((new_high, lt_i))

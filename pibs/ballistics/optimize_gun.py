@@ -231,7 +231,7 @@ conditions is {v_j:.4g} m/s."
                 psi = f_psi_z(z)
                 l_psi_bar = 1 - delta / rho_p - delta * (alpha - 1 / rho_p) * psi
 
-                p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
+                p_bar = max((psi - v_bar**2) / (l_bar + l_psi_bar), p_a_bar)
                 if c_a_bar and v_bar > 0:
                     v_r = v_bar / c_a_bar
                     p_d_bar = (
@@ -302,8 +302,8 @@ conditions is {v_j:.4g} m/s."
 
             return p_bar_p - p_bar_d, *vals
 
-        dp_bar_probe = _f_p_e_1(self.min_web)[0]
-        probe_web = self.min_web
+        dp_bar_probe = _f_p_e_1(0.5 * self.min_web)[0]
+        probe_web = 0.5 * self.min_web
 
         if dp_bar_probe < 0:
             raise ValueError("Design pressure cannot be achieved by varying web down to minimum")
@@ -342,7 +342,7 @@ conditions is {v_j:.4g} m/s."
             psi = f_psi_z(z)
 
             l_psi_bar = 1 - delta / rho_p - delta * (alpha - 1 / rho_p) * psi
-            p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
+            p_bar = max((psi - v_bar**2) / (l_bar + l_psi_bar), p_a_bar)
 
             if c_a_bar != 0 and v_bar > 0:
                 v_r = v_bar / c_a_bar

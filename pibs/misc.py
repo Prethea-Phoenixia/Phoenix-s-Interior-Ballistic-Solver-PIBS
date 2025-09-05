@@ -61,17 +61,17 @@ def loadfont(fontpath, private=True, enumerable=False):
     """
     if isinstance(fontpath, bytes):
         pathbuf = create_string_buffer(fontpath)
-        AddFontResourceEx = windll.gdi32.AddFontResourceExA
+        add_font_resource_ex = windll.gdi32.AddFontResourceExA
 
     elif isinstance(fontpath, str):
         pathbuf = create_unicode_buffer(fontpath)
-        AddFontResourceEx = windll.gdi32.AddFontResourceExW
+        add_font_resource_ex = windll.gdi32.AddFontResourceExW
     else:
         raise TypeError("fontpath must be of type str or unicode")
 
     flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
-    numFontsAdded = AddFontResourceEx(byref(pathbuf), flags, 0)
-    return bool(numFontsAdded)
+    num_fonts_added = add_font_resource_ex(byref(pathbuf), flags, 0)
+    return bool(num_fonts_added)
 
 
 def unloadfont(fontpath, private=True, enumerable=False):
@@ -82,18 +82,18 @@ def unloadfont(fontpath, private=True, enumerable=False):
     """
     if isinstance(fontpath, bytes):
         pathbuf = create_string_buffer(fontpath)
-        RemoveFontResourceEx = windll.gdi32.RemoveFontResourceExA
+        remove_font_resource_ex = windll.gdi32.RemoveFontResourceExA
     elif isinstance(fontpath, str):
         pathbuf = create_unicode_buffer(fontpath)
-        RemoveFontResourceEx = windll.gdi32.RemoveFontResourceExW
+        remove_font_resource_ex = windll.gdi32.RemoveFontResourceExW
     else:
         raise TypeError("fontpath must be a str or unicode")
 
     flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
-    return bool(RemoveFontResourceEx(byref(pathbuf), flags, 0))
+    return bool(remove_font_resource_ex(byref(pathbuf), flags, 0))
 
 
-def to_si(v, dec=4, unit=None, useSN=False):
+def to_si(v, dec=4, unit=None, use_sn=False):
     if v is None:
         return "N/A"
     elif isinstance(v, int) or isinstance(v, float):
@@ -120,7 +120,7 @@ def to_si(v, dec=4, unit=None, useSN=False):
                 + " " * (dec + 1 - len(vstr) + vstr.find("."))
                 + (
                     ("E{:<+3d}".format(round(log(magnitude, 10))) if magnitude != 1 else "    ")  # 4 SPACES!
-                    if useSN
+                    if use_sn
                     else prefix
                 )
                 + (unit if unit is not None else "")
@@ -129,7 +129,7 @@ def to_si(v, dec=4, unit=None, useSN=False):
         return (
             (" " if positive else "-")
             + "{:#.{:}g}".format(v, dec)
-            + ("     " if useSN else "  ")
+            + ("     " if use_sn else "  ")
             + (unit if unit is not None else "")
         )
     else:  # return a result in SI as a last resort
@@ -233,7 +233,7 @@ def dot_aligned(matrix, units, use_sn, strip_ws=True):
         snums = []
         for n in seq:
             if isinstance(n, int) or isinstance(n, float) or n is None:
-                vstr = to_si(n, unit=unit, useSN=isSN)
+                vstr = to_si(n, unit=unit, use_sn=isSN)
                 snums.append(vstr.strip() if strip_ws else vstr)
             elif isinstance(n, str):
                 snums.append(n)
@@ -272,8 +272,8 @@ with open(resolvepath("ui/localization.json"), encoding="utf-8") as file:
     STRING = json.load(file)
 
 
-def filenameize(str: str) -> str:
-    return str.replace(" ", "_")
+def filenameize(string: str) -> str:
+    return string.replace(" ", "_")
 
 
 def detect_darkmode_in_windows() -> bool:

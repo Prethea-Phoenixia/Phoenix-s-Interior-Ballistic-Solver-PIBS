@@ -80,7 +80,7 @@ class Recoilless(DelegatesPropellant):
         structural_material: Material = None,
         structural_safety_factor: float = 1.1,
         autofrettage: bool = True,
-        # traveling_charge: bool = True,
+        traveling_charge: bool = False,
         **_,
     ):
         super().__init__(propellant=propellant)
@@ -106,7 +106,7 @@ class Recoilless(DelegatesPropellant):
 
         self.propellant = propellant
         self.caliber = caliber
-        # self.is_tc = traveling_charge
+        self.is_tc = traveling_charge
 
         e_1 = 0.5 * web
         self.s = (caliber / 2) ** 2 * pi
@@ -204,7 +204,7 @@ class Recoilless(DelegatesPropellant):
         dl_bar = v_bar
         dv_bar = self.theta * 0.5 * (p_bar - p_d_bar)
 
-        # dv_bar /= (1 + self.w / self.m * (1 - psi)) if self.is_tc else 1
+        dv_bar /= (1 + self.w / self.m * (1 - psi)) if self.is_tc else 1
 
         deta = self.c_a * self.s_j_bar * p_bar * tau**-0.5  # deta / dt_bar
         dtau = ((1 - tau) * (dpsi * dz) - 2 * v_bar * dv_bar - self.theta * tau * deta) / (psi - eta)  # dtau/dt_bar
@@ -233,7 +233,7 @@ class Recoilless(DelegatesPropellant):
 
         dz = (0.5 * self.theta / self.B) ** 0.5 * p_bar**self.n / v_bar
         dv_bar = self.theta * 0.5 * (p_bar - p_d_bar) / v_bar
-        # dv_bar /= (1 + self.w / self.m * (1 - psi)) if self.is_tc else 1
+        dv_bar /= (1 + self.w / self.m * (1 - psi)) if self.is_tc else 1
         # dv_bar/dl_bar
         dt_bar = 1 / v_bar  # dt_bar / dl_bar
 
@@ -260,7 +260,7 @@ class Recoilless(DelegatesPropellant):
         dt_bar = (2 * self.B / self.theta) ** 0.5 * p_bar**-self.n
         dl_bar = v_bar * dt_bar
         dv_bar = 0.5 * self.theta * (p_bar - p_d_bar) * dt_bar
-        # dv_bar /= (1 + self.w / self.m * (1 - psi)) if self.is_tc else 1
+        dv_bar /= (1 + self.w / self.m * (1 - psi)) if self.is_tc else 1
         deta = self.c_a * self.s_j_bar * p_bar * tau**-0.5 * dt_bar  # deta / dZ
         dtau = ((1 - tau) * dpsi - 2 * v_bar * dv_bar - self.theta * tau * deta) / (psi - eta)
 
@@ -430,7 +430,6 @@ class Recoilless(DelegatesPropellant):
                     abs_tol=tol**2,
                     abort_func=abort,
                     record=ztlvet_record_i,
-                    debug=True,
                 )
 
                 p_bar_j = self.f_p_bar(z_j, l_bar_j, eta_j, tau_j)
