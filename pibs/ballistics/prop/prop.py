@@ -261,6 +261,8 @@ class Propellant:
         aux_r2: float = 1.0,
         web_ratio: float = 1.0,  # e1_2 / e1_1
         mass_ratio: float = 0.0,  # w_2 / w_1
+        combustible_fraction: float = 0,  # combustible cartridge
+        combustible_force: float = 0,
     ):
         """
         for propellant i = 1, 2:
@@ -286,13 +288,17 @@ class Propellant:
         _, _, _, _, _, z_b2 = self.aux_params
 
         self.web_ratio, self.mass_ratio = web_ratio, mass_ratio
+        self.combustible_fraction, self.combustible_force = combustible_fraction, combustible_force
+
+        if not (0 <= self.combustible_fraction <= 1):
+            raise ValueError("Combustible fraction should be in [0,1]")
 
         if self.mass_ratio > 0 and z_b2 > self.z_b / self.web_ratio:
             raise ValueError("Auxiliary grains must complete combustion in advance of the primary grains.")
 
     @property
     def f(self) -> float:
-        return self.composition.f
+        return self.composition.f * (1 - self.combustible_fraction) + self.combustible_force * self.combustible_fraction
 
     @property
     def alpha(self) -> float:

@@ -13,7 +13,6 @@ from math import ceil, inf, log10
 from multiprocessing import Process, Queue
 from queue import Empty
 from tkinter import (
-    Frame,
     IntVar,
     Menu,
     StringVar,
@@ -23,6 +22,8 @@ from tkinter import (
     messagebox,
     ttk,
 )
+
+from tkinter.ttk import Frame
 from tkinter.font import Font
 from typing import Literal
 
@@ -314,7 +315,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.force_update_on_theme_widget.append(self.description)
 
         ## left frame
-        left_frm = ttk.Frame(self)
+        left_frm = Frame(self)
         left_frm.grid(row=1, column=0, sticky="nsew")
         left_frm.columnconfigure(0, weight=1)
         left_frm.rowconfigure(0, weight=1)
@@ -524,7 +525,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_canvas.get_tk_widget().place(relwidth=1, relheight=1)
 
         ## right frame
-        right_frm = ttk.Frame(self)
+        right_frm = Frame(self)
         right_frm.grid(row=0, column=3, rowspan=2, sticky="nsew")
         right_frm.columnconfigure(0, weight=1)
         right_frm.rowconfigure(0, weight=1)
@@ -904,18 +905,18 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.prop_frame.rowconfigure(1, weight=1)
         self.prop_frame.columnconfigure(0, weight=1)
 
+        j = 0
+
         self.drop_prop = self.add_localized_dropdown(
             parent=self.prop_frame,
             str_obj_dict=Composition.read_file(resolvepath("ballistics/resource/propellants.csv")),
             desc_label_key="propFrmLabel",
         )
-        self.drop_prop.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        self.drop_prop.grid(row=j, column=0, columnspan=2, sticky="nsew")
+        j += 1
 
         spec_scroll = ttk.Scrollbar(self.prop_frame, orient="vertical")
-        spec_scroll.grid(row=1, rowspan=2, column=1, sticky="nsew")
         spec_h_scroll = ttk.Scrollbar(self.prop_frame, orient="horizontal")
-        spec_h_scroll.grid(row=2, column=0, sticky="nsew")
-
         self.specs = Text(
             self.prop_frame,
             wrap="word",
@@ -925,12 +926,61 @@ class InteriorBallisticsFrame(LocalizedFrame):
             xscrollcommand=spec_h_scroll.set,
             font=(FONTNAME, FONTSIZE),
         )
-        self.specs.grid(row=1, column=0, sticky="nsew")
-
+        self.force_update_on_theme_widget.append(self.specs)
         spec_scroll.config(command=self.specs.yview)
         spec_h_scroll.config(command=self.specs.xview)
 
-        self.force_update_on_theme_widget.append(self.specs)
+        self.specs.grid(row=j, column=0, sticky="nsew")
+        spec_scroll.grid(row=j, rowspan=2, column=1, sticky="nsew")
+        j += 1
+
+        spec_h_scroll.grid(row=j, column=0, sticky="nsew")
+        j += 1
+
+        self.use_combustible, j = (
+            self.add_localized_label_check(
+                self.prop_frame,
+                label_loc_key="combustibleLabel",
+                tooltip_loc_key="combustibleText",
+                default=False,
+                row=j,
+                columnspan=2,
+            ),
+            j + 1,
+        )
+
+        combustible_frame = Frame(self.prop_frame)
+        combustible_frame.grid(row=j, column=0, columnspan=2, sticky="nsew")
+        j += 1
+
+        k = 0
+        self.combustible_mass, k = (
+            self.add_localized_3_input(
+                combustible_frame,
+                label_loc_key="combustibleMassLabel",
+                default="0.0",
+                unit_text="kg",
+                desc_label_key="ωʹ",
+                dtype=float,
+                validation=validation_nn,
+                row=k,
+            ),
+            k + 1,
+        )
+
+        self.combustible_force, k = (
+            self.add_localized_3_input(
+                combustible_frame,
+                label_loc_key="combustibleForceLabel",
+                default="750.0",
+                unit_text="kJ/kg",
+                desc_label_key="fʹ",
+                dtype=float,
+                validation=validation_nn,
+                row=k,
+            ),
+            k + 1,
+        )
 
         self.grain_frm = self.add_localized_label_frame(self.prop_tab_parent, label_loc_key="grainFrmLabel")
         self.grain_frm.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
@@ -1353,6 +1403,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_web_ratio,
             self.aux_grain_r1,
             self.aux_grain_r2,
+            self.use_combustible,
+            self.combustible_force,
+            self.combustible_mass,
+            self.chg_kg,
         ):
 
             entry.var.trace_add("write", self.propellant_callback)
@@ -1372,6 +1426,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
         for check in (self.trace_hull, self.trace_press):
             check.trace_add("write", self.update_aux_plot)
 
+        self.use_combustible.trace_add("write", self.combustible_callback)
+
         self.amb_callback()
         self.cvldlf_callback()
         self.cvldlf_consistency_callback()
@@ -1380,6 +1436,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.material_callback()
         self.guide_callback()
         self.propellant_callback()
+        self.combustible_callback()
 
         self.update_all()
 
@@ -1716,7 +1773,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             "step_lf": float(self.guide_step_lf.get()) * 1e-2,
             "max_iter": int(self.max_iter.get()),
             "max_guess": int(self.max_guess.get()),
-            # "traveling_charge": is_tc,
         }
 
         if atmosphere:
@@ -2428,6 +2484,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 mass_ratio=self.aux_mass_ratio.get() if self.use_aux_grain.get() else 0.0,
                 aux_r1=self.aux_grain_r1.get(),
                 aux_r2=self.aux_grain_r2.get(),
+                combustible_force=float(self.combustible_force.get() * 1e3),
+                combustible_fraction=float(
+                    self.combustible_mass.get() / self.chg_kg.get() if self.use_combustible.get() else 0.0
+                ),
             )
 
         except Exception as e:
@@ -2510,7 +2570,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
     def remove_cvldlf_consistency_traces(self):
         for entry in (self.chg_kg, self.cv_L, self.lf, self.ld, self.chg_kg):
             for trace in entry.var.trace_info():
-                entry.var.trace_remove(*trace)
+                ops, name = trace
+                if "cvldlf_consistency_callback" in name:
+                    entry.var.trace_remove(*trace)
 
     def cvldlf_consistency_callback(self, val_name="", *_):
         try:
@@ -2546,6 +2608,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.amb_p.enable() if self.in_atmos.get() else self.amb_p.disable()
         self.amb_rho.enable() if self.in_atmos.get() else self.amb_rho.disable()
         self.amb_gamma.enable() if self.in_atmos.get() else self.amb_gamma.disable()
+
+    def combustible_callback(self, *_):
+        self.combustible_mass.enable() if self.use_combustible.get() else self.combustible_mass.disable()
+        self.combustible_force.enable() if self.use_combustible.get() else self.combustible_force.disable()
 
     def cvldlf_callback(self, *_):
         use_cv = self.use_cv.get_obj()
