@@ -190,7 +190,7 @@ class Loc2Input(LocalizableWidget, Descriptive):
         label_loc_key: str = "",
         desc_label_key: None | str = "",  # None can be specified to ignore some inputs.
         validation: str | None = None,
-        label_width: int = 20,
+        label_width: int = 15,
         entry_width: int = 10,
         formatter: Callable[[Event, StringVar], None] = format_float_input,
         color: str = "",
@@ -487,7 +487,7 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         label_loc_key: str = "",
         desc_label_key: str | None = "",
         tooltip_loc_key: str = "",
-        width: int = 25,
+        width: int = 0,
         all_localized: list | None = None,
     ):
         super().__init__(loc_func=loc_func, all_localized=all_localized, var=BooleanVar(value=default))

@@ -2,6 +2,23 @@ from pibs.ballistics.therm import Ingredient, Mixture
 
 
 def main():
+    nitrations = tuple(0.109 + 0.001 * i for i in range(25))
+    forces = []
+    temperatures = []
+    for nitration in nitrations:
+        nc = Ingredient.nitrocellulose(nitration=nitration)
+        m = Mixture("", compoDict={nc: 1})
+        forces.append(m.f)
+        temperatures.append(m.Tv)
+
+    for nitration, force, temperature in zip(nitrations, forces, temperatures):
+        print(f"Nitrocellulose ({nitration:.1%}),,1.25,1600,{force*1e3:.0f},1.0e-3,0.83,2.0e-8,{temperature:.0f}")
+
+    from tabulate import tabulate
+
+    print(tabulate(zip([n * 100 for n in nitrations], forces, temperatures), headers=("N%", "f", "Tv"), floatfmt=".1f"))
+    input()
+
     NC1260 = Ingredient.getLine(683)
     RDX = Ingredient.getLine(847)
 
@@ -41,7 +58,7 @@ def main():
         compoDict={RDX: 76, CAB: 12, NC1260: 4, ATEC: 7.6, EC: 0.4},
     )
 
-    XM39.prettyPrint()
+    XM39.pretty_print()
 
     M43 = Mixture(
         name="M43",
@@ -55,7 +72,7 @@ def main():
         },
         Delta=0.2,
     )
-    M43.prettyPrint()
+    M43.pretty_print()
 
     NG = Ingredient.getLine(693)
 
@@ -81,19 +98,19 @@ def main():
         name="ATK PRD20", compoDict={NC1260: 41.90, RDX: 25.71, MeNENA: 14.00, EtNENA: 10.00, NG: 7.69}, Delta=0.2
     )
 
-    ATKPRD20.prettyPrint()
+    ATKPRD20.pretty_print()
 
     ATKPRDS21 = Mixture(
         name="ATK PRD(S)21", compoDict={NC1260: 36.48, RDX: 30.33, MeNENA: 13.44, EtNENA: 9.57, NG: 9.46}, Delta=0.2
     )
 
-    ATKPRDS21.prettyPrint()
+    ATKPRDS21.pretty_print()
 
     ATKPRDS22 = Mixture(
         name="ATK PRD(S)22", compoDict={NC1260: 31.11, RDX: 34.08, MeNENA: 12.57, EtNENA: 8.94, NG: 12.58}, Delta=0.2
     )
 
-    ATKPRDS22.prettyPrint()
+    ATKPRDS22.pretty_print()
 
     # import matplotlib.pyplot as plt
     # from labellines import labelLines
@@ -154,30 +171,30 @@ def main():
 
     WC846 = Mixture(name="WC846", compoDict={NC1316: 81.40, NG: 10.39, DBP: 5.61, DPA: 0.97, DNT: 0.06}, Delta=0.2)
 
-    WC846.prettyPrint()
+    WC846.pretty_print()
 
     WC870 = Mixture(
         name="WC870", compoDict={NC1311: 79.70, NG: 9.94, DBP: 5.68, DPA: 0.95, KNO3: 0.78, DNT: 0.69}, Delta=0.2
     )
-    WC870.prettyPrint()
+    WC870.pretty_print()
 
     IMR4227 = Mixture(name="IMR4227", compoDict={NC1315: 89.72, DNT: 6.74, DPA: 0.84, K2SO4: 0.73}, Delta=0.2)
-    IMR4227.prettyPrint()
+    IMR4227.pretty_print()
 
     IMR4350 = Mixture(name="IMR4350", compoDict={NC1315: 91.56, DNT: 4.80, DPA: 0.85, K2SO4: 0.73}, Delta=0.2)
-    IMR4350.prettyPrint()
+    IMR4350.pretty_print()
 
     IMR8138M = Mixture(name="IMR8138M", compoDict={NC1315: 92.96, ETC: 3.60, DPA: 0.89, K2SO4: 0.69}, Delta=0.2)
-    IMR8138M.prettyPrint()
+    IMR8138M.pretty_print()
 
     IMR4895 = Mixture(name="IMR4895", compoDict={NC1315: 88.99, DNT: 7.55, DPA: 0.78, K2SO4: 0.93}, Delta=0.2)
-    IMR4895.prettyPrint()
+    IMR4895.pretty_print()
 
     IMR5010 = Mixture(name="IMR5010", compoDict={NC1315: 88.27, DNT: 8.76, K2SO4: 0.64, DPA: 0.55}, Delta=0.2)
-    IMR5010.prettyPrint()
+    IMR5010.pretty_print()
 
     CMR160 = Mixture(name="CMR160", compoDict={NC1315: 95.77, MEC: 2.43, DPA: 0.73, K2SO4: 0.84})
-    CMR160.prettyPrint()
+    CMR160.pretty_print()
     #
     # P5BPfl = Mixture(name="P5BPFl", compoDict={NC1315: 95.77})
 

@@ -59,7 +59,7 @@
 		"calcLabel": "Solve Gun",
 		"cancelMsg": "File Operation Was Canceled",
 		"chgLabel": "Charge Mass",
-		"chgText": "Mass of propellant charge to be used. For ratio of charge to mass much less than 1, the model used is decently accurate. Empirically, calculated results for a charge to mass ratio of close to 1 (e.g. US M829A1) is also reasonably close. For ratio greater than 1, calculated result is an underestimation of shot velocity. To date, the highest charge to mass gun to be fielded is that of the German 380mm Paris Gun, at ~2-2.5.",
+		"chgText": "Mass of propellant charge to be used. For ratio of charge to mass much less than 1, the model used is accurate. For ratio much greater than 1, calculated result tends to underestimate true shot velocity. To date, the highest charge to mass reported is around 2-2.5 for practical weapons.",
 		"clrLabel": "Chambrage Ratio",
 		"clrText": "Chambrage ratio, or the average cross section of chamber over that of the barrel.\n Given the density of propellant is much less than that of the shot, having chamber that is wider than the barrel improves cartridge packaging. This an increase in speed of gasses as it flows from the chamber into the barrel, most prominently at the beginning of the internal ballistic cycle.\n For conventional gun, the chambrage effect is corrected by averaging the influence of chambrage over the length of barrel and increasing the secondary work factor by a corresponding amount. For recoilless gun, due to the slow velocity of shot and low pressure, the chambrage effect is not corrected for.",
 		"columnList": {
@@ -99,8 +99,8 @@
 		"debugLabel": "Debug",
 		"densityDesc": " Density",
 		"designLabel": "Design",
-		"dgcLabel": "Resistance Factor",
-		"dgcText": "Resistance factor models all resistive forces as a fraction of the shot base pressure.\n 2%-7% has been reported, value is higher for small arm bullets which deforms the jacket to engage with rifling, lower end for large caliber shells with driving bands.",
+		"dgcLabel": "Resistance",
+		"dgcText": "Resistance models all resistive forces as a fraction of the shot base pressure.\n 2%-7% has been reported, value is higher for small arm bullets which deforms the jacket to engage with rifling, lower end for large caliber shells with driving bands.",
 		"diaText": "Specify the diameter of propellant grain.",
 		"diamLabel": "Diameter",
 		"enableLabel": "Enabled",
@@ -157,7 +157,7 @@
 		"lockButton": "Constrain Travel",
 		"lockText": "Respect the user specified travel during constrained solving, in lieu of the velocity target. This option is mutually exclusive with minimum chamber volume optimization.",
 		"ltarcLabel": "Length / Web",
-		"ltarcText": "Specify the length to web ratio for tubular propellant.",
+		"ltarcText": "Specify the length to web ratio.",
 		"ltdLabel": "Length / Diameter",
 		"ltwLabel": "Length / Width",
 		"lxLabel": "Travel",
@@ -255,7 +255,10 @@
 		"vacISPDesc": "Isp(Vac)",
 		"vinfText": "Velocity the shot would achieve if the barrel is extended to infinite length, or equivalently, if the gas is allowed to expand to temperature of absolute zero.",
 		"widthLabel": "Width",
-		"widthText": "Specify the width of propellant strip or flake."
+		"widthText": "Specify the width of propellant strip or flake.",
+      "combustibleLabel": "Combustible Cartridge",
+      "combustibleMassLabel": "Mass",
+      "combustibleForceLabel": "Force"
 	},
 	"中文": {
 		"BURNOUT": "火药燃尽",
@@ -318,7 +321,7 @@
 		"calcLabel": "求解火炮",
 		"cancelMsg": "已取消",
 		"chgLabel": "药量",
-		"chgText": "内弹道系统的极限弹速正比与装药质量与火药力的乘积的平方根，因此使用更高的装药量与换用药力更高的火药都对于提高弹速具有积极作用。装药量与通过乘以（1+阻力系数）调整的等效弹重系数的比例称为装药比。程序使用的经典内弹道系统对于装药比<1的情况适用。经验表明，计算结果对于装药比接近1（如美M829A1脱壳尾翼稳定穿甲弹）的仍然比较准确。历史上在常规火炮中实用过的最大装药比约为2到2.5（德380mm“巴黎大炮”）。>1的高装药比下计算结果倾向于低估弹速，仅作为参考。",
+		"chgText": "内弹道系统的极限弹速正比与装药质量与火药力的乘积的平方根，因此使用更高的装药量与换用药力更高的火药都对于提高弹速具有积极作用。装药量与通过乘以（1+阻力系数）调整的等效弹重系数的比例称为装药比。程序使用的经典内弹道系统对于装药比<1的情况适用。经验表明，计算结果对于装药比接近1的情况仍然比较准确。常规火炮中曾见装药比高达2-2.5，这类情况下，计算结果倾向于低估弹速，仅供参考。",
 		"clrLabel": "药室扩大系数",
 		"clrText": "药室扩大系数指的是药室截面积与炮管截面积的比例。膛压较大时，定装弹药过长的药室存在抽壳困难的情况，后膛过长也不利于火炮装填作业，并造成点火困难。\n药室缩进产生流速突变对于弹道内循环的起始阶段影响最大。这里按照坡膛面积、流速突变考虑，对于常规火炮，以修正次要功系数的方法体现这样的效应。对于无坐力炮，由于涉及压强弹速较低，未对缩进效应进行修正。",
 		"columnList": {
@@ -416,7 +419,7 @@
 		"lockButton": "锁定行程",
 		"lockText": "按设定的行程，作压强符合计算，忽略设定的弹速目标。该选项与最小膛容解计算互斥。",
 		"ltarcLabel": "药长弧厚比",
-		"ltarcText": "设置管状火药药长弧厚比。",
+		"ltarcText": "设置药长弧厚比。",
 		"ltdLabel": "药粒长径比",
 		"ltwLabel": "长宽比",
 		"lxLabel": "身管长",
@@ -510,6 +513,9 @@
 		"vacISPDesc": "　　真空比冲",
 		"vinfText": "该装药条件下的极限速度（vj），即炮管长度趋于无穷时弹速的极限。正比与火药力与装药量的乘积的平方根，反比于弹重，绝热指数-1，与次要功系数的平方根。",
 		"widthLabel": "宽度",
-		"widthText": "设置带状火药宽度。"
+		"widthText": "设置带状火药宽度。",
+      "combustibleLabel": "含可燃药筒",
+      "combustibleMassLabel": "质量",
+      "combustibleForceLabel": "药力"
 	}
 }
