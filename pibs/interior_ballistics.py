@@ -22,9 +22,8 @@ from tkinter import (
     messagebox,
     ttk,
 )
-
-from tkinter.ttk import Frame
 from tkinter.font import Font
+from tkinter.ttk import Frame
 from typing import Literal
 
 import matplotlib as mpl
@@ -954,7 +953,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         j += 1
 
         k = 0
-        self.combustible_mass, k = (
+        self.combustible_mass_kg, k = (
             self.add_localized_3_input(
                 combustible_frame,
                 label_loc_key="combustibleMassLabel",
@@ -968,7 +967,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             k + 1,
         )
 
-        self.combustible_force, k = (
+        self.combustible_force_kJ__kg, k = (
             self.add_localized_3_input(
                 combustible_frame,
                 label_loc_key="combustibleForceLabel",
@@ -1404,8 +1403,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_grain_r1,
             self.aux_grain_r2,
             self.use_combustible,
-            self.combustible_force,
-            self.combustible_mass,
+            self.combustible_force_kJ__kg,
+            self.combustible_mass_kg,
             self.chg_kg,
         ):
 
@@ -2484,9 +2483,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 mass_ratio=self.aux_mass_ratio.get() if self.use_aux_grain.get() else 0.0,
                 aux_r1=self.aux_grain_r1.get(),
                 aux_r2=self.aux_grain_r2.get(),
-                combustible_force=float(self.combustible_force.get() * 1e3),
+                combustible_force=float(self.combustible_force_kJ__kg.get() * 1e3),
                 combustible_fraction=float(
-                    self.combustible_mass.get() / self.chg_kg.get() if self.use_combustible.get() else 0.0
+                    self.combustible_mass_kg.get() / self.chg_kg.get() if self.use_combustible.get() else 0.0
                 ),
             )
 
@@ -2610,8 +2609,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.amb_gamma.enable() if self.in_atmos.get() else self.amb_gamma.disable()
 
     def combustible_callback(self, *_):
-        self.combustible_mass.enable() if self.use_combustible.get() else self.combustible_mass.disable()
-        self.combustible_force.enable() if self.use_combustible.get() else self.combustible_force.disable()
+        self.combustible_mass_kg.enable() if self.use_combustible.get() else self.combustible_mass_kg.disable()
+        (
+            self.combustible_force_kJ__kg.enable()
+            if self.use_combustible.get()
+            else self.combustible_force_kJ__kg.disable()
+        )
 
     def cvldlf_callback(self, *_):
         use_cv = self.use_cv.get_obj()
