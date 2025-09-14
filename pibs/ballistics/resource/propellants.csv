@@ -1,11 +1,12 @@
 type,description,adiabatic index,density kg/m^3,force J/kg,covolume m^3/kg,pressure exponent,burnrate coefficient m/s/Pa^n,isochoric adb flame temp K
 P-5 BPfl,"High Nitrogen Single Base\n*---------- High Nitrated Pyroxylin\n 2.2 - 4.1% Dimethacrylate (Bis-Triethylene Glycol) Phthalate\n 1.4 - 3.2% Volatile\n 1.0 - 2.0% Diphenyl Amine\n 0.1 - 0.5% Potassium Sulphate\n 0.05-0.15% Graphite. Flame temperature is estimated.",1.23,1575,990000,1.0e-3,1.0,7.1951e-10,2900
+Pyroxylin (10.9%),"Low Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains. Flame temperature is estimated.",1.25,1600,855000,1.0e-3,0.83,2.014e-8,2330
+Pyroxylin (11.4%),"Medium Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains. Flame temperature is estimated.",1.25,1600,900000,1.0e-3,0.83,2.014e-8,2530
 Pyroxylin,"Pyroxylin (nitrocellulose) propellant with values typically used to model multiple-perforated grains. Flame temperature is estimated.",1.25,1600,950000,1.0e-3,0.83,1.8e-8,2730
-Pyroxylin (Low Nitration),"Low Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains. Flame temperature is estimated.",1.25,1600,855000,1.0e-3,0.83,2.014e-8,2330
-Pyroxylin (Mid Nitration),"Medium Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains. Flame temperature is estimated.",1.25,1600,900000,1.0e-3,0.83,2.014e-8,2530
 Pyroxylin (V/A),High Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains.,1.25,1600,1017500,1.0e-3,0.83,2.094e-8,2970
-Pyroxylin (High Nitration),High Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains.,1.25,1600,1046400,1.0e-3,0.83,2.094e-8,3075
-ZT-12A,"60.0% Nitrocellulose\n28.0% Nitroglycerin\n 9.5% TEGN\n 2.0% Centralite\n 0.5% TiO2\nThermalchemical properties assumed the same as ZT-2/TG-115",1.23,1600,1127800,1.0e-3,0.67,5e-7,3381
+Pyroxylin (13.0%),High Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains.,1.25,1600,1046400,1.0e-3,0.83,2.094e-8,3075
+ZT,"64.0% Nitrocellulose (13.15% Nitration)\n16.0% Nitroglycerin\n11.0% TEGN\n 6.5% DNT\n 2.0% Centralite\n0.5% TiO2\nDeveloped as TG-110",1.2375,1600,1078550,1.0e-3,1.0,0.83e-9,3136
+ZT-12A,"60.0% Nitrocellulose\n28.0% Nitroglycerin\n 9.5% TEGN\n 2.0% Centralite\n 0.5% TiO2\nThermalchemical properties assumed the same as TG-115/ZT-2",1.23,1600,1127800,1.0e-3,0.67,5e-7,3381
 DG-4,Values except force is generic,1.25,1600,1004000,1.0e-3,0.83,2.094e-8,2668
 APTs-235P,34.1% Nitrocellulose (low N)\n33.7% Nitroglycerin\n27.0% Tetraazadecalin\n 1.2% Centralite\nValues except force is generic.,1.25,1600,1101000,1.0e-3,0.83,2.094e-8,3060
 M1,Single Base\nAMCP 706-150\nADA043778\n*85.00% Nitrocellulose (13.15%N)\n 10.00% Dinitrotloluene\n  5.00% Dibutylphthalate\n  1.00% Diphenylamine,1.2593,1569,911700,1.104e-3,0.951,1.078e-9,2417

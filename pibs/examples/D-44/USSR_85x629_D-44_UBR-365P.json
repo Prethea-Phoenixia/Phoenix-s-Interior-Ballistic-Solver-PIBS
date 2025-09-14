@@ -43,7 +43,7 @@
 	"Pressure Constraint": "PEAK_AVG_P",
 	"Pressure Target (MPa)": 274.0,
 	"Propellant": "Pyroxylin",
-	"Resistance Factor (%)": 3.0,
+	"Resistance (%)": 3.0,
 	"Safety Factor": 1.35,
 	"Sampling Points": "DOMAIN_TIME",
 	"Shot Mass (kg)": 4.99,

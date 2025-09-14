@@ -999,6 +999,16 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.geom_plot_frm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         j += 1
 
+        ## geom plot
+        with mpl.rc_context(CONTEXT):
+            fig = Figure(dpi=96, layout="constrained")
+            self.geom_fig = fig
+            self.geom_ax = fig.add_subplot(111)
+
+            self.geom_canvas = FigureCanvasTkAgg(fig, master=self.geom_plot_frm)
+            self.geom_canvas.draw_idle()
+            self.geom_canvas.get_tk_widget().place(relheight=1, relwidth=1)
+
         self.main_geom = self.add_localized_dropdown(
             parent=self.grain_frm, str_obj_dict=Geometry.get_desc_geometry_dict(), desc_label_key="Grain Geometry"
         )
@@ -1127,18 +1137,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.swap_button = ttk.Button(self.grain_frm, text=self.get_loc_str("swapLabel"), command=self.swap)
         self.swap_button.grid(row=j, column=0, columnspan=3, sticky="nsew")
         j += 1
-
-        # self.is_tc, j = (
-        #     self.add_localized_label_check(
-        #         parent=self.grain_frm,
-        #         row=j,
-        #         label_loc_key="isTravelingChargeLabel",
-        #         tooltip_loc_key="travelingChargeText",
-        #         columnspan=3,
-        #         default=False,
-        #     ),
-        #     j + 1,
-        # )
 
         self.use_cv = self.add_localized_dropdown(
             parent=specs_frame,
@@ -1320,17 +1318,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
             i + 1,
         )
-        specs_frame.rowconfigure(i, weight=5)
-
-        ## geom plot
-        with mpl.rc_context(CONTEXT):
-            fig = Figure(dpi=96, layout="constrained")
-            self.geom_fig = fig
-            self.geom_ax = fig.add_subplot(111)
-
-            self.geom_canvas = FigureCanvasTkAgg(fig, master=self.geom_plot_frm)
-            self.geom_canvas.draw_idle()
-            self.geom_canvas.get_tk_widget().place(relheight=1, relwidth=1)
 
         ## guide plot
         plot_frm = self.add_localized_label_frame(self.guide_tab, label_loc_key="guideFrmLabel")

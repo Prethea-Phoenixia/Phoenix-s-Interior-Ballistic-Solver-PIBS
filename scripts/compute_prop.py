@@ -2,7 +2,7 @@ from pibs.ballistics.therm import Ingredient, Mixture
 
 
 def main():
-    for nitration in (0.109, 0.114, 0.119, 0.123):
+    for nitration in (0.109, 0.114, 0.119, 0.13):
         nc = Ingredient.nitrocellulose(nitration=nitration)
         Mixture("", compoDict={nc: 1}).prettyPrint()
     input()
