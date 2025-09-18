@@ -1048,7 +1048,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 row=j,
                 desc_label_key="1/β",
                 unit_text="x",
-                default="2.5",
+                default="10.0",
                 validation=validation_nn,
                 dtype=float,
             ),
@@ -1126,7 +1126,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 parent=self.aux_grain_frm,
                 row=k,
                 unit_text="x",
-                default="2.5",
+                default="10.0",
                 desc_label_key="Auxiliary 1/β",
                 validation=validation_nn,
                 dtype=float,
@@ -1502,10 +1502,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             initialfile=filenameize(self.get_description()),
         )
 
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
-
         try:
             loc_val_dict = {
                 loc.get_descriptive(): loc.get()
@@ -1522,7 +1518,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             )
 
         except Exception as e:
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+            self.handle_errors(e, logging.WARNING)
 
     def load_gun(self, initialdir: str = None):
         file_name = filedialog.askopenfilename(
@@ -1531,9 +1527,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             defaultextension=".json",
             initialdir=initialdir,
         )
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
 
         self.remove_cvldlf_consistency_traces()
 
@@ -1565,8 +1558,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 self.description.insert("end", file_dict[DESCRIPTION].strip("\n"))
 
         except Exception as e:
-            self.handle_errors(e)
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+            self.handle_errors(e, logging.WARNING)
         finally:
             self.add_cvldlf_consistency_traces()
             self.on_calculate()
@@ -1575,14 +1567,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
         file_name = filedialog.askopenfilename(
             title=self.get_loc_str("loadLabel"), filetypes=(("Comma Separated Values File", "*.csv"),)
         )
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
+
         try:
             self.drop_prop.reset(str_obj_dict=Composition.read_file(file_name))
         except Exception as e:
-            self.handle_errors(e)
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+            self.handle_errors(e, logging.WARNING)
 
     def on_reset(self):
         for loc in self.locs:
@@ -1616,9 +1605,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         gun_type = self.kwargs["typ"]
         column_list = self.get_loc_str("columnList")[gun_type]
 
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
         try:
             with open(file_name, "w", encoding="utf-8", newline="") as csvFile:
                 csv_writer = csv.writer(csvFile, delimiter=",", quoting=csv.QUOTE_MINIMAL)
@@ -1631,7 +1617,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             )
 
         except Exception as e:
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+            self.handle_errors(e, logging.WARNING)
 
     def change_lang(self):
 
@@ -2259,7 +2245,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
                     web.localize("arcLabel", "arcText")
 
                 r1.localize("pdtarcLabel", "pdtarcText")
-                r2.localize("ltdLabel", "perfLRText")
+                # r2.localize("ltdLabel", "perfLRText")
+                r2.localize("ltarcLabel", "ltarcText")
 
     def update_geom_plot(self):
         with mpl.rc_context(CONTEXT):
@@ -2698,9 +2685,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             initialfile=filenameize(self.get_description() + " " + save),
         )
 
-        if file_name == "":
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("cancelMsg"))
-            return
         try:
             if save == "main":
                 fig = self.fig
@@ -2719,7 +2703,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             messagebox.showinfo(self.get_loc_str("sucTitle"), self.get_loc_str("savedLocMsg") + f" {file_name:}")
 
         except Exception as e:
-            messagebox.showinfo(self.get_loc_str("excTitle"), str(e))
+            self.handle_errors(e, logging.WARNING)
 
     def swap(self):
         ## this swaps the primary and auxiliary charge.

@@ -102,6 +102,16 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
         self.A, self.B, self.C = A, B, C
         self.rho_div, self.n_hole, self.a_factors, self.b_factors = rho_div, n_hole, a_factors, b_factors
 
+    # fmt: off
+    SEVEN_PERF_CYLINDER = ("SEVEN_PERF_CYLINDER", 1, 7, 0, 0.2956, 7, (0, 0), (3, 8))
+    SEVEN_PERF_ROSETTE = ("SEVEN_PERF_ROSETTE", 2, 8, 12 * 3**0.5 / pi, 0.1547, 7, (1, 2), (1, 4))
+    FOURTEEN_PERF_ROSETTE = ("FOURTEEN_PERF_ROSETTE", 8 / 3, 47 / 3, 26 * 3**0.5 / pi, 0.1547, 14, (1, 2), (1, 4))
+    NINETEEN_PERF_CYLINDER = ("NINETEEN_PERF_CYLINDER", 1, 19, 0, 0.3559, 19, (0, 0), (5, 12))
+    NINETEEN_PERF_ROSETTE = ("NINETEEN_PERF_ROSETTE", 3, 21, 36 * 3**0.5 / pi, 0.1547, 19, (1, 2), (1, 4))
+    NINETEEN_PERF_HEXAGON = ("NINETEEN_PERF_HEXAGON", 18 / pi, 19, 18 * (3 * 3**0.5 - 1) / pi, 0.1864, 19, (1, 2), (1, 2))
+    NINETEEN_PERF_ROUNDED_HEXAGON = ("NINETEEN_PERF_ROUNDED_HEXAGON", 3**0.5 + 12 / pi, 19, 3 - 3**0.5 + 12 * (4 * 3**0.5 - 1) / pi, 0.1977, 19, (1, 2), (1, 2))
+    # fmt: on
+
     def __str__(self):
         return self.desc
 
@@ -110,26 +120,28 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
         Parameters:
         -----------
         r1: float
-            perforation diameter/web. d_0 / (2e_1)
+            perforation diameter / web. d_0 / 2e_1
         r2: float
             length/diameter (width) of grain.
+            length / web, 2c / 2e_1
         """
         web = 1
-        e_1, d_0 = web / 2, web * r1
+        e_1, d_0, c = 0.5 * web, web * r1, 0.5 * r2 * web
         a = sum(p * q for p, q in zip(self.a_factors, (d_0, e_1)))
         b = sum(p * q for p, q in zip(self.b_factors, (d_0, e_1)))
 
-        A, B, C, n = self.A, self.B, self.C, self.n_hole
-        c = 0.5 * r2 * (C * a**2 + A * b**2 + (n - B) * d_0**2) ** 0.5
+        # c = 0.5 * r2 * (self.C * a**2 + self.A * b**2 + (self.n_hole - self.B) * d_0**2) ** 0.5
 
         rho = self.rho_div * (e_1 + d_0 / 2)
 
-        p = (A * b + B * d_0) / (2 * c)
-        q = (C * a**2 + A * b**2 - B * d_0**2) / (2 * c) ** 2
+        p = (self.A * b + self.B * d_0) / (2 * c)
+        q = (self.C * a**2 + self.A * b**2 - self.B * d_0**2) / (2 * c) ** 2
         beta = e_1 / c
 
         # first phase of burning rate parameters, Z from 0 to 1
-        chi, labda, mu = (q + 2 * p) / q * beta, (n - 1 - 2 * p) / (q + 2 * p) * beta, -(n - 1) / (q + 2 * p) * beta**2
+        chi = (q + 2 * p) / q * beta
+        labda = (self.n_hole - 1 - 2 * p) / (q + 2 * p) * beta
+        mu = -(self.n_hole - 1) / (q + 2 * p) * beta**2
 
         z_b = (e_1 + rho) / e_1  # second phase burning Z upper limit
         psi_s = chi * (1 + labda + mu)
@@ -138,16 +150,6 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
         labda_s = psi_s / chi_s - 1
 
         return chi, labda, mu, chi_s, labda_s, z_b
-
-    # fmt: off
-    SEVEN_PERF_CYLINDER = ("SEVEN_PERF_CYLINDER", 1, 7, 0, 0.2956, 7, (0, 0), (3, 8))
-    SEVEN_PERF_ROSETTE = ("SEVEN_PERF_ROSETTE", 2, 8, 12 * 3**0.5 / pi, 0.1547, 7, (1, 2), (1, 4))
-    FOURTEEN_PERF_ROSETTE = ("FOURTEEN_PERF_ROSETTE", 8 / 3, 47 / 3, 26 * 3**0.5 / pi, 0.1547, 14, (1, 2), (1, 4))
-    NINETEEN_PERF_ROSETTE = ("NINETEEN_PERF_ROSETTE", 3, 21, 36 * 3**0.5 / pi, 0.1547, 19, (1, 2), (1, 4))
-    NINETEEN_PERF_CYLINDER = ("NINETEEN_PERF_CYLINDER", 1, 19, 0, 0.3559, 19, (0, 0), (5, 12))
-    NINETEEN_PERF_HEXAGON = ("NINETEEN_PERF_HEXAGON", 18 / pi, 19, 18 * (3 * 3**0.5 - 1) / pi, 0.1864, 19, (1, 2), (1, 2))
-    NINETEEN_PERF_ROUNDED_HEXAGON = ("NINETEEN_PERF_ROUNDED_HEXAGON", 3**0.5 + 12 / pi, 19, 3 - 3**0.5 + 12 * (4 * 3**0.5 - 1) / pi, 0.1977, 19, (1, 2), (1, 2))
-    # fmt: on
 
 
 class Composition:
