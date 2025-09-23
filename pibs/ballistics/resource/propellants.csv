@@ -3,11 +3,13 @@ P-5 BPfl,"High Nitrogen Single Base\n*---------- High Nitrated Pyroxylin\n 2.2 -
 Pyroxylin (10.9%),"Low Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains. Flame temperature is estimated.",1.25,1600,855000,1.0e-3,0.83,2.014e-8,2330
 Pyroxylin (11.4%),"Medium Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains. Flame temperature is estimated.",1.25,1600,900000,1.0e-3,0.83,2.014e-8,2530
 Pyroxylin,"Pyroxylin (nitrocellulose) propellant with values typically used to model multiple-perforated grains. Flame temperature is estimated.",1.25,1600,950000,1.0e-3,0.83,1.8e-8,2730
-Pyroxylin (V/A),High Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains.,1.25,1600,1017500,1.0e-3,0.83,2.094e-8,2970
+Pyroxylin (V/A),High Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains.,1.25,1600,1016000,1.007e-3,0.83,"1.9e-8",2970
 Pyroxylin (13.0%),High Nitration Pyroxylin (Nitrocellulose) propellant\n with values typically used to model multiple-perforated grains.,1.25,1600,1046400,1.0e-3,0.83,2.094e-8,3075
 ZT,"64.0% Nitrocellulose (13.15% Nitration)\n16.0% Nitroglycerin\n11.0% TEGN\n 6.5% DNT\n 2.0% Centralite\n0.5% TiO2\nDeveloped as TG-110",1.2375,1600,1078550,1.0e-3,1.0,0.83e-9,3136
 ZT-12A,"60.0% Nitrocellulose\n28.0% Nitroglycerin\n 9.5% TEGN\n 2.0% Centralite\n 0.5% TiO2\nThermalchemical properties assumed the same as TG-115/ZT-2",1.23,1600,1127800,1.0e-3,0.67,5e-7,3381
-DG-4,Values except force is generic,1.25,1600,1004000,1.0e-3,0.83,2.094e-8,2668
+DG-2,"See final table in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.255,1520,933000,1.133e-3,0.83,2e-8,2370
+DG-3,"See final table in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.25,1520,968000,1.113e-3,0.83,2e-8,2505
+DG-4,"See final table in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.243,1520,1004000,1.085e-3,0.83,2e-8,2655
 APTs-235P,34.1% Nitrocellulose (low N)\n33.7% Nitroglycerin\n27.0% Tetraazadecalin\n 1.2% Centralite\nValues except force is generic.,1.25,1600,1101000,1.0e-3,0.83,2.094e-8,3060
 M1,Single Base\nAMCP 706-150\nADA043778\n*85.00% Nitrocellulose (13.15%N)\n 10.00% Dinitrotloluene\n  5.00% Dibutylphthalate\n  1.00% Diphenylamine,1.2593,1569,911700,1.104e-3,0.951,1.078e-9,2417
 M2,Double Base\nAMCP 706-150\nADA043778\n*77.45% Nitrocellulose (13.25%N)\n*19.50% Nitroglycerin\n  1.40% Barium Nitrate\n  0.75% Potassium Nitrate\n  0.60% Ethyl Centralite\n  0.30% Graphite,1.2238,1652,1076000,1.008e-3,0.933,3.540e-9,3319

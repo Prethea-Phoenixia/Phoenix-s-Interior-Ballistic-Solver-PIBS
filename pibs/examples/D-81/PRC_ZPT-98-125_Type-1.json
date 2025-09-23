@@ -19,7 +19,7 @@
 	"Combustible Cartridge": true,
 	"Constrain Design": true,
 	"Constrain Travel": true,
-	"Description": "Ballistics of the 125mm Type-1 Tungsten APFSDS round for use on weapons of the D-81 family, including the ZPT-98-125. Designed in China and exported after 1992, did not enter widespread service with PLA. This entry represents charge design as manufactured and exported by the Pakistan State Arsenal.\n\nProjectile: 125-1 7.37 kg\nCharge: 9.35 kg Nitrocellulose (High Nitration, 1046.4 kJ/kg)\n - Main:        6.00 kg 16/19 Rosette\n - Incremental: 3.35 kg\n  - 2.55 kg 16/19 Rosette\n  - 0.8  kg 19/1-25\nCombustible Cartridge: 1.12 kg (from D-81, 686.5 kJ/kg)\nSpecification:      \n           15 °C      50 °C\n -   Pmcp: 475.6 MPa  549.17 MPa\nCorrected: 530   MPa  615    MPa\n - Muzzle Velocity:  1730 m/s",
+	"Description": "Ballistics of the 125mm Type-1 Tungsten APFSDS round for use on weapons of the D-81 family, including the ZPT-98-125. Designed in China and exported after 1992, did not enter widespread service with PLA. This entry represents charge design as manufactured and exported by the Pakistan State Arsenal.\n\nProjectile: 125-1 7.37 kg\nCharge: 9.35 kg Nitrocellulose (High Nitration, 1046.4 kJ/kg)\n - Main:        6.00 kg 16/19 Rosette\n - Incremental: 3.35 kg\n  - 2.55 kg 16/19 Rosette\n  - 0.8  kg 19/1-25\nCombustible Cartridge: 1.12 kg (from D-81, 686.5 kJ/kg)\nSpecification:      \n           15 °C      50 °C\n -   Pmcp: 475.6 MPa  549.17 MPa\nCorrected: 530   MPa  615    MPa  (1.12x)\n - Muzzle Velocity:  1730 m/s",
 	"Expansion Ratio (x)": 4.0,
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "NINETEEN_PERF_ROSETTE",
