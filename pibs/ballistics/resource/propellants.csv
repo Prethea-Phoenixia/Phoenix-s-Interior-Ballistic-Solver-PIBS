@@ -1,5 +1,6 @@
 type,description,adiabatic index,density kg/m^3,force J/kg,covolume m^3/kg,pressure exponent,burnrate coefficient m/s/Pa^n,isochoric adb flame temp K
 P-5 BPfl,"High Nitrogen Single Base\n*---------- High Nitrated Pyroxylin\n 2.2 - 4.1% Dimethacrylate (Bis-Triethylene Glycol) Phthalate\n 1.4 - 3.2% Volatile\n 1.0 - 2.0% Diphenyl Amine\n 0.1 - 0.5% Potassium Sulphate\n 0.05-0.15% Graphite. From table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.236,1600,988000,1.038e-3,1.0,7.1951e-10,2800
+Pyroxylin (BP),"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.255,1600,904000,1.098e-3,0.83,2e-8,2375
 Pyroxylin,,1.25,1600,960100,1.0e-3,0.83,1.8e-8,2800
 Pyroxylin (V/A),"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.25,1600,1016000,1.007e-3,0.83,1.9e-8,2970
 Nitrocellulose (10.9%),,1.25,1600,853623,1.0e-3,0.83,2.0e-8,2331

@@ -1535,6 +1535,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         if not file_name:
             return
 
+        self.on_reset()
         self.remove_cvldlf_consistency_traces()
 
         try:
