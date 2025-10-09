@@ -1321,6 +1321,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.swap_button = ttk.Button(self.grain_frm, text=self.get_loc_str("swapLabel"), command=self.swap)
         self.swap_button.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.locs.append(self.swap_button)
         j += 1
 
         ## guide plot
@@ -1796,6 +1797,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
             self.calc_button.config(state="disabled")
             self.guide_button.config(state="disabled")
+            self.swap_button.config(state="disabled")
 
     def on_calculate(self):
 
@@ -1827,6 +1829,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
             self.calc_button.config(state="disabled")
             self.guide_button.config(state="disabled")
+            self.swap_button.config(state="disabled")
 
     def get_value(self):
         try:
@@ -1874,6 +1877,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.calc_button.config(state="normal")
         self.guide_button.config(state="normal")
+        self.swap_button.config(state="normal")
 
         for loc in self.locs:
             try:
@@ -1945,6 +1949,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.update_guide_graph()
         self.calc_button.config(state="normal")
         self.guide_button.config(state="normal")
+        self.swap_button.config(state="normal")
 
         for loc in self.locs:
             try:
