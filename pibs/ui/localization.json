@@ -258,7 +258,9 @@
 		"widthText": "Specify the width of propellant strip or flake.",
       "combustibleLabel": "Combustible Cartridge",
       "combustibleMassLabel": "Mass",
-      "combustibleForceLabel": "Force"
+      "combustibleForceLabel": "Force",
+      "forceFudgeLabel": "Force Modifier",
+      "sjLabel": "Throat Cross Section"
 	},
 	"中文": {
 		"BURNOUT": "火药燃尽",
@@ -516,6 +518,8 @@
 		"widthText": "设置带状火药宽度。",
       "combustibleLabel": "含可燃药筒",
       "combustibleMassLabel": "质量",
-      "combustibleForceLabel": "药力"
-	}
+      "combustibleForceLabel": "药力",
+      "forceFudgeLabel": "火药力修正系数",
+      "sjLabel": "喷管喉部截面积"
+    }
 }

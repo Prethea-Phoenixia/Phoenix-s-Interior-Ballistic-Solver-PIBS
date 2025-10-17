@@ -13,8 +13,8 @@ _prefix = {
     "n": 1e-9,  # nano
     "μ": 1e-6,  # micro
     "m": 1e-3,  # mili
-    # "c": 1e-2,  # centi
-    # "d": 1e-1,  # deci
+    "c": 1e-2,  # centi
+    "d": 1e-1,  # deci
     " ": 1,  # unit
     # "da": 1e1, # deca
     # "h": 1e2,  # hecto
@@ -93,7 +93,7 @@ def unloadfont(fontpath, private=True, enumerable=False):
     return bool(remove_font_resource_ex(byref(pathbuf), flags, 0))
 
 
-def to_si(v, dec=4, unit=None, use_sn=False):
+def to_si(v, dec=4, unit=None, unit_dim=1, use_sn=False):
     if v is None:
         return "N/A"
     elif isinstance(v, int) or isinstance(v, float):
@@ -106,14 +106,14 @@ def to_si(v, dec=4, unit=None, use_sn=False):
     else:
         positive = False
     v = abs(v)
-    for prefix, magnitude, nextMagnitude in zip(
+    for prefix, magnitude, next_magnitude in zip(
         _prefix.keys(),
         tuple(_prefix.values())[:-1],
         tuple(_prefix.values())[1:],
     ):
-        if 1 <= (v / magnitude) < (nextMagnitude / magnitude):
+        if 1 <= (v / magnitude**unit_dim) < (next_magnitude / magnitude) ** unit_dim:
             # allows handling of non-uniformly log10 spaced prefixes
-            vstr = "{:#.{:}g}".format(v / magnitude, dec)
+            vstr = "{:#.{:}g}".format(v / magnitude**unit_dim, dec)
             return (
                 (" " if positive else "-")
                 + vstr
