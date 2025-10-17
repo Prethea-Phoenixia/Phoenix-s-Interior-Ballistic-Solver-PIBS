@@ -21,6 +21,7 @@
 	"Constrain Travel": true,
 	"Description": "Ballistics of the DTW (Type-2) APFSDS round for the ZPT-98-125, exported as the BTA4 round.\n\nCharge Design: 8.8 kg ZT-12A\n - Main: 6 kg 18/19 Rosette grain\n - Inc:  2.1 kg 18/19 Rosette grain + 0.7 kg tubular\nCombustible: 1.6 kg",
 	"Expansion Ratio (x)": 4.0,
+	"Force Modifier (%)": 100.0,
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "NINETEEN_PERF_ROSETTE",
 	"Gun Type": "CONVENTIONAL",

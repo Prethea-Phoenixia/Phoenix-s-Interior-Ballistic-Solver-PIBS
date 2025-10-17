@@ -21,6 +21,7 @@
 	"Constrain Travel": true,
 	"Description": "Ballistics of APFSDS-T round fired from the PTZ-89 120mm self-propelled smoothbore tank gun, based on the chasis of Type 69-II tank. \n\nBarrel Length:    6250 mm\nCartridge Length:  740 mm exterior, 183 mm rim diameter\nTravel:           5525 mm\nCharge:          10.33 kg 9.33 kg ZT-14/19 19 perforated rosette prism\n                            ~1 kg combustible cartridge.\nChambrage:        1.75 (assumed) \nBreech Pressure:   458 MPa (copper-crusher gauge, converts to 512.96 MPa) \nAs Accepted: 1740 m/s @ 4800 kgf/cm²\nAs Tested:\nT   m.v.   P.mcp\n    m/s    MPa\n-40 1675.5 404\n 15 1731.6 458   (copper crusher gauge, converts to 512.96 MPa in piezoelectric value)\n 50 1773.6 492.5 ",
 	"Expansion Ratio (x)": 4.0,
+	"Force Modifier (%)": 100.0,
 	"Gas Gradient": "SOL_LAGRANGE",
 	"Grain Geometry": "NINETEEN_PERF_ROSETTE",
 	"Gun Type": "CONVENTIONAL",

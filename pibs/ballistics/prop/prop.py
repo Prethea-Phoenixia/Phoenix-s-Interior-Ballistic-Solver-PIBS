@@ -265,6 +265,7 @@ class Propellant:
         mass_ratio: float = 0.0,  # w_2 / w_1
         combustible_fraction: float = 0,  # combustible cartridge
         combustible_force: float = 0,
+        force_fudge: float = 1.0,
     ):
         """
         for propellant i = 1, 2:
@@ -291,6 +292,7 @@ class Propellant:
 
         self.web_ratio, self.mass_ratio = web_ratio, mass_ratio
         self.combustible_fraction, self.combustible_force = combustible_fraction, combustible_force
+        self.force_fudge = force_fudge
 
         if not (0 <= self.combustible_fraction <= 1):
             raise ValueError("Combustible fraction should be in [0,1]")
@@ -300,7 +302,9 @@ class Propellant:
 
     @property
     def f(self) -> float:
-        return self.composition.f * (1 - self.combustible_fraction) + self.combustible_force * self.combustible_fraction
+        return (
+            self.composition.f * (1 - self.combustible_fraction) + self.combustible_force * self.combustible_fraction
+        ) * self.force_fudge
 
     @property
     def alpha(self) -> float:

@@ -255,7 +255,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.root.bind("<Control-L>", lambda *_: self.load_gun())
 
         design_menu.add_command(
-            label=self.get_loc_str("loadPresetLabel"), command=lambda: self.load_gun(initialdir=resolvepath("examples"))
+            label=self.get_loc_str("loadPresetLabel"),
+            command=lambda: self.load_gun(initial_dir=resolvepath("examples")),
         )
 
         design_menu.add_command(label=self.get_loc_str("resetLabel"), command=self.on_reset, accelerator="Ctrl+N")
@@ -314,12 +315,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.force_update_on_theme_widget.append(self.description)
 
         ## left frame
-        info_frm = Frame(self)
-        info_frm.grid(row=1, column=0, sticky="nsew")
-        info_frm.columnconfigure(0, weight=1)
-        info_frm.rowconfigure(0, weight=1)
+        info_frame = Frame(self)
+        info_frame.grid(row=1, column=0, sticky="nsew")
+        info_frame.columnconfigure(0, weight=1)
+        info_frame.rowconfigure(0, weight=1)
 
-        par_frm = self.add_localized_label_frame(info_frm, label_loc_key="parFrmLabel")
+        par_frm = self.add_localized_label_frame(info_frame, label_loc_key="parFrmLabel")
         par_frm.grid(row=0, column=0, sticky="nsew")
         par_frm.columnconfigure(0, weight=1)
 
@@ -356,6 +357,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
         self.pa, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="paLabel"), i + 2
         self.gm, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="gmLabel"), i + 2
+
+        self.sj, i = self.add_localized_12_display(parent=par_frm, row=i, label_loc_key="sjLabel"), i + 2
 
         ## center frame
         self.tab_parent = ttk.Notebook(self, padding=0)
@@ -1085,26 +1088,26 @@ class InteriorBallisticsFrame(LocalizedFrame):
         i = 0
         mid_frame.rowconfigure(i, weight=1)
         ### propellant frame
-        self.prop_frame = self.add_localized_label_frame(
+        prop_frame = self.add_localized_label_frame(
             mid_frame, label_loc_key="propFrmLabel", tooltip_loc_key="specsText"
         )
-        self.prop_frame.grid(row=i, column=0, columnspan=3, sticky="nsew")
+        prop_frame.grid(row=i, column=0, columnspan=3, sticky="nsew")
         i += 1
-        self.prop_frame.rowconfigure(1, weight=1)
-        self.prop_frame.columnconfigure(0, weight=1)
+        prop_frame.rowconfigure(1, weight=1)
+        prop_frame.columnconfigure(0, weight=1)
         j = 0
         self.drop_prop = self.add_localized_dropdown(
-            parent=self.prop_frame,
+            parent=prop_frame,
             str_obj_dict=Composition.read_file(resolvepath("ballistics/resource/propellants.csv")),
             desc_label_key="propFrmLabel",
         )
         self.drop_prop.grid(row=j, column=0, columnspan=2, sticky="nsew")
         j += 1
 
-        spec_scroll = ttk.Scrollbar(self.prop_frame, orient="vertical")
-        spec_h_scroll = ttk.Scrollbar(self.prop_frame, orient="horizontal")
+        spec_scroll = ttk.Scrollbar(prop_frame, orient="vertical")
+        spec_h_scroll = ttk.Scrollbar(prop_frame, orient="horizontal")
         self.specs = Text(
-            self.prop_frame,
+            prop_frame,
             wrap="word",
             height=0,
             width=0,
@@ -1119,13 +1122,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.specs.grid(row=j, column=0, sticky="nsew")
         spec_scroll.grid(row=j, rowspan=2, column=1, sticky="nsew")
         j += 1
-
         spec_h_scroll.grid(row=j, column=0, sticky="nsew")
         j += 1
 
         self.use_combustible, j = (
             self.add_localized_label_check(
-                self.prop_frame,
+                prop_frame,
                 label_loc_key="combustibleLabel",
                 tooltip_loc_key="combustibleText",
                 default=False,
@@ -1135,7 +1137,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             j + 1,
         )
 
-        combustible_frame = Frame(self.prop_frame)
+        combustible_frame = Frame(prop_frame)
         combustible_frame.grid(row=j, column=0, columnspan=2, sticky="nsew")
         j += 1
 
@@ -1166,6 +1168,22 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 row=k,
             ),
             k + 1,
+        )
+        force_fudge_frame = Frame(prop_frame)
+        force_fudge_frame.grid(row=j, column=0, columnspan=2, sticky="nsew")
+        j += 1
+
+        force_fudge_frame.columnconfigure(0, weight=1)
+        force_fudge_frame.rowconfigure(0, weight=1)
+
+        self.force_fudge = self.add_localized_3_input(
+            force_fudge_frame,
+            label_loc_key="forceFudgeLabel",
+            tooltip_loc_key="forceFudgeText",
+            default="100.0",
+            unit_text="%",
+            dtype=float,
+            validation=validation_nn,
         )
         ###
 
@@ -1321,7 +1339,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.swap_button = ttk.Button(self.grain_frm, text=self.get_loc_str("swapLabel"), command=self.swap)
         self.swap_button.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        self.locs.append(self.swap_button)
+        # self.locs.append(self.swap_button)
         j += 1
 
         ## guide plot
@@ -1398,6 +1416,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.combustible_force_kJ__kg,
             self.combustible_mass_kg,
             self.chg_kg,
+            self.force_fudge,
         ):
 
             entry.var.trace_add("write", self.propellant_callback)
@@ -1525,12 +1544,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         except Exception as e:
             self.handle_errors(e, logging.WARNING)
 
-    def load_gun(self, initialdir: str = None):
+    def load_gun(self, initial_dir: str = None):
         file_name = filedialog.askopenfilename(
             title=self.get_loc_str("loadLabel"),
             filetypes=(("JSON File", "*.json"),),
             defaultextension=".json",
-            initialdir=initialdir,
+            initialdir=initial_dir,
         )
 
         if not file_name:
@@ -1670,7 +1689,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.tab_parent.tab(self.errorTab, text=self.get_loc_str("errorTab"))
         self.tab_parent.tab(self.guide_tab, text=self.get_loc_str("guideTab"))
         #
-        # self.prop_tab_parent.tab(self.prop_frame, text=self.get_loc_str("propFrmLabel"))
+        # self.prop_tab_parent.tab(prop_frame, text=self.get_loc_str("propFrmLabel"))
         # self.prop_tab_parent.tab(self.grain_frm, text=self.get_loc_str("grainFrmLabel"))
 
         self.guide_plot_travel.config(text=self.get_loc_str("guidePlotTravel"))
@@ -1772,19 +1791,17 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.kwargs.update({"ambient_p": 0, "ambient_rho": 0, "ambient_gamma": 1})
 
     def on_guide(self):
-        if self.process or self.guide_process:
-            return
-
         self.focus()  # remove focus to force widget entry validation
         self.update()  # and wait for the event to update.
+        self.generate_kwargs()
 
-        self.guide_process = None
+        if self.process or self.guide_process:
+            return
         try:
-            self.generate_kwargs()
             self.guide_process = Process(target=guide, args=(self.guide_job_queue, self.log_queue, self.kwargs))
             self.guide_process.start()
-
         except Exception as e:
+            self.guide_process = None
             self.handle_errors(e)
             self.guide = None
             self.update_guide_graph()
@@ -1800,20 +1817,17 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.swap_button.config(state="disabled")
 
     def on_calculate(self):
+        self.focus()  # remove focus to force widget entry validation
+        self.update()  # and wait for the event to update.
+        self.generate_kwargs()
 
         if self.process or self.guide_process:
             return
-        self.focus()  # remove focus to force widget entry validation
-        self.update()  # and wait for the event to update.
-
-        self.process = None
         try:
-            self.generate_kwargs()
             self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, self.kwargs))
-
             self.process.start()
-
         except Exception as e:
+            self.process = None
             self.handle_errors(e)
 
             self.gun, self.gun_result = None, None
@@ -1900,6 +1914,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.pp,
             self.mv,
             self.bop,
+            self.sj,
         ):
             entry.reset()
         try:
@@ -1935,6 +1950,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 self.bop.set(f"{burnout_entry.travel / self.gun.l_g * 1e2:.2f} %")
             except ValueError:
                 self.bop.set(self.get_loc_str("uncontained"))
+
+            try:
+                self.sj.set(f"{to_si(self.gun.S_j, unit='m²', unit_dim=2):}")
+            except AttributeError:
+                self.sj.set("N/A")
 
         except (AttributeError, ValueError, TypeError):
             pass
@@ -2211,9 +2231,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.specs.insert("end", compo.desc)
         self.specs.config(state="disabled")
 
-        # self.propellant_callback()
-        # self.cvldlf_consistency_callback()  # update the chamber volume / load fraction with current data
-
     def update_geom(self, *_):
         for geom, r1, r2 in zip(
             (self.main_geom.get_obj(), self.aux_geom.get_obj()),
@@ -2478,6 +2495,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 combustible_fraction=float(
                     self.combustible_mass_kg.get() / self.chg_kg.get() if self.use_combustible.get() else 0.0
                 ),
+                force_fudge=float(self.force_fudge.get()) * 1e-2,
             )
 
         except Exception as e:

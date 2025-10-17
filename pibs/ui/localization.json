@@ -258,7 +258,10 @@
 		"widthText": "Specify the width of propellant strip or flake.",
       "combustibleLabel": "Combustible Cartridge",
       "combustibleMassLabel": "Mass",
-      "combustibleForceLabel": "Force"
+      "combustibleForceLabel": "Force",
+      "forceFudgeLabel": "Force Modifier",
+      "forceFudgeText": "On a theoretical basis, the reduction of propellant force can be used to account for thermal loss. In practice, adjusting propellant force is required to account for environmental factors and batch-by-batch deviation's influence on system performance. The factor acts on the mass-weighed mean of the main charge and the combustible cartridge.",
+      "sjLabel": "Throat Cross Section"
 	},
 	"中文": {
 		"BURNOUT": "火药燃尽",
@@ -516,6 +519,9 @@
 		"widthText": "设置带状火药宽度。",
       "combustibleLabel": "含可燃药筒",
       "combustibleMassLabel": "质量",
-      "combustibleForceLabel": "药力"
-	}
+      "combustibleForceLabel": "药力",
+      "forceFudgeLabel": "火药力修正系数",
+      "forceFudgeText": "理论计算上，以降低火药力采用值修正发射过程中的热散失。实际生产中，也通过调整火药力修正环境，批次等因素对内弹道的影响。该系数乘在主装药及可燃药筒按质量作加权平均的等效药力上。",
+      "sjLabel": "喷管喉部截面积"
+    }
 }

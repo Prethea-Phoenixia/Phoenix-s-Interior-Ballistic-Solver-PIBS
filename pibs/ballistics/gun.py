@@ -858,7 +858,6 @@ class Gun(DelegatesPropellant):
         labda_2_prime = self.labda_2 * (1 / self.chi_k + labda_g) / (1 + labda_g)
 
         factor_s = 1 + labda_2_prime * (self.w / (self.phi_1 * self.m))  # factor_b = P/P_b = phi / phi_1
-
         factor_b = (self.phi_1 * self.m + labda_2_prime * self.w) / (self.phi_1 * self.m + labda_1_prime * self.w)
 
         return p / factor_s, p / factor_b
