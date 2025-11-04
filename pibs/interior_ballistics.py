@@ -6,7 +6,8 @@ import multiprocessing
 import platform
 import sys
 import traceback
-from ctypes import windll
+if platform.system() == "Windows":
+    from ctypes import windll
 from itertools import repeat
 from logging.handlers import QueueHandler, QueueListener
 from math import ceil, inf, log10
@@ -161,7 +162,9 @@ class TextHandler(logging.Handler):
 class PIBS(Tk):
     def __init__(self, *args, loc, **kwargs):
         super().__init__(*args, **kwargs)
-        super().iconbitmap(default=resolvepath("ui/logo.ico"))
+        # Only works on windows:(
+        if platform.system() == "Windows":
+            super().iconbitmap(default=resolvepath("ui/logo.ico"))
         super().option_add("*tearOff", False)
 
         font = Font(family=FONTNAME, size=FONTSIZE)
