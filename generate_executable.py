@@ -1,35 +1,28 @@
 import os
-
 import PyInstaller.__main__
-
 from pibs import __version__
 
 if __name__ == "__main__":
-
     name = "PIBSv" + __version__
+
+    sep = os.pathsep  # ':' on POSIX, ';' on Windows
 
     options = [
         "run_pibs.py",
         "--clean",
         "--noconfirm",
         "--windowed",
-        "--icon",
-        "pibs/ui/logo.ico",
-        "--name",
-        name,
-        "--debug",
-        "all",
-        "--add-data",
-        "pibs/ballistics/resource;ballistics/resource/",
-        "--add-data",
-        "pibs/ui;ui/",
-        "--add-data",
-        "pibs/examples;examples/",
-        "--exclude-module",
-        "pibs.ballistics.therm",
+        "--icon=pibs/ui/logo.ico",
+        "--name=" + name,
+        "--debug=all",
+        f"--add-data=pibs/ballistics/resource{sep}ballistics/resource/",
+        f"--add-data=pibs/ui{sep}ui/",
+        f"--add-data=pibs/examples{sep}examples/",
+        "--exclude-module=pibs.ballistics.therm",
+        "--onefile",
     ]
-    # use this for dist
-    PyInstaller.__main__.run(options + ["--onefile"])
+
+    PyInstaller.__main__.run(options)
 
     with open(name + ".spec", "r") as f:
         content = f.readlines()

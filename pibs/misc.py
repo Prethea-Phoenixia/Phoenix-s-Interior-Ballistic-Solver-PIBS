@@ -1,7 +1,12 @@
 import json
 import os
 import sys
-from ctypes import byref, create_string_buffer, create_unicode_buffer, windll
+import shutil
+from pathlib import Path
+from ctypes import byref, create_string_buffer, create_unicode_buffer
+import platform
+if platform.system() == "Windows":
+    from ctypes import windll
 from math import floor, log, log10
 
 _prefix = {
@@ -27,6 +32,14 @@ _prefix = {
     "Z": 1e21,  # zetta
     "Y": 1e24,  # yotta
 }
+
+def get_font_dir():
+    if platform.system() == "Windows":
+        return None
+    else:
+        font_dir = Path.home() / ".local" / "share" / "fonts"
+        font_dir.mkdir(parents=True, exist_ok=True)
+        return font_dir
 
 
 # noinspection PyTypeChecker
@@ -59,19 +72,27 @@ def loadfont(fontpath, private=True, enumerable=False):
     This function is written for Python 2.x. For 3.x, you
     have to convert the isinstance checks to bytes and str
     """
-    if isinstance(fontpath, bytes):
-        pathbuf = create_string_buffer(fontpath)
-        add_font_resource_ex = windll.gdi32.AddFontResourceExA
+    if platform.system() == "Windows":
+        if isinstance(fontpath, bytes):
+            pathbuf = create_string_buffer(fontpath)
+            add_font_resource_ex = windll.gdi32.AddFontResourceExA
+        elif isinstance(fontpath, str):
+            pathbuf = create_unicode_buffer(fontpath)
+            add_font_resource_ex = windll.gdi32.AddFontResourceExW
+        else:
+            raise TypeError("fontpath must be of type str or unicode")
 
-    elif isinstance(fontpath, str):
-        pathbuf = create_unicode_buffer(fontpath)
-        add_font_resource_ex = windll.gdi32.AddFontResourceExW
+        flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
+        num_fonts_added = add_font_resource_ex(byref(pathbuf), flags, 0)
+        print(f"Windows: Loaded font {fontpath} (private={private}, enumerable={enumerable})")
+        return bool(num_fonts_added)
     else:
-        raise TypeError("fontpath must be of type str or unicode")
-
-    flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
-    num_fonts_added = add_font_resource_ex(byref(pathbuf), flags, 0)
-    return bool(num_fonts_added)
+        font_dir = get_font_dir()
+        if font_dir is None:
+            return False
+        shutil.copy2(fontpath, font_dir)
+        print(f"Linux: Copied font {fontpath} to {font_dir}")
+        return True
 
 
 def unloadfont(fontpath, private=True, enumerable=False):
@@ -80,17 +101,28 @@ def unloadfont(fontpath, private=True, enumerable=False):
 
     see http://msdn2.microsoft.com/en-us/library/ms533925.aspx
     """
-    if isinstance(fontpath, bytes):
-        pathbuf = create_string_buffer(fontpath)
-        remove_font_resource_ex = windll.gdi32.RemoveFontResourceExA
-    elif isinstance(fontpath, str):
-        pathbuf = create_unicode_buffer(fontpath)
-        remove_font_resource_ex = windll.gdi32.RemoveFontResourceExW
-    else:
-        raise TypeError("fontpath must be a str or unicode")
+    if platform.system() == "Windows":
+        if isinstance(fontpath, bytes):
+            pathbuf = create_string_buffer(fontpath)
+            remove_font_resource_ex = windll.gdi32.RemoveFontResourceExA
+        elif isinstance(fontpath, str):
+            pathbuf = create_unicode_buffer(fontpath)
+            remove_font_resource_ex = windll.gdi32.RemoveFontResourceExW
+        else:
+            raise TypeError("fontpath must be a str or unicode")
 
-    flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
-    return bool(remove_font_resource_ex(byref(pathbuf), flags, 0))
+        flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
+        print(f"Windows: Unloaded font {fontpath} (private={private}, enumerable={enumerable})")
+        return bool(remove_font_resource_ex(byref(pathbuf), flags, 0))
+    else:
+        font_dir = get_font_dir()
+        if font_dir is None:
+            return False
+        dest_path = font_dir / Path(fontpath).name
+        if dest_path.exists():
+            dest_path.unlink()
+        print(f"Linux: Removed font {fontpath} from {font_dir}")
+        return True
 
 
 def to_si(v, dec=4, unit=None, unit_dim=1, use_sn=False):
