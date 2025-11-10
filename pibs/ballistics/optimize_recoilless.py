@@ -13,7 +13,7 @@ from . import (
     Points,
 )
 from .generics import DelegatesPropellant
-from .num import dekker, gss, rkf78
+from .num import dekker, gss, rkf
 from .prop import Propellant
 from .recoilless import Recoilless
 
@@ -233,8 +233,11 @@ class ConstrainedRecoilless(DelegatesPropellant):
 
             # integrate this to end of burn
 
-            def _ode_z(z, t_bar, l_bar, v_bar, eta, tau, _):
+            def _ode_z(
+                z: float, tlvetatau: tuple[float, float, float, float, float], dz: float
+            ) -> tuple[float, float, float, float, float]:
                 """burnout domain ode of internal ballistics"""
+                t_bar, l_bar, v_bar, eta, tau = tlvetatau
                 psi = f_psi_z(z)
                 dpsi = f_sigma_z(z)  # dpsi/dZ
 
@@ -268,11 +271,11 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 return dt_bar, dl_bar, dv_bar, deta, dtau
 
             # stepVanished = False
-            record = [[z_0, [0, 0, 0, 0, 1]]]
+            record = [(z_0, (0.0, 0.0, 0.0, 0.0, 1.0))]
             try:
-                (z_j, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j), _) = rkf78(
+                z_j, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j) = rkf(
                     d_func=_ode_z,
-                    ini_val=(0, 0, 0, 0, 1),
+                    ini_val=(0.0, 0.0, 0.0, 0.0, 1.0),
                     x_0=z_0,
                     x_1=z_b,
                     rel_tol=tol,
@@ -282,7 +285,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 )
 
                 if z_j not in [line[0] for line in record]:
-                    record.append([z_j, [t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j]])
+                    record.append((z_j, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j)))
             except ValueError:
                 z_j, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j) = record[-1]
 
@@ -313,28 +316,19 @@ class ConstrainedRecoilless(DelegatesPropellant):
                     ys = record[i][1]
 
                     r = []
-                    _, (t_bar, l_bar, v_bar, eta, tau), _ = rkf78(
-                        d_func=_ode_z,
-                        ini_val=ys,
-                        x_0=x,
-                        x_1=z,
-                        rel_tol=tol,
-                        abs_tol=tol**2,
-                        record=r,
-                    )
+                    t_bar, l_bar, v_bar, eta, tau = rkf(
+                        d_func=_ode_z, ini_val=ys, x_0=x, x_1=z, rel_tol=tol, abs_tol=tol**2, record=r
+                    )[1]
 
                     xs = [v[0] for v in record]
                     record.extend(v for v in r if v[0] not in xs)
                     record.sort()
-                    return _f_p_bar(z, l_bar, v_bar, eta, tau)
+                    return _f_p_bar(z, l_bar, v_bar, eta, tau), z, t_bar, l_bar, v_bar, eta, tau
 
-                z_1, z_2 = gss(_f_p_z, z_i, z_j, y_rel_tol=tol, find_min=False)
+                z_1, z_2 = gss(lambda z: _f_p_z(z)[0], z_i, z_j, y_rel_tol=tol, find_min=False)
                 z_p = 0.5 * (z_1 + z_2)
-
-                p_bar_p = _f_p_z(z_p)
-                i = [line[0] for line in record].index(z_p)
-
-                return p_bar_p - p_bar_d, record[i][0], *record[i][-1]
+                p_bar_p, *vals = _f_p_z(z_p)
+                return p_bar_p - p_bar_d, *vals
 
         dp_bar_probe, z, *_ = _f_p_e_1(0.5 * self.min_web)
         probe_web = 0.5 * self.min_web
@@ -380,8 +374,12 @@ class ConstrainedRecoilless(DelegatesPropellant):
 
         b = s**2 * e_1**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
-        def _ode_v(v_bar, _, z, l_bar, eta, tau, __):
+        def _ode_v(
+            v_bar: float, tzletatau: tuple[float, float, float, float, float], __: float
+        ) -> tuple[float, float, float, float, float]:
+            _, z, l_bar, eta, tau = tzletatau
             psi = f_psi_z(z)
+
             dpsi = f_sigma_z(z)  # dpsi/dZ
 
             l_psi_bar = 1 - delta * ((1 - psi) / rho_p + alpha * (psi - eta))
@@ -417,13 +415,9 @@ class ConstrainedRecoilless(DelegatesPropellant):
             ot_bar, *_ = record[-1][-1]
             return l_bar > l_bar_d or t_bar < ot_bar
 
-        vtzlet_record = [[v_bar_i, (t_bar_i, z_i, l_bar_i, eta_i, tau_i)]]
+        vtzlet_record = [(v_bar_i, (t_bar_i, z_i, l_bar_i, eta_i, tau_i))]
         try:
-            (
-                v_bar_g,
-                (t_bar_g, z_g, l_bar_g, eta_g, tau_g),
-                _,
-            ) = rkf78(
+            v_bar_g, (t_bar_g, z_g, l_bar_g, eta_g, tau_g) = rkf(
                 d_func=_ode_v,
                 ini_val=(t_bar_i, z_i, l_bar_i, eta_i, tau_i),
                 x_0=v_bar_i,

@@ -24,7 +24,7 @@ from . import (
     Domains,
 )
 from .gun import Gun
-from .num import dekker, gss, rkf78
+from .num import dekker, gss, rkf
 from .prop import Composition, Propellant
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 from .generics import (
     DelegatesPropellant,
     GenericEntry,
-    GenericErrorEntry,
     GenericResult,
     OutlineEntry,
     PressureProbePoint,
@@ -49,17 +48,9 @@ class RecoillessTableEntry(GenericEntry):
 
 
 @dataclass
-class RecoillessErrorEntry(GenericErrorEntry):
-    outflow_velocity: float | None = None
-    stag_pressure: float | None = None
-    outflow_fraction: float | None = None
-
-
-@dataclass
 class RecoillessResult(GenericResult):
     gun: Recoilless
     table_data: list[RecoillessTableEntry]
-    error_data: list[RecoillessErrorEntry]
 
 
 class Recoilless(DelegatesPropellant):
@@ -185,7 +176,8 @@ class Recoilless(DelegatesPropellant):
 
         return max(p_bar, self.p_a_bar)
 
-    def ode_t(self, _, z, l_bar, v_bar, eta, tau, __):
+    def ode_t(self, t: float, zlvetatau: tuple[float, float, float, float, float], dt: float):
+        z, l_bar, v_bar, eta, tau = zlvetatau
         psi = self.f_psi_z(z)
         dpsi = self.f_sigma_z(z)  # dpsi/dZ
         p_bar = self.f_p_bar(z, l_bar, eta, tau, psi)
@@ -211,7 +203,7 @@ class Recoilless(DelegatesPropellant):
 
         return dz, dl_bar, dv_bar, deta, dtau
 
-    def ode_l(self, l_bar, _, z, v_bar, eta, tau, __):
+    def ode_l(self, l_bar: float, tzvetatau: tuple[float, float, float, float, float], dl_bar: float):
         """length domain ode of internal ballistics
         the 1/v_bar pose a starting problem that prevent us from using it from
         initial condition.
@@ -219,6 +211,7 @@ class Recoilless(DelegatesPropellant):
         in general, d/dl_bar = d/dt_bar * dt_bar/dl_bar
 
         """
+        t, z, v_bar, eta, tau = tzvetatau
 
         psi = self.f_psi_z(z)
         dpsi = self.f_sigma_z(z)  # dpsi/dZ
@@ -243,7 +236,8 @@ class Recoilless(DelegatesPropellant):
 
         return dt_bar, dz, dv_bar, deta, dtau
 
-    def ode_z(self, z, _, l_bar, v_bar, eta, tau, __):
+    def ode_z(self, z: float, tlvetatau: tuple[float, float, float, float, float], dz: float):
+        t, l_bar, v_bar, eta, tau = tlvetatau
         psi = self.f_psi_z(z)
         dpsi = self.f_sigma_z(z)  # dpsi/dZ
         p_bar = self.f_p_bar(z, l_bar, eta, tau, psi)
@@ -351,36 +345,12 @@ class Recoilless(DelegatesPropellant):
         z_0 = self.z_0
 
         bar_data = []
-        bar_err = []
 
-        def upd_bar_data(
-            tag, t_bar, l_bar, z, v_bar, eta, tau, t_bar_err, l_bar_err, z_err, v_bar_err, eta_err, tau_err
-        ):
+        def upd_bar_data(tag, t_bar, l_bar, z, v_bar, eta, tau):
             p_bar = self.f_p_bar(z, l_bar, eta, tau)
-            p_bar_err = "N/A"
             bar_data.append((tag, t_bar, l_bar, z, v_bar, p_bar, eta, tau))
-            """
-            Worst case scenario for pressure deviation is when:
-            Z higher than actual, l lower than actual, v lower than actual
-            more burnt propellant, less volume, lower speed of projectile.
-            """
-            bar_err.append(("L", t_bar_err, l_bar_err, z_err, v_bar_err, p_bar_err, eta_err, tau_err))
 
-        upd_bar_data(
-            tag=POINT_START,
-            t_bar=0,
-            l_bar=0,
-            z=z_0,
-            v_bar=0,
-            eta=0,
-            tau=1,
-            t_bar_err=0,
-            l_bar_err=0,
-            z_err=0,
-            v_bar_err=0,
-            eta_err=0,
-            tau_err=0,
-        )
+        upd_bar_data(tag=POINT_START, t_bar=0, l_bar=0, z=z_0, v_bar=0, eta=0, tau=1)
 
         record.append((0, (0, self.psi_0, 0, p_bar_0, 0, 1)))
 
@@ -421,7 +391,7 @@ class Recoilless(DelegatesPropellant):
                 if z_j > z_b:
                     z_j = z_b
 
-                z, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j), _ = rkf78(
+                z, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j) = rkf(
                     self.ode_z,
                     (t_bar_i, l_bar_i, v_bar_i, eta_i, tau_i),
                     z_i,
@@ -437,7 +407,7 @@ class Recoilless(DelegatesPropellant):
             except ValueError as e:
                 ztlvet_record.extend(ztlvet_record_i)
                 z, (t_bar, l_bar, v_bar, eta, tau) = ztlvet_record[-1]
-                dt_bar, dl_bar, dv_bar, deta, dtau = self.ode_z(z, t_bar, l_bar, v_bar, eta, tau, _)
+                dt_bar, dl_bar, dv_bar, deta, dtau = self.ode_z(z, (t_bar, l_bar, v_bar, eta, tau), _)
 
                 if all((dt_bar > 0, dl_bar > 0, dv_bar < 0)):
                     raise ValueError(
@@ -533,7 +503,7 @@ class Recoilless(DelegatesPropellant):
         """
 
         ltzvet_record = []
-        (_, (t_bar_e, z_e, v_bar_e, eta_e, tau_e), (t_bar_err, z_err, v_bar_err, eta_err, tau_err)) = rkf78(
+        t_bar_e, z_e, v_bar_e, eta_e, tau_e = rkf(
             self.ode_l,
             (t_bar_i, z_i, v_bar_i, eta_i, tau_i),
             l_bar_i,
@@ -541,28 +511,14 @@ class Recoilless(DelegatesPropellant):
             rel_tol=tol,
             abs_tol=tol**2,
             record=ltzvet_record,
-        )
+        )[1]
 
         record.extend(
             (t_bar, (l_bar, self.f_psi_z(z), v_bar, self.f_p_bar(z, l_bar, eta, tau), eta, tau))
             for (l_bar, (t_bar, z, v_bar, eta, tau)) in ltzvet_record
         )
 
-        upd_bar_data(
-            tag=POINT_EXIT,
-            t_bar=t_bar_e,
-            l_bar=l_g_bar,
-            z=z_e,
-            v_bar=v_bar_e,
-            eta=eta_e,
-            tau=tau_e,
-            t_bar_err=t_bar_err,
-            l_bar_err=0,
-            z_err=z_err,
-            v_bar_err=v_bar_err,
-            eta_err=eta_err,
-            tau_err=tau_err,
-        )
+        upd_bar_data(tag=POINT_EXIT, t_bar=t_bar_e, l_bar=l_g_bar, z=z_e, v_bar=v_bar_e, eta=eta_e, tau=tau_e)
 
         t_bar_f = None
         if z_b > 1.0 and z_e >= 1.0:  # fracture point exist and is contained
@@ -571,11 +527,9 @@ class Recoilless(DelegatesPropellant):
             ODE w.r.t Z is integrated from Z_0 to 1, from onset of projectile
             movement to charge fracture
             """
-            (
-                _,
-                (t_bar_f, l_bar_f, v_bar_f, eta_f, tau_f),
-                (t_bar_err_f, l_bar_err_f, v_bar_err_f, eta_err_f, tau_err_f),
-            ) = rkf78(self.ode_z, (0, 0, 0, 0, 1), z_0, 1, rel_tol=tol, abs_tol=tol**2)
+            t_bar_f, l_bar_f, v_bar_f, eta_f, tau_f = rkf(
+                self.ode_z, (0, 0, 0, 0, 1), z_0, 1, rel_tol=tol, abs_tol=tol**2
+            )[1]
 
             upd_bar_data(
                 tag=POINT_FRACTURE,
@@ -585,12 +539,6 @@ class Recoilless(DelegatesPropellant):
                 eta=eta_f,
                 tau=tau_f,
                 v_bar=v_bar_f,
-                t_bar_err=t_bar_err_f,
-                l_bar_err=l_bar_err_f,
-                z_err=0,
-                v_bar_err=v_bar_err_f,
-                eta_err=eta_err_f,
-                tau_err=tau_err_f,
             )
 
         t_bar_b = None
@@ -601,27 +549,11 @@ class Recoilless(DelegatesPropellant):
             movement to charge burnout.
             """
 
-            (
-                _,
-                (t_bar_b, l_bar_b, v_bar_b, eta_b, tau_b),
-                (t_bar_err_b, l_bar_err_b, v_bar_err_b, eta_err_b, tau_err_b),
-            ) = rkf78(self.ode_z, (0, 0, 0, 0, 1), z_0, z_b, rel_tol=tol, abs_tol=tol**2)
+            t_bar_b, l_bar_b, v_bar_b, eta_b, tau_b = rkf(
+                self.ode_z, (0, 0, 0, 0, 1), z_0, z_b, rel_tol=tol, abs_tol=tol**2
+            )[1]
 
-            upd_bar_data(
-                tag=POINT_BURNOUT,
-                t_bar=t_bar_b,
-                l_bar=l_bar_b,
-                z=z_b,
-                v_bar=v_bar_b,
-                eta=eta_b,
-                tau=tau_b,
-                t_bar_err=t_bar_err_b,
-                l_bar_err=l_bar_err_b,
-                z_err=0,
-                v_bar_err=v_bar_err_b,
-                eta_err=eta_err_b,
-                tau_err=tau_err_b,
-            )
+            upd_bar_data(tag=POINT_BURNOUT, t_bar=t_bar_b, l_bar=l_bar_b, z=z_b, v_bar=v_bar_b, eta=eta_b, tau=tau_b)
 
         """
         Subscript p indicate peak pressure
@@ -633,7 +565,7 @@ class Recoilless(DelegatesPropellant):
         """
 
         def g(t, tag):
-            z, l_bar, v_bar, eta, tau = rkf78(self.ode_t, (z_0, 0, 0, 0, 1), 0, t, rel_tol=tol, abs_tol=tol**2)[1]
+            z, l_bar, v_bar, eta, tau = rkf(self.ode_t, (z_0, 0, 0, 0, 1), 0, t, rel_tol=tol, abs_tol=tol**2)[1]
             p_bar = self.f_p_bar(z, l_bar, eta, tau)
 
             if tag == POINT_PEAK_AVG:
@@ -664,26 +596,9 @@ class Recoilless(DelegatesPropellant):
 
             t_bar = 0.5 * (t_bar_1 + t_bar_2)
 
-            (_, (z, l_bar, v_bar, eta, tau), (z_err, l_bar_err, v_bar_err, eta_err, tau_err)) = rkf78(
-                self.ode_t, (z_0, 0, 0, 0, 1), 0, t_bar, rel_tol=tol, abs_tol=tol**2
-            )
-            t_bar_err = 0.5 * t_bar_tol
+            z, l_bar, v_bar, eta, tau = rkf(self.ode_t, (z_0, 0, 0, 0, 1), 0, t_bar, rel_tol=tol, abs_tol=tol**2)[1]
 
-            upd_bar_data(
-                tag=tag,
-                t_bar=t_bar,
-                l_bar=l_bar,
-                z=z,
-                v_bar=v_bar,
-                eta=eta,
-                tau=tau,
-                t_bar_err=t_bar_err,
-                l_bar_err=l_bar_err,
-                z_err=z_err,
-                v_bar_err=v_bar_err,
-                eta_err=eta_err,
-                tau_err=tau_err,
-            )
+            upd_bar_data(tag=tag, t_bar=t_bar, l_bar=l_bar, z=z, v_bar=v_bar, eta=eta, tau=tau)
 
         for i, peak in enumerate([POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH, POINT_PEAK_STAG]):
             find_peak(lambda x: g(x, peak), peak)
@@ -699,26 +614,12 @@ class Recoilless(DelegatesPropellant):
             # fmt: on
             for j in range(step):
                 t_bar_k = t_bar_e / (step + 1) * (j + 1)
-                (_, (z_j, l_bar_j, v_bar_j, eta_j, tau_j), (z_err, l_bar_err, v_bar_err, eta_err, tau_err)) = rkf78(
+                z_j, l_bar_j, v_bar_j, eta_j, tau_j = rkf(
                     self.ode_t, (z_j, l_bar_j, v_bar_j, eta_j, tau_j), t_bar_j, t_bar_k, rel_tol=tol, abs_tol=tol**2
-                )
+                )[1]
                 t_bar_j = t_bar_k
 
-                upd_bar_data(
-                    tag=COMPUTE,
-                    t_bar=t_bar_j,
-                    l_bar=l_bar_j,
-                    z=z_j,
-                    v_bar=v_bar_j,
-                    eta=eta_j,
-                    tau=tau_j,
-                    t_bar_err=0,
-                    l_bar_err=l_bar_err,
-                    z_err=z_err,
-                    v_bar_err=v_bar_err,
-                    eta_err=eta_err,
-                    tau_err=tau_err,
-                )
+                upd_bar_data(tag=SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j, eta=eta_j, tau=tau_j)
 
         elif dom == DOMAIN_LEN:
             """
@@ -733,34 +634,20 @@ class Recoilless(DelegatesPropellant):
              ongoing).
             """
             t_bar_j = 0.5 * t_bar_i
-            z_j, l_bar_j, v_bar_j, eta_j, tau_j = rkf78(
+            z_j, l_bar_j, v_bar_j, eta_j, tau_j = rkf(
                 self.ode_t, (z_0, 0, 0, 0, 1), 0, t_bar_j, rel_tol=tol, abs_tol=tol**2
             )[1]
 
             for j in range(step):
                 l_bar_k = l_g_bar / (step + 1) * (j + 1)
 
-                (_, (t_bar_j, z_j, v_bar_j, eta_j, tau_j), (t_bar_err, z_err, v_bar_err, eta_err, tau_err)) = rkf78(
+                t_bar_j, z_j, v_bar_j, eta_j, tau_j = rkf(
                     self.ode_l, (t_bar_j, z_j, v_bar_j, eta_j, tau_j), l_bar_j, l_bar_k, rel_tol=tol, abs_tol=tol**2
-                )
+                )[1]
 
                 l_bar_j = l_bar_k
 
-                upd_bar_data(
-                    tag=COMPUTE,
-                    t_bar=t_bar_j,
-                    l_bar=l_bar_j,
-                    z=z_j,
-                    v_bar=v_bar_j,
-                    eta=eta_j,
-                    tau=tau_j,
-                    t_bar_err=t_bar_err,
-                    l_bar_err=0,
-                    z_err=z_err,
-                    v_bar_err=v_bar_err,
-                    eta_err=eta_err,
-                    tau_err=tau_err,
-                )
+                upd_bar_data(tag=SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j, eta=eta_j, tau=tau_j)
 
         logger.info(f"sampled for {step} points.")
 
@@ -768,24 +655,20 @@ class Recoilless(DelegatesPropellant):
         sort the data points
         """
 
-        data, error, p_trace = [], [], []
+        data, p_trace = [], []
         l_c = self.l_c
-        # l_g = self.l_g
 
         trace_step = max(step, 1)
 
-        for bar_dataLine, bar_errorLine in zip(bar_data, bar_err):
+        for bar_dataLine in bar_data:
             dtag, t_bar, l_bar, z, v_bar, p_bar, eta, tau = bar_dataLine
-            (etag, t_bar_err, l_bar_err, z_err, v_bar_err, p_bar_err, eta_err, tau_err) = bar_errorLine
 
-            t, t_err = t_bar * t_scale, t_bar_err * t_scale
-            l, l_err = l_bar * self.l_0, l_bar_err * self.l_0
-            psi, psi_err = self.f_psi_z(z), abs(self.f_sigma_z(z) * z_err)
-            v, v_err = v_bar * self.v_j, v_bar_err * self.v_j
-
-            p, p_err = p_bar * p_scale, (p_bar_err if isinstance(p_bar_err, str) else p_bar_err * p_scale)
+            t = t_bar * t_scale
+            l = l_bar * self.l_0
+            psi = self.f_psi_z(z)
+            v = v_bar * self.v_j
+            p = p_bar * p_scale
             temp = tau * self.T_v if self.T_v else None
-            temp_err = tau_err * self.T_v if self.T_v else None
 
             ps, p0, pb, vb = self.to_ps_p0_pb_vb(l, v, p, tau, eta)
 
@@ -815,18 +698,6 @@ class Recoilless(DelegatesPropellant):
                     outflow_fraction=eta,
                 )
             )
-            error.append(
-                RecoillessErrorEntry(
-                    tag=etag,
-                    time=t_err,
-                    travel=l_err,
-                    burnup=psi_err,
-                    velocity=v_err,
-                    avg_pressure=p_err,
-                    temperature=temp_err,
-                    outflow_fraction=eta_err,
-                )
-            )
 
         for t_bar, (l_bar, psi, v_bar, p_bar, eta, tau) in record:
             t = t_bar * t_scale
@@ -844,11 +715,11 @@ class Recoilless(DelegatesPropellant):
                 p_line.append(pp)
 
             p_line.append(PressureProbePoint(l + l_c, ps))
-            p_trace.append(PressureTraceEntry(SAMPLE, temp, p_line))
+            p_trace.append(PressureTraceEntry(COMPUTE, temp, p_line))
 
             data.append(
                 RecoillessTableEntry(
-                    tag=SAMPLE,
+                    tag=COMPUTE,
                     time=t,
                     travel=l,
                     burnup=psi,
@@ -862,13 +733,10 @@ class Recoilless(DelegatesPropellant):
                     outflow_fraction=eta,
                 )
             )
-            error.append(RecoillessErrorEntry("L"))
 
-        data, error, p_trace = zip(
-            *((a, b, c) for a, b, c in sorted(zip(data, error, p_trace), key=lambda entries: entries[0].time))
-        )
+        data, p_trace = zip(*((a, b) for a, b in sorted(zip(data, p_trace), key=lambda entries: entries[0].time)))
 
-        recoilless_result = RecoillessResult(self, data, error, p_trace)
+        recoilless_result = RecoillessResult(self, data, p_trace)
 
         if self.material is None:
             logger.warning("material is not specified, skipping structural calculation.")
@@ -997,7 +865,7 @@ class Recoilless(DelegatesPropellant):
             + [l_g + l_c]
         )
 
-        p_probes = [0] * len(x_probes)
+        p_probes = [0.0 for _ in range(len(x_probes))]
         for recoillessTableEntry in recoilless_result.table_data:
             l = recoillessTableEntry.travel
             v = recoillessTableEntry.velocity
@@ -1105,9 +973,10 @@ class Recoilless(DelegatesPropellant):
             # v_c, rho_c = Gun.vrho_k(x_c, p_c, [s * chi_k for _ in x_c], sigma, tol, k_min=rho_n[-1])  # c for chamber
 
             v_c, rho_c = Gun.vrho_k(x_c, p_c, [s * chi_k for _ in x_c], sigma, tol)
-            v_b, rho_b = Gun.vrho_k(
-                x_b, p_b, [s for _ in x_b], sigma, tol, k_max=rho_c[-1] * chi_k**0.5, p_ref=max(p_c)
-            )  # b for bore
+            v_b, rho_b = Gun.vrho_k(x_b, p_b, [s for _ in x_b], sigma, tol)  # b for bore
+
+            # k_max=rho_c[-1] * chi_k**0.5, p_ref=max(p_c)
+
             v = v_c + v_b
             rho_probes = rho_c + rho_b
 

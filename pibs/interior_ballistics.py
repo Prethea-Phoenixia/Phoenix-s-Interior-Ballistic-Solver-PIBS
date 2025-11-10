@@ -6,6 +6,7 @@ import multiprocessing
 import platform
 import sys
 import traceback
+
 if platform.system() == "Windows":
     from ctypes import windll
 from itertools import repeat
@@ -160,7 +161,7 @@ class TextHandler(logging.Handler):
 
 
 class PIBS(Tk):
-    def __init__(self, *args, loc, **kwargs):
+    def __init__(self, *args, loc: str, debug: bool, **kwargs):
         super().__init__(*args, **kwargs)
         # Only works on windows:(
         if platform.system() == "Windows":
@@ -193,6 +194,7 @@ class PIBS(Tk):
             localization_dict=STRING,
             font=font,
             os_dark=detect_darkmode_in_windows(),
+            debug=debug,
         )
         self.frame.grid(row=0, column=0, sticky="nsew")
 
@@ -213,7 +215,7 @@ class PIBS(Tk):
 
 class InteriorBallisticsFrame(LocalizedFrame):
 
-    def __init__(self, root, menubar, dpi, default_lang, localization_dict, font, os_dark: bool):
+    def __init__(self, root, menubar, dpi, default_lang, localization_dict, font, os_dark: bool, debug: bool):
         super().__init__(
             root, font=font, menubar=menubar, default_lang=default_lang, localization_dict=localization_dict
         )
@@ -247,7 +249,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.debug_menu = debug_menu
 
         self.theme_name_var = StringVar(value="awdark" if os_dark else "awlight")
-        self.debug = IntVar(value=0)
+        self.debug = IntVar(value=int(debug))
 
         design_menu.add_command(label=self.get_loc_str("saveLabel"), command=self.save, accelerator="Ctrl+S")
         self.root.bind("<Control-s>", lambda *_: self.save())
@@ -540,22 +542,22 @@ class InteriorBallisticsFrame(LocalizedFrame):
         validation_ce = self.register(validate_ce)
 
         i = 1
-        env_frm = self.add_localized_label_frame(right_frm, label_loc_key="envFrmLabel")
-        env_frm.grid(row=i, column=0, sticky="nsew")
+        environment_frame = self.add_localized_label_frame(right_frm, label_loc_key="envFrmLabel")
+        environment_frame.grid(row=i, column=0, sticky="nsew")
         i += 1
-        env_frm.columnconfigure(0, weight=1)
+        environment_frame.columnconfigure(0, weight=1)
 
         j = 0
         self.in_atmos, j = (
             self.add_localized_label_check(
-                parent=env_frm, label_loc_key="atmosLabel", desc_label_key="atmosLabel", row=j, columnspan=3
+                parent=environment_frame, label_loc_key="atmosLabel", desc_label_key="atmosLabel", row=j, columnspan=3
             ),
             j + 1,
         )
 
         self.amb_p, j = (
             self.add_localized_3_input(
-                parent=env_frm,
+                parent=environment_frame,
                 row=j,
                 label_loc_key="ambPresLabel",
                 unit_text="kPa",
@@ -567,7 +569,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
         self.amb_rho, j = (
             self.add_localized_3_input(
-                parent=env_frm,
+                parent=environment_frame,
                 row=j,
                 label_loc_key="ambRhoLabel",
                 unit_text="kg/m³",
@@ -580,7 +582,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.amb_gamma, j = (
             self.add_localized_3_input(
-                parent=env_frm,
+                parent=environment_frame,
                 row=j,
                 label_loc_key="ambGamLabel",
                 default="1.400",
@@ -1082,7 +1084,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
 
         ## grain frame
-
         mid_frame = Frame(self)
 
         mid_frame.grid(row=0, column=3, rowspan=2, sticky="nsew")
@@ -1475,7 +1476,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.timed_loop()
 
-    def handle_errors(self, exception: Exception, level: Literal[30, 40] = logging.ERROR):
+    def handle_errors(self, exception: Exception, level: int = logging.ERROR):
         if self.debug.get():
             exc_type, exc_value, exc_traceback = sys.exc_info()
             root_logger.log(level, "".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
@@ -2129,10 +2130,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_ax_h.cla()
 
             p_trace = self.gun_result.pressure_trace
+
             cmap = mpl.colormaps["afmhot" + ("_r" if THEMES[self.theme_name_var.get()] else "")]
 
             x_max, y_max, t_min, t_max = 0, 0, inf, 0
             for trace in p_trace:
+
                 if not trace.temperature:
                     continue
                 if trace.temperature > t_max:
@@ -2140,11 +2143,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 elif trace.temperature < t_min:
                     t_min = trace.temperature
 
-            for pressureTraceEntry in p_trace[::-1]:
+            for trace in p_trace[::-1]:
+
                 tag, t, trace = (
-                    pressureTraceEntry.tag,
-                    pressureTraceEntry.temperature,
-                    pressureTraceEntry.pressure_trace,
+                    trace.tag,
+                    trace.temperature,
+                    trace.pressure_trace,
                 )
 
                 if t:
@@ -2224,7 +2228,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             ),
         )
         self.specs.insert("end", "{:}:\n".format(self.get_loc_str("brDesc")))
-        for p in (100e6, 200e6, 300e6):
+        for p in (1e6, 10e6, 100e6, 1000e6):
             self.specs.insert(
                 "end",
                 "{:>12}".format(to_si(compo.get_lbr(p), unit="m/s", dec=3))
@@ -2317,52 +2321,47 @@ class InteriorBallisticsFrame(LocalizedFrame):
             return
 
         gun_type = self.kwargs["typ"]
-        table_data, error_data, use_sn, units = [], [], (), ()
+        table_data, use_sn, units = [], (), ()
 
         if gun_type == CONVENTIONAL:
-            table_data, error_data = (
-                [
-                    (
-                        entry.tag,
-                        entry.time,
-                        entry.travel,
-                        entry.burnup,
-                        entry.velocity,
-                        entry.breech_pressure,
-                        entry.avg_pressure,
-                        entry.shot_pressure,
-                        entry.temperature,
-                    )
-                    for entry in data
-                ]
-                for data in (self.gun_result.table_data, self.gun_result.error_data)
-            )
-            use_sn = False, False, False, True, False, False, False, False, True
+            table_data = [
+                (
+                    entry.tag,
+                    entry.time,
+                    entry.travel,
+                    entry.burnup,
+                    entry.velocity,
+                    entry.breech_pressure,
+                    entry.avg_pressure,
+                    entry.shot_pressure,
+                    entry.temperature,
+                )
+                for entry in self.gun_result.table_data
+            ]
+
+            use_sn = False, False, False, True, False, False, False, False, False
             units = None, "s", "m", None, "m/s", "Pa", "Pa", "Pa", "K"
 
         elif gun_type == RECOILLESS:
-            table_data, error_data = (
-                [
-                    (
-                        entry.tag,
-                        entry.time,
-                        entry.travel,
-                        entry.burnup,
-                        entry.outflow_fraction,
-                        entry.velocity,
-                        entry.outflow_velocity,
-                        entry.breech_pressure,
-                        entry.stag_pressure,
-                        entry.avg_pressure,
-                        entry.shot_pressure,
-                        entry.temperature,
-                    )
-                    for entry in data
-                ]
-                for data in (self.gun_result.table_data, self.gun_result.error_data)
-            )
+            table_data = [
+                (
+                    entry.tag,
+                    entry.time,
+                    entry.travel,
+                    entry.burnup,
+                    entry.outflow_fraction,
+                    entry.velocity,
+                    entry.outflow_velocity,
+                    entry.breech_pressure,
+                    entry.stag_pressure,
+                    entry.avg_pressure,
+                    entry.shot_pressure,
+                    entry.temperature,
+                )
+                for entry in self.gun_result.table_data
+            ]
 
-            use_sn = False, False, False, True, True, False, False, False, False, False, False, True
+            use_sn = False, False, False, True, True, False, False, False, False, False, False, False
             units = None, "s", "m", None, None, "m/s", "m/s", "Pa", "Pa", "Pa", "Pa", "K"
 
         # translate the tags.
@@ -2371,7 +2370,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
             loc_table_data.append((self.get_loc_str(line[0]), *line[1:]))
 
         loc_table_data = dot_aligned(loc_table_data, units=units, use_sn=use_sn)
-        error_data = dot_aligned(error_data, units=units, use_sn=use_sn)
 
         column_list = self.get_loc_str("columnList")[gun_type]
         self.tv["columns"] = column_list
@@ -2394,18 +2392,15 @@ class InteriorBallisticsFrame(LocalizedFrame):
         font_width, _ = self.font.measure("m"), self.font.metrics("linespace")
 
         win_width = self.tv.winfo_width()
-        width = win_width // len(self.tv["columns"])
 
         for i, column in enumerate(column_list):  # foreach column
             self.tv.heading(i, text=column, anchor="e")  # let the column heading = column name
-            self.tv.column(column, stretch=True, width=width, minwidth=font_width * 14, anchor="e")
+            min_width = font_width * 14
+            ini_width = max(win_width // len(self.tv["columns"]), min_width)
+            self.tv.column(column, stretch=True, width=ini_width, minwidth=min_width, anchor="e")
 
-        for i, (row, erow) in enumerate(zip(loc_table_data, error_data)):
+        for i, row in enumerate(loc_table_data):
             self.tv.insert("", "end", str(i + 1), values=row, tags=(row[0].strip(), "monospace"))
-            self.tv.insert(
-                str(i + 1), "end", str(-i - 1), values=tuple("±" + e if "." in e else e for e in erow), tags="error"
-            )
-            self.tv.move(str(-i - 1), str(i + 1), -1)
 
     def update_guide_graph(self):
         style = ttk.Style(self)
@@ -2853,7 +2848,7 @@ def guide(guide_job_queue, log_queue, kwargs):
         guide_job_queue.put(guide_results)
 
 
-def main(loc: str = None):
+def main(loc: str = None, debug: bool = False):
     multiprocessing.freeze_support()
     root_logger.info("Initializing")
 
@@ -2873,7 +2868,7 @@ def main(loc: str = None):
     loadfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"), True, True)
     font_manager.fontManager.addfont(resolvepath("ui/sarasa-fixed-sc-regular.ttf"))
 
-    pibs = PIBS(loc=loc)
+    pibs = PIBS(loc=loc, debug=debug)
     pibs.mainloop()
 
 

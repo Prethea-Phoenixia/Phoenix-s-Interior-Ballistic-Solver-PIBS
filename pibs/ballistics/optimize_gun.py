@@ -18,7 +18,7 @@ from . import (
 )
 from .generics import DelegatesPropellant
 from .gun import pidduck
-from .num import dekker, gss, rkf78
+from .num import dekker, gss, rkf
 from .prop import Propellant
 
 """
@@ -226,8 +226,9 @@ conditions is {v_j:.4g} m/s."
 
             b = s**2 * e_1**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
-            def _ode_z(z, _, l_bar, v_bar, __):
+            def _ode_z(z: float, tlv: tuple[float, float, float], __: float) -> tuple[float, float, float]:
                 """burnup domain ode of internal ballistics"""
+                t_bar, l_bar, v_bar = tlv
                 psi = f_psi_z(z)
                 l_psi_bar = 1 - delta / rho_p - delta * (alpha - 1 / rho_p) * psi
 
@@ -250,11 +251,11 @@ conditions is {v_j:.4g} m/s."
                 else:
                     dt_bar, dl_bar, dv_bar = 0, 0, 0
 
-                return [dt_bar, dl_bar, dv_bar]
+                return dt_bar, dl_bar, dv_bar
 
-            record = [[z_0, [0, 0, 0]]]
+            record = [(z_0, (0, 0, 0))]
 
-            z_j, (t_bar_j, l_bar_j, v_bar_j), e = rkf78(
+            z_j, (t_bar_j, l_bar_j, v_bar_j) = rkf(
                 d_func=_ode_z,
                 ini_val=(0, 0, 0),
                 x_0=z_0,
@@ -278,9 +279,9 @@ conditions is {v_j:.4g} m/s."
                 ys = record[i][1]
 
                 r = []
-                _, (t_bar, l_bar, v_bar), _ = rkf78(
+                t_bar, l_bar, v_bar = rkf(
                     d_func=_ode_z, ini_val=ys, x_0=x, x_1=z, rel_tol=tol, abs_tol=tol**2, record=r
-                )
+                )[1]
                 xs = [v[0] for v in record]
                 record.extend(v for v in r if v[0] not in xs)
                 record.sort()
@@ -338,7 +339,8 @@ conditions is {v_j:.4g} m/s."
 
         b = s**2 * e_1**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
-        def _ode_v(v_bar, _, z, l_bar, __):
+        def _ode_v(v_bar: float, tzl: tuple[float, float, float], __: float) -> tuple[float, float, float]:
+            t_bar, z, l_bar = tzl
             psi = f_psi_z(z)
 
             l_psi_bar = 1 - delta / rho_p - delta * (alpha - 1 / rho_p) * psi
@@ -358,15 +360,15 @@ conditions is {v_j:.4g} m/s."
             dz = dt_bar * (0.5 * theta / b) ** 0.5 * p_bar**n
             dl_bar = v_bar * dt_bar
 
-            return [dt_bar, dz, dl_bar]
+            return dt_bar, dz, dl_bar
 
         def abort_v(x, ys, record):
             _, _, l_bar = ys
             return l_bar > l_bar_d
 
-        vtzl_record = [[v_bar_i, (t_bar_i, z_i, l_bar_i)]]
+        vtzl_record = [(v_bar_i, (t_bar_i, z_i, l_bar_i))]
         try:
-            (v_bar_g, (t_bar_g, z_g, l_bar_g), _) = rkf78(
+            v_bar_g, (t_bar_g, z_g, l_bar_g) = rkf(
                 d_func=_ode_v,
                 ini_val=(t_bar_i, z_i, l_bar_i),
                 x_0=v_bar_i,

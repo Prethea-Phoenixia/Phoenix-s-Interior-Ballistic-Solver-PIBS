@@ -5,6 +5,10 @@ import shutil
 from pathlib import Path
 from ctypes import byref, create_string_buffer, create_unicode_buffer
 import platform
+import logging
+
+logger = logging.getLogger(__name__)
+
 if platform.system() == "Windows":
     from ctypes import windll
 from math import floor, log, log10
@@ -32,6 +36,7 @@ _prefix = {
     "Z": 1e21,  # zetta
     "Y": 1e24,  # yotta
 }
+
 
 def get_font_dir():
     if platform.system() == "Windows":
@@ -84,14 +89,14 @@ def loadfont(fontpath, private=True, enumerable=False):
 
         flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
         num_fonts_added = add_font_resource_ex(byref(pathbuf), flags, 0)
-        print(f"Windows: Loaded font {fontpath} (private={private}, enumerable={enumerable})")
+        logger.info(f"Windows: Loaded font {fontpath} (private={private}, enumerable={enumerable})")
         return bool(num_fonts_added)
     else:
         font_dir = get_font_dir()
         if font_dir is None:
             return False
         shutil.copy2(fontpath, font_dir)
-        print(f"Linux: Copied font {fontpath} to {font_dir}")
+        logger.info(f"Linux: Copied font {fontpath} to {font_dir}")
         return True
 
 
@@ -112,7 +117,7 @@ def unloadfont(fontpath, private=True, enumerable=False):
             raise TypeError("fontpath must be a str or unicode")
 
         flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
-        print(f"Windows: Unloaded font {fontpath} (private={private}, enumerable={enumerable})")
+        logger.info(f"Windows: Unloaded font {fontpath} (private={private}, enumerable={enumerable})")
         return bool(remove_font_resource_ex(byref(pathbuf), flags, 0))
     else:
         font_dir = get_font_dir()
@@ -121,11 +126,11 @@ def unloadfont(fontpath, private=True, enumerable=False):
         dest_path = font_dir / Path(fontpath).name
         if dest_path.exists():
             dest_path.unlink()
-        print(f"Linux: Removed font {fontpath} from {font_dir}")
+        logger.info(f"Linux: Removed font {fontpath} from {font_dir}")
         return True
 
 
-def to_si(v, dec=4, unit=None, unit_dim=1, use_sn=False):
+def to_si(v: float, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: bool = False):
     if v is None:
         return "N/A"
     elif isinstance(v, int) or isinstance(v, float):

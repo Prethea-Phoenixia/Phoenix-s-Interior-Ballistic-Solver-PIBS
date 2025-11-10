@@ -5,7 +5,6 @@ import sys
 import traceback
 from dataclasses import dataclass
 from math import exp, inf, log, pi
-
 from . import (
     COMPUTE,
     DOMAIN_LEN,
@@ -27,15 +26,14 @@ from . import (
 from .generics import (
     DelegatesPropellant,
     GenericEntry,
-    GenericErrorEntry,
     GenericResult,
     OutlineEntry,
     PressureProbePoint,
     PressureTraceEntry,
 )
-from .material import Material
-from .num import dekker, gss, intg, rkf78, secant
+from .num import dekker, gss, intg, rkf, secant
 from .prop import Composition, Propellant
+from .material import Material
 
 logger = logging.getLogger(__name__)
 
@@ -44,16 +42,10 @@ logger = logging.getLogger(__name__)
 class GunResult(GenericResult):
     gun: Gun
     table_data: list[GunTableEntry]
-    error_data: list[GunErrorEntry]
 
 
 @dataclass
 class GunTableEntry(GenericEntry):
-    pass
-
-
-@dataclass
-class GunErrorEntry(GenericErrorEntry):
     pass
 
 
@@ -182,7 +174,8 @@ class Gun(DelegatesPropellant):
 
         return max(p_bar, self.p_a_bar)
 
-    def ode_t(self, _, z, l_bar, v_bar, __) -> tuple[float, float, float]:
+    def ode_t(self, t: float, zlv: tuple[float, float, float], dt: float) -> tuple[float, float, float]:
+        z, l_bar, v_bar = zlv
         p_bar = self.f_p_bar(z, l_bar, v_bar)
 
         if self.c_a_bar != 0 and v_bar > 0:
@@ -201,13 +194,13 @@ class Gun(DelegatesPropellant):
 
         return dz, dl_bar, dv_bar
 
-    def ode_l(self, l_bar, _, z, v_bar, __) -> tuple[float, float, float]:
+    def ode_l(self, l_bar: float, tzv: tuple[float, float, float], dl_bar: float) -> tuple[float, float, float]:
         """length domain ode of internal ballistics
         the 1/v_bar pose a starting problem that prevent us from using it from
         initial condition."""
+        t_bar, z, v_bar = tzv
 
         p_bar = self.f_p_bar(z, l_bar, v_bar)
-
         if self.c_a_bar != 0 and v_bar > 0:
             k = self.k_1  # gamma
             v_r = v_bar / self.c_a_bar
@@ -222,7 +215,8 @@ class Gun(DelegatesPropellant):
 
         return dt_bar, dz, dv_bar
 
-    def ode_z(self, z, t_bar, l_bar, v_bar, _):
+    def ode_z(self, z: float, tlv: tuple[float, float, float], dz: float):
+        t_bar, l_bar, v_bar = tlv
         p_bar = self.f_p_bar(z, l_bar, v_bar)
 
         if self.c_a_bar != 0 and v_bar > 0:
@@ -385,15 +379,12 @@ class Gun(DelegatesPropellant):
         z_0 = self.z_0
 
         bar_data = []
-        bar_err = []
 
-        def upd_bar_data(tag, t_bar, l_bar, z, v_bar, t_bar_err, l_bar_err, z_err, v_bar_err):
+        def upd_bar_data(tag, t_bar, l_bar, z, v_bar):
             p_bar = self.f_p_bar(z, l_bar, v_bar)
             bar_data.append((tag, t_bar, l_bar, z, v_bar, p_bar))
-            p_bar_err = abs(self.dp_dz(z, l_bar, v_bar) * z_err)
-            bar_err.append(("L", t_bar_err, l_bar_err, z_err, v_bar_err, p_bar_err))
 
-        upd_bar_data(tag=POINT_START, t_bar=0, l_bar=0, z=z_0, v_bar=0, t_bar_err=0, l_bar_err=0, z_err=0, v_bar_err=0)
+        upd_bar_data(tag=POINT_START, t_bar=0, l_bar=0, z=z_0, v_bar=0)
 
         record.append((0, (0, self.psi_0, 0, p_bar_0)))
 
@@ -430,7 +421,7 @@ class Gun(DelegatesPropellant):
             try:
                 if z_j > z_b:
                     z_j = z_b
-                z, (t_bar_j, l_bar_j, v_bar_j), _ = rkf78(
+                z, (t_bar_j, l_bar_j, v_bar_j) = rkf(
                     self.ode_z,
                     (t_bar_i, l_bar_i, v_bar_i),
                     z_i,
@@ -529,7 +520,7 @@ class Gun(DelegatesPropellant):
         """
 
         ltzv_record = []
-        l_bar, (t_bar_e, z_e, v_bar_e), (t_bar_err, z_err, v_bar_err) = rkf78(
+        l_bar, (t_bar_e, z_e, v_bar_e) = rkf(
             self.ode_l, (t_bar_i, z_i, v_bar_i), l_bar_i, l_g_bar, rel_tol=tol, abs_tol=tol**2, record=ltzv_record
         )
 
@@ -545,17 +536,7 @@ class Gun(DelegatesPropellant):
             for (l_bar, (t_bar, z, v_bar)) in ltzv_record
         )
 
-        upd_bar_data(
-            tag=POINT_EXIT,
-            t_bar=t_bar_e,
-            l_bar=l_g_bar,
-            z=z_e,
-            v_bar=v_bar_e,
-            t_bar_err=t_bar_err,
-            l_bar_err=0,
-            z_err=z_err,
-            v_bar_err=v_bar_err,
-        )
+        upd_bar_data(tag=POINT_EXIT, t_bar=t_bar_e, l_bar=l_g_bar, z=z_e, v_bar=v_bar_e)
 
         t_bar_f = None
         if z_b > 1.0 and z_e >= 1.0:  # fracture point exist and is contained
@@ -563,21 +544,9 @@ class Gun(DelegatesPropellant):
             Subscript f indicate fracture condition
             ODE w.r.t Z is integrated from Z_0 to 1, from onset of projectile movement to charge fracture
             """
-            (_, (t_bar_f, l_bar_f, v_bar_f), (t_bar_err_f, l_bar_err_f, v_bar_err_f)) = rkf78(
-                self.ode_z, (0, 0, 0), z_0, 1, rel_tol=tol, abs_tol=tol**2
-            )
+            t_bar_f, l_bar_f, v_bar_f = rkf(self.ode_z, (0, 0, 0), z_0, 1, rel_tol=tol, abs_tol=tol**2)[1]
 
-            upd_bar_data(
-                tag=POINT_FRACTURE,
-                t_bar=t_bar_f,
-                l_bar=l_bar_f,
-                z=1,
-                v_bar=v_bar_f,
-                t_bar_err=t_bar_err_f,
-                l_bar_err=l_bar_err_f,
-                z_err=0,
-                v_bar_err=v_bar_err_f,
-            )
+            upd_bar_data(tag=POINT_FRACTURE, t_bar=t_bar_f, l_bar=l_bar_f, z=1, v_bar=v_bar_f)
 
         t_bar_b = None
         if is_burn_out_contained:
@@ -586,23 +555,9 @@ class Gun(DelegatesPropellant):
             ODE w.r.t Z is integrated from Z_0 to z_b, from onset of projectile movement to charge burnout.
             """
 
-            (
-                _,
-                (t_bar_b, l_bar_b, v_bar_b),
-                (t_bar_err_b, l_bar_err_b, v_bar_err_b),
-            ) = rkf78(self.ode_z, (0, 0, 0), z_0, z_b, rel_tol=tol, abs_tol=tol**2)
+            t_bar_b, l_bar_b, v_bar_b = rkf(self.ode_z, (0, 0, 0), z_0, z_b, rel_tol=tol, abs_tol=tol**2)[1]
 
-            upd_bar_data(
-                tag=POINT_BURNOUT,
-                t_bar=t_bar_b,
-                l_bar=l_bar_b,
-                z=z_b,
-                v_bar=v_bar_b,
-                t_bar_err=t_bar_err_b,
-                l_bar_err=l_bar_err_b,
-                z_err=0,
-                v_bar_err=v_bar_err_b,
-            )
+            upd_bar_data(tag=POINT_BURNOUT, t_bar=t_bar_b, l_bar=l_bar_b, z=z_b, v_bar=v_bar_b)
 
         """
         Subscript p indicate peak pressure
@@ -625,25 +580,12 @@ class Gun(DelegatesPropellant):
 
             t_bar = 0.5 * (t_bar_1 + t_bar_2)
 
-            _, (z, l_bar, v_bar), (z_err, l_bar_err, v_bar_err) = rkf78(
-                self.ode_t, (z_0, 0, 0), 0, t_bar, rel_tol=tol, abs_tol=tol**2
-            )
-            t_bar_err = 0.5 * t_bar_tol
+            z, l_bar, v_bar = rkf(self.ode_t, (z_0, 0, 0), 0, t_bar, rel_tol=tol, abs_tol=tol**2)[1]
 
-            upd_bar_data(
-                tag=tag,
-                t_bar=t_bar,
-                l_bar=l_bar,
-                z=z,
-                v_bar=v_bar,
-                t_bar_err=t_bar_err,
-                l_bar_err=l_bar_err,
-                z_err=z_err,
-                v_bar_err=v_bar_err,
-            )
+            upd_bar_data(tag=tag, t_bar=t_bar, l_bar=l_bar, z=z, v_bar=v_bar)
 
         def g(t, tag) -> float:
-            z, l_bar, v_bar = rkf78(self.ode_t, (z_0, 0, 0), 0, t, rel_tol=tol, abs_tol=tol**2)[1]
+            z, l_bar, v_bar = rkf(self.ode_t, (z_0, 0, 0), 0, t, rel_tol=tol, abs_tol=tol**2)[1]
 
             p_bar = self.f_p_bar(z, l_bar, v_bar)
             if tag == POINT_PEAK_AVG:
@@ -668,22 +610,12 @@ class Gun(DelegatesPropellant):
             (z_j, l_bar_j, v_bar_j, t_bar_j) = (z_0, 0, 0, 0)
             for j in range(step):
                 t_bar_k = t_bar_e / (step + 1) * (j + 1)
-                (_, (z_j, l_bar_j, v_bar_j), (z_err, l_bar_err, v_bar_err)) = rkf78(
+                z_j, l_bar_j, v_bar_j = rkf(
                     self.ode_t, (z_j, l_bar_j, v_bar_j), t_bar_j, t_bar_k, rel_tol=tol, abs_tol=tol**2
-                )
+                )[1]
                 t_bar_j = t_bar_k
 
-                upd_bar_data(
-                    tag=SAMPLE,
-                    t_bar=t_bar_j,
-                    l_bar=l_bar_j,
-                    z=z_j,
-                    v_bar=v_bar_j,
-                    t_bar_err=0,
-                    l_bar_err=l_bar_err,
-                    z_err=z_err,
-                    v_bar_err=v_bar_err,
-                )
+                upd_bar_data(tag=SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j)
 
         elif dom == DOMAIN_LEN:
             """
@@ -694,27 +626,17 @@ class Gun(DelegatesPropellant):
             burning is still ongoing).
             """
             t_bar_j = 0.5 * t_bar_i
-            z_j, l_bar_j, v_bar_j = rkf78(self.ode_t, (z_0, 0, 0), 0, t_bar_j, rel_tol=tol, abs_tol=tol**2)[1]
+            z_j, l_bar_j, v_bar_j = rkf(self.ode_t, (z_0, 0, 0), 0, t_bar_j, rel_tol=tol, abs_tol=tol**2)[1]
 
             for j in range(step):
                 l_bar_k = l_g_bar / (step + 1) * (j + 1)
 
-                (_, (t_bar_j, z_j, v_bar_j), (t_bar_err, z_err, v_bar_err)) = rkf78(
+                t_bar_j, z_j, v_bar_j = rkf(
                     self.ode_l, (t_bar_j, z_j, v_bar_j), l_bar_j, l_bar_k, rel_tol=tol, abs_tol=tol**2
-                )
+                )[1]
                 l_bar_j = l_bar_k
 
-                upd_bar_data(
-                    tag=SAMPLE,
-                    t_bar=t_bar_j,
-                    l_bar=l_bar_j,
-                    z=z_j,
-                    v_bar=v_bar_j,
-                    t_bar_err=t_bar_err,
-                    l_bar_err=0,
-                    z_err=z_err,
-                    v_bar_err=v_bar_err,
-                )
+                upd_bar_data(tag=SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j)
 
         logger.info(f"sampled for {step} points.")
 
@@ -723,20 +645,17 @@ class Gun(DelegatesPropellant):
         """
 
         data = []
-        error = []
         p_trace = []
         trace_steps = max(step, 1)
 
-        for bar_dataLine, bar_errorLine in zip(bar_data, bar_err):
+        for bar_dataLine in bar_data:
             dtag, t_bar, l_bar, z, v_bar, p_bar = bar_dataLine
 
-            _, t_bar_err, l_bar_err, z_err, v_bar_err, p_bar_err = bar_errorLine
-
-            t, t_err = t_bar * t_scale, t_bar_err * t_scale
-            l, l_err = l_bar * self.l_0, l_bar_err * self.l_0
-            psi, psi_err = self.f_psi_z(z), abs(self.f_sigma_z(z) * z_err)
-            v, v_err = v_bar * self.v_j, v_bar_err * self.v_j
-            p, p_err = p_bar * p_scale, p_bar_err * p_scale
+            t = t_bar * t_scale
+            l = l_bar * self.l_0
+            psi = self.f_psi_z(z)
+            v = v_bar * self.v_j
+            p = p_bar * p_scale
             ps, pb = self.to_ps_pb(l, p)
             temp = self.get_temperature(psi, l, p)
 
@@ -761,24 +680,12 @@ class Gun(DelegatesPropellant):
                 shot_pressure=ps,
                 temperature=temp,
             )
-            error_entry = GunErrorEntry(
-                tag="L",
-                time=t_err,
-                travel=l_err,
-                burnup=psi_err,
-                velocity=v_err,
-                breech_pressure=None,
-                avg_pressure=p_err,
-                shot_pressure=None,
-                temperature=None,
-            )
+
             data.append(table_entry)
-            error.append(error_entry)
 
         """
         scale the records too
         """
-
         for t_bar, (l_bar, psi, v_bar, p_bar) in record:
             t = t_bar * t_scale
             if t in [tableEntry.time for tableEntry in data]:
@@ -811,21 +718,17 @@ class Gun(DelegatesPropellant):
                 shot_pressure=ps,
                 temperature=temp,
             )
-            error_entry = GunErrorEntry("L")
             data.append(table_entry)
-            error.append(error_entry)
 
-        data, error, p_trace = zip(
+        data, p_trace = zip(
             *(
-                (tableEntry, errorEntry, pTrace)
-                for tableEntry, errorEntry, pTrace in sorted(
-                    zip(data, error, p_trace), key=lambda entries: entries[0].time
-                )
+                (tableEntry, pTrace)
+                for tableEntry, pTrace in sorted(zip(data, p_trace), key=lambda entries: entries[0].time)
             )
         )
 
         # calculate a pressure and flow velocity tracing.
-        gun_result = GunResult(self, data, error, p_trace)
+        gun_result = GunResult(self, data, p_trace)
 
         if self.material is None:
             logger.warning("material is not specified, skipping structural calculation.")
@@ -904,14 +807,14 @@ class Gun(DelegatesPropellant):
         chi_k = self.chi_k
         sigma = self.material.yield_strength
         s = self.s
-        r_b = r * chi_k**0.5
+        r_c = r * chi_k**0.5  #
         x_probes = (
             [i / step * l_c for i in range(step)]
             + [l_c * (1 - tol)]
             + [i / step * l_g + l_c for i in range(step)]
             + [l_g + l_c]
         )
-        p_probes = [0] * len(x_probes)
+        p_probes = [0.0 for _ in range(len(x_probes))]
 
         for gun_table_entry in gun_result.table_data:
             l = gun_table_entry.travel
@@ -921,7 +824,6 @@ class Gun(DelegatesPropellant):
             for i, x in enumerate(x_probes):
                 if (x - l_c) <= l:
                     p_x, _ = self.to_px_u(l, p_s, p_b, v, x)
-                    # noinspection PyTypeChecker
                     p_probes[i] = max(p_probes[i], p_x)
                 else:
                     break
@@ -948,9 +850,7 @@ class Gun(DelegatesPropellant):
             x_b, p_b = x_probes[i:], p_probes[i:]  # b for barrel
 
             v_c, rho_c = Gun.vrho_k(x_c, p_c, [s * chi_k for _ in x_c], sigma, tol)
-            v_b, rho_b = Gun.vrho_k(
-                x_b, p_b, [s for _ in x_b], sigma, tol, p_ref=max(p_c), k_max=rho_c[-1] * chi_k**0.5
-            )
+            v_b, rho_b = Gun.vrho_k(x_b, p_b, [s for _ in x_b], sigma, tol)
 
             v = v_c + v_b
             rho_probes = rho_c + rho_b
@@ -1003,7 +903,7 @@ class Gun(DelegatesPropellant):
         hull = []
         for x, rho in zip(x_probes, rho_probes):
             if x < l_c:
-                hull.append(OutlineEntry(x, r_b, rho * r_b))
+                hull.append(OutlineEntry(x, r_c, rho * r_c))
             else:
                 hull.append(OutlineEntry(x, r, rho * r))
 
@@ -1017,137 +917,79 @@ class Gun(DelegatesPropellant):
         x_s: list[float],  # probe location
         p_s: list[float],  # probe pressure
         s_s: list[float],  # probe cross-section area
-        sigma_yield: float,  # yield strength
+        yield_strength: float,  # yield strength
         tol: float,  # tolerance
-        k_max: float = None,  # maximum autofrettage
-        k_min: float = None,  # minimum autofrettage
-        p_ref=None,  # manually specify maximum pressure
     ):
 
-        if p_ref is not None:
-            p_max = p_ref
-        else:
-            p_max = max(p_s)
-
-        # optimal autofrettage for this pressure
-        m_opt = exp(p_max / sigma_yield * 3**0.5 * 0.5)
-
-        def sigma_min(m):
-            return (sigma_yield * (1 - (1 + 2 * log(m)) / m**2) + 2 * p_max / m**2) * (3**0.5 * 0.5)
-
-        if sigma_min(m_opt) > sigma_yield:
-            """if the minimum junction stress at the optimal autofrettage
-            fraction cannot be achieved down to material yield even as
-            the thickness goes to infinity, raise an error and abort
-            calculation"""
-            raise ValueError(
-                "Plastic-elastic junction stress exceeds material "
-                + f"yield ({sigma_yield * 1e-6:.3f} MPa) for autofrettaged construction."
-            )
-
-        elif sigma_min(1) > sigma_yield:
-            """if the minimum junction stress at an autofrettage fraction
-            of 1 exceeds material yield, implies a certain amount of
-            autofrettaging is required to contain the pressure"""
-            m_min, _ = dekker(sigma_min, 1, m_opt, y=sigma_yield, y_rel_tol=tol)
-
-            """safety, fudge code to ensure a valid minimum autofrettage
-            fraction is found.
+        def sigma_min(m, p):
             """
-            while sigma_min(m_min) > sigma_yield:
-                m_min *= 1 + tol**2
+            the limit as k -> +inf for the stress is:
 
-        else:
-            m_min = 1 + tol**2
-
-        def f(m: float):
-            rhos = []
-            v = 0
-            for p in p_s:
-                sigma_max = Gun.sigma_von_mises(m, p, m, sigma_yield)
-                """
-                the limit as k -> +inf for the stress is:
-
-                lim sigma_tresca =
-                 k-> +inf
-                  sigma * [1 - (1 + 2 ln(m))/m**2 ] + 2p/m**2
-                """
-                if sigma_max < sigma_yield:
-                    rho = m
-                else:
-                    rho, _ = secant(
-                        lambda k: Gun.sigma_von_mises(k, p, m, sigma_yield),
-                        m,
-                        m * 2,
-                        y=sigma_yield,
-                        x_min=m,
-                        y_rel_tol=tol,
-                    )
-
-                rhos.append(rho)
-
-            for i in range(len(x_s) - 1):
-                x_0, x_1 = x_s[i], x_s[i + 1]
-                s_0, s_1 = s_s[i], s_s[i + 1]
-                rho_0, rho_1 = rhos[i], rhos[i + 1]
-                dv = 0.5 * ((rho_0**2 - 1) * s_0 + (rho_1**2 - 1) * s_1) * (x_1 - x_0)
-                v += dv
-            return v, rhos
-
-        m_max = m_opt
-        if k_max is not None:
-            """another constraint is the continuation criteria, i.e. the
-            barrel base should not require a thickness jump from the front of
-            breech, within reason.
-
-            A maximum ratio corresponds to a minimum autofrettage ratio.
-            manually setting f(m_opt) to -1 since this is always true,
-            but the limitations to numerical accuracy can cause the result
-            to float around ~ +/- 10 * tol
-
-            Since in all use cases k_max is set using a section of the chamber
-            with higher pressure ratings, it is almost guaranteed that the
-            corresponding m_min must exist. In the case this is not true, the
-            resulting error raised will cause the program to gracefully default
-            to finding the minimum auto-frettaged mass.
+            lim sigma_tresca =
+             k-> +inf =
+              sigma * [1 - (1 + 2 ln(m))/m**2 ] + 2p/m**2
             """
-            try:
-                m_k, _ = dekker(lambda m: f(m)[1][0] if m != m_opt else -1, m_min, m_opt, y=k_max, y_rel_tol=tol)
-                m_min = max(m_k, m_min)
-            except ValueError:
-                pass
+            return (yield_strength * (1 - (1 + 2 * log(m)) / m**2) + 2 * p / m**2) * (3**0.5 * 0.5)
 
-        if k_min is not None:
-            try:
-                m_k, _ = dekker(lambda m: f(m)[1][0] if m != m_opt else -1, m_min, m_opt, y=k_min, y_rel_tol=tol)
-                m_max = min(m_k, m_max)
-            except ValueError:
-                pass
+        rhos = []
+        v = 0
+        for p in p_s:
+            m_opt = exp(p / yield_strength * 3**0.5 * 0.5)  # optimum autofrettage ratio (von Mises)
+            sigma_inf = sigma_min(m_opt, p)  # minimum stress at the autofrettage juncture with infinite thick walls
 
-        m_best, _ = gss(lambda m: f(m)[0], m_min, m_max, y_rel_tol=tol, find_min=True)
-        return f(m_best)
+            if sigma_inf > yield_strength:
+                raise ValueError(
+                    "Plastic-elastic junction stress exceeds material "
+                    + f"yield ({yield_strength * 1e-6:.3f} MPa) for autofrettage construction."
+                )
+            else:  # finite thickness exist able to contain the pressure.
+                rho, _ = secant(
+                    lambda k: Gun.sigma_von_mises(k, p, m_opt, yield_strength),
+                    1 + tol,
+                    1 + 2 * tol,
+                    y=yield_strength,
+                    x_min=1,
+                    y_rel_tol=tol,
+                )
+
+            rhos.append(rho)
+
+        for i in range(len(x_s) - 1):
+            x_0, x_1 = x_s[i], x_s[i + 1]
+            s_0, s_1 = s_s[i], s_s[i + 1]
+            rho_0, rho_1 = rhos[i], rhos[i + 1]
+            dv = 0.5 * ((rho_0**2 - 1) * s_0 + (rho_1**2 - 1) * s_1) * (x_1 - x_0)
+            v += dv
+        return v, rhos
 
     @staticmethod
     def sigma_von_mises(k, p, m, sigma):
         """
-        k   : probing point, radius ratio
-        p   : working pressure (from within)
-        m   : autofrettaged (plastically yielded region) rim radius over
-            : barrel radius.
+        k       : probing point, radius ratio
+        p       : working pressure (from within)
+        m       : autofrettage (plastically yielded region) rim radius over barrel radius.
+        sigma   : material yield strength
 
         Calculate the von Misses stress at point radius ratio k.
         When supplied with k = m, the result is for at plastic-elastic
-        juncture. This is the limiting stress point for an auto-
-        frettaged gun barrel under internal pressure loading.
+        juncture. This is the limiting stress point for an autofrettage
+        gun barrel under internal pressure loading.
 
         In general, for increasing m up until m=k, the ability of a barrel to
         tolerate stress increase.
         """
-        sigma_tr = (
-            sigma * (k / m) ** 2 * ((m / k) ** 2 - (1 - (m / k) ** 2 + 2 * log(m)) / (k**2 - 1))
-            + 2 * p / (k**2 - 1) * (k / m) ** 2
-        )
-        return sigma_tr * 3**0.5 * 0.5  # convert Tresca to von Misses equivalent stress
+
+        if k == 1:
+            sigma_tresca = inf
+        else:
+            if m == 1:
+                sigma_tresca = 2 * p * k**2 / (k**2 - 1)
+            else:
+                sigma_tresca = (
+                    sigma * (k / m) ** 2 * ((m / k) ** 2 - (1 - (m / k) ** 2 + 2 * log(m)) / (k**2 - 1))
+                    + 2 * p / (k**2 - 1) * (k / m) ** 2
+                )
+        return sigma_tresca * 3**0.5 * 0.5  # convert Tresca to von Misses equivalent stress
 
 
 if __name__ == "__main__":
