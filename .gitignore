@@ -152,3 +152,7 @@ cython_debug/
 .idea/
 .run/
 
+
+# VSCode
+# Exclude .vscode folder
+.vscode/

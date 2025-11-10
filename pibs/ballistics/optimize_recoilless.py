@@ -13,7 +13,7 @@ from . import (
     Points,
 )
 from .generics import DelegatesPropellant
-from .num import dekker, gss, rkf78
+from .num import dekker, gss, rkf
 from .prop import Propellant
 from .recoilless import Recoilless
 
@@ -174,13 +174,11 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 "Propellant load too low to achieve design velocity. "
                 + " The 2nd ballistic limit for this loading conditions is"
                 + " {:.4g} m/s,".format(v_j)
-                + " and recoiless guns only achieve a part of that as well."
+                + " and recoilless guns only achieve a part of that as well."
             )
 
         psi_0 = (1 / delta - 1 / rho_p) / (f / p_0 + alpha - 1 / rho_p)
-        z_0, _ = dekker(lambda z: self.propellant.f_psi_z(z) - psi_0, 0, 1, y_rel_tol=tol, y_abs_tol=tol**2)
-
-        # p_bar_0 = p_0 / (f * Delta)
+        z_0, _ = dekker(lambda _z: self.propellant.f_psi_z(_z), 0, 1, y=psi_0, y_rel_tol=tol, y_abs_tol=tol**2)
 
         def _f_p_bar(z, l_bar, v_bar, eta, tau):
             psi = f_psi_z(z)
@@ -213,11 +211,10 @@ class ConstrainedRecoilless(DelegatesPropellant):
         l_bar_d = self.max_length / l_0
 
         """
-        step 1, find grain size that satisifies design pressure
+        step 1, find grain size that satisfies design pressure
         """
 
-        # noinspection PyUnusedLocal
-        def abort_z(x, ys, record):
+        def _abort_z(x, ys, _):
             z, (_, l_bar, v_bar, eta, tau) = x, ys
             p_bar = _f_p_bar(z, l_bar, v_bar, eta, tau)
             return (p_bar > 2 * p_bar_d) or l_bar > l_bar_d
@@ -229,12 +226,15 @@ class ConstrainedRecoilless(DelegatesPropellant):
             l_bar < l_bar_d,
             p_bar < 2 * p_bar_d.
             """
-            b = (s**2 * e_1**2) / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
+            b_e_1 = (s**2 * e_1**2) / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
             # integrate this to end of burn
 
-            def _ode_z(z, t_bar, l_bar, v_bar, eta, tau, _):
+            def _ode_z(
+                z: float, tlvetatau: tuple[float, float, float, float, float], _: float
+            ) -> tuple[float, float, float, float, float]:
                 """burnout domain ode of internal ballistics"""
+                t_bar, l_bar, v_bar, eta, tau = tlvetatau
                 psi = f_psi_z(z)
                 dpsi = f_sigma_z(z)  # dpsi/dZ
 
@@ -251,7 +251,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
                     p_d_bar = 0
 
                 if z <= z_b:
-                    dt_bar = (2 * b / theta) ** 0.5 * p_bar**-n
+                    dt_bar = (2 * b_e_1 / theta) ** 0.5 * p_bar**-n
                     dl_bar = v_bar * dt_bar
                     dv_bar = 0.5 * theta * (p_bar - p_d_bar) * dt_bar
                     dv_bar /= (1 + w / m * (1 - psi)) if is_tc else 1
@@ -268,35 +268,37 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 return dt_bar, dl_bar, dv_bar, deta, dtau
 
             # stepVanished = False
-            record = [[z_0, [0, 0, 0, 0, 1]]]
+            record = [(z_0, (0.0, 0.0, 0.0, 0.0, 1.0))]
             try:
-                (z_j, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j), _) = rkf78(
+                z_k, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j) = rkf(
                     d_func=_ode_z,
-                    ini_val=(0, 0, 0, 0, 1),
+                    ini_val=(0.0, 0.0, 0.0, 0.0, 1.0),
                     x_0=z_0,
                     x_1=z_b,
                     rel_tol=tol,
                     abs_tol=tol**2,
-                    abort_func=abort_z,
+                    abort_func=_abort_z,
                     record=record,
                 )
 
-                if z_j not in [line[0] for line in record]:
-                    record.append([z_j, [t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j]])
+                if z_k not in [line[0] for line in record]:
+                    record.append((z_k, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j)))
             except ValueError:
-                z_j, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j) = record[-1]
+                z_k, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j) = record[-1]
 
-            p_bar_j = _f_p_bar(z_j, l_bar_j, v_bar_j, eta_j, tau_j)
+            p_bar_j = _f_p_bar(z_k, l_bar_j, v_bar_j, eta_j, tau_j)
 
             peak = None
 
             # find the last peak
             if len(record) > 2:
-                p_bars = [_f_p_bar(z, l_bar, v_bar, eta, tau) for (z, (t_bar, l_bar, v_bar, eta, tau)) in record]
+                p_bars = [
+                    _f_p_bar(_z, _l_bar, _v_bar, _eta, _tau) for (_z, (_t_bar, _l_bar, _v_bar, _eta, _tau)) in record
+                ]
 
-                for i, (l, c, r) in enumerate(zip(p_bars[:-2], p_bars[1:-1], p_bars[2:])):
-                    if l < c and c > r:
-                        peak = i + 1
+                for _i, (_l, _c, _r) in enumerate(zip(p_bars[:-2], p_bars[1:-1], p_bars[2:])):
+                    if _l < _c and _c > _r:
+                        peak = _i + 1
 
             if peak is None:
                 # no peak, so it suffice to compare the end points.
@@ -304,8 +306,8 @@ class ConstrainedRecoilless(DelegatesPropellant):
                     p_bar_j = inf
                 return p_bar_j - p_bar_d, record[-1][0], *record[-1][-1]
             else:  # peak exist, must compare the peak and the two end points.
-                z_i = record[peak - 1][0]
-                z_j = record[peak + 1][0]
+                z_j = record[peak - 1][0]
+                z_k = record[peak + 1][0]
 
                 def _f_p_z(z):
                     i = record.index([v for v in record if v[0] <= z][-1])
@@ -313,37 +315,28 @@ class ConstrainedRecoilless(DelegatesPropellant):
                     ys = record[i][1]
 
                     r = []
-                    _, (t_bar, l_bar, v_bar, eta, tau), _ = rkf78(
-                        d_func=_ode_z,
-                        ini_val=ys,
-                        x_0=x,
-                        x_1=z,
-                        rel_tol=tol,
-                        abs_tol=tol**2,
-                        record=r,
-                    )
+                    t_bar, l_bar, v_bar, eta, tau = rkf(
+                        d_func=_ode_z, ini_val=ys, x_0=x, x_1=z, rel_tol=tol, abs_tol=tol**2, record=r
+                    )[1]
 
                     xs = [v[0] for v in record]
                     record.extend(v for v in r if v[0] not in xs)
                     record.sort()
-                    return _f_p_bar(z, l_bar, v_bar, eta, tau)
+                    return _f_p_bar(z, l_bar, v_bar, eta, tau), z, t_bar, l_bar, v_bar, eta, tau
 
-                z_1, z_2 = gss(_f_p_z, z_i, z_j, y_rel_tol=tol, find_min=False)
+                z_1, z_2 = gss(lambda _z: _f_p_z(_z)[0], z_j, z_k, y_rel_tol=tol, find_min=False)
                 z_p = 0.5 * (z_1 + z_2)
+                p_bar_p, *vals = _f_p_z(z_p)
+                return p_bar_p - p_bar_d, *vals
 
-                p_bar_p = _f_p_z(z_p)
-                i = [line[0] for line in record].index(z_p)
-
-                return p_bar_p - p_bar_d, record[i][0], *record[i][-1]
-
-        dp_bar_probe, z, *_ = _f_p_e_1(0.5 * self.min_web)
         probe_web = 0.5 * self.min_web
+        dp_bar_probe, z_probe, *_ = _f_p_e_1(probe_web)
 
         if dp_bar_probe < 0:
             raise ValueError(
                 "Design pressure cannot be achieved by varying web down to minimum. "
                 + "Peak pressure found at phi = {:.4g} at {:.4g} MPa".format(
-                    f_psi_z(z), (dp_bar_probe + p_bar_d) * 1e-6 * f * delta
+                    f_psi_z(z_probe), (dp_bar_probe + p_bar_d) * 1e-6 * f * delta
                 )
             )
 
@@ -351,20 +344,13 @@ class ConstrainedRecoilless(DelegatesPropellant):
             probe_web *= 2
             dp_bar_probe = _f_p_e_1(probe_web)[0]
 
-        e_1, e_1_2 = dekker(
-            lambda x: _f_p_e_1(x)[0], probe_web, 0.5 * probe_web, y_rel_tol=tol
-        )  # this is the e_1 that satisfies the pressure specification.
+        e_1_solved, _ = dekker(lambda _e_1: _f_p_e_1(_e_1)[0], probe_web, 0.5 * probe_web, y_rel_tol=tol)
 
-        """
-        e_1 and e_2 brackets the true solution
-        """
-
-        dp_bar_i, *vals_1 = _f_p_e_1(e_1)
-
+        dp_bar_i, *vals_1 = _f_p_e_1(e_1_solved)
         z_i, t_bar_i, l_bar_i, v_bar_i, eta_i, tau_i = vals_1
 
         if known_bore:
-            return e_1, length_gun
+            return e_1_solved, length_gun
 
         """
         step 2, find the requisite muzzle length to achieve design velocity
@@ -378,10 +364,14 @@ class ConstrainedRecoilless(DelegatesPropellant):
             else:
                 raise ValueError(f"Design velocity exceeded before peak pressure point (V = {v_bar_i * v_j:.4g} m/s).")
 
-        b = s**2 * e_1**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
+        b = s**2 * e_1_solved**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
-        def _ode_v(v_bar, _, z, l_bar, eta, tau, __):
+        def _ode_v(
+            v_bar: float, tzletatau: tuple[float, float, float, float, float], __: float
+        ) -> tuple[float, float, float, float, float]:
+            _, z, l_bar, eta, tau = tzletatau
             psi = f_psi_z(z)
+
             dpsi = f_sigma_z(z)  # dpsi/dZ
 
             l_psi_bar = 1 - delta * ((1 - psi) / rho_p + alpha * (psi - eta))
@@ -410,27 +400,21 @@ class ConstrainedRecoilless(DelegatesPropellant):
 
             return dt_bar, dz, dl_bar, deta, dtau
 
-        def abort_v(x, ys, record):
-            # v_bar = x
+        def _abort_v(_, ys, record):
             t_bar, _, l_bar, _, _ = ys
-
             ot_bar, *_ = record[-1][-1]
             return l_bar > l_bar_d or t_bar < ot_bar
 
-        vtzlet_record = [[v_bar_i, (t_bar_i, z_i, l_bar_i, eta_i, tau_i)]]
+        vtzlet_record = [(v_bar_i, (t_bar_i, z_i, l_bar_i, eta_i, tau_i))]
         try:
-            (
-                v_bar_g,
-                (t_bar_g, z_g, l_bar_g, eta_g, tau_g),
-                _,
-            ) = rkf78(
+            v_bar_g, (t_bar_g, z_g, l_bar_g, eta_g, tau_g) = rkf(
                 d_func=_ode_v,
                 ini_val=(t_bar_i, z_i, l_bar_i, eta_i, tau_i),
                 x_0=v_bar_i,
                 x_1=v_bar_d,
                 rel_tol=tol,
                 abs_tol=tol**2,
-                abort_func=abort_v,
+                abort_func=_abort_v,
                 record=vtzlet_record,
             )
 
@@ -467,22 +451,15 @@ class ConstrainedRecoilless(DelegatesPropellant):
             )
 
         logger.info(
-            f"ω/m = {charge_mass_ratio:.2f}, Δ/ρ = {charge_mass_ratio:.2f} -> e_1 = {e_1 * 1e3:.2f} mm, l_g = {l_g * 1e3:.0f} mm"
+            f"ω/m = {charge_mass_ratio:.2f}, Δ/ρ = {load_fraction:.2f} -> e_1 = {e_1_solved * 1e3:.2f} mm, l_g = {l_g * 1e3:.0f} mm"
         )
-        return e_1, l_bar_g * l_0
+        return e_1_solved, l_bar_g * l_0
 
     def find_min_v(self, charge_mass_ratio: float, max_guess: int = MAX_GUESSES, **_):
         """
         find the minimum volume solution.
         """
 
-        """
-        Step 1, find a valid range of values for load fraction,
-        using psuedo-bisection.
-
-        high lf -> high web
-        low lf -> low web
-        """
         w = self.m * charge_mass_ratio
         rho_p = self.rho_p
         s = self.s
@@ -493,10 +470,10 @@ class ConstrainedRecoilless(DelegatesPropellant):
             vol_0 = w / (rho_p * load_fraction)
             l_0 = vol_0 / s
 
-            e_1, l_g = solve(
+            e_1_delta, l_g_delta = solve(
                 load_fraction=load_fraction, charge_mass_ratio=charge_mass_ratio, known_bore=False, suppress=True
             )
-            return e_1, (l_g + l_0), l_g
+            return e_1_delta, (l_g_delta + l_0), l_g_delta
 
         records = []
         for i in range(max_guess):
@@ -568,7 +545,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
         Step 2, gss to min.
         """
         logger.info(f"solution constrained Δ/ρ : {low:.3%} - {high:.3%}")
-        lf_low, lf_high = gss(lambda lf: f(lf)[1], low, high, y_rel_tol=tol, find_min=True)
+        lf_low, lf_high = gss(lambda _lf: f(_lf)[1], low, high, y_rel_tol=tol, find_min=True)
         lf = 0.5 * (lf_high + lf_low)
         e_1, l_t, l_g = f(lf)
         logger.info(f"Optimal Δ/ρ = {lf:.2f}")
@@ -576,44 +553,4 @@ class ConstrainedRecoilless(DelegatesPropellant):
 
 
 if __name__ == "__main__":
-    from prop import Composition, MultPerfGeometry, SimpleGeometry
-
-    compositions = Composition.read_file("data/propellants.csv")
-    S22 = compositions["ATK PRD(S)22"]
-    M8 = compositions["M8"]
-    M1 = compositions["M1"]
-
-    S22S = Propellant(S22, SimpleGeometry.TUBE, 1, 2.5)
-    M8S = Propellant(M8, SimpleGeometry.TUBE, 1, 2.5)
-    M17P = Propellant(M1, MultPerfGeometry.SEVEN_PERF_CYLINDER, 1.0, 2.50)
-    test = ConstrainedRecoilless(
-        caliber=93e-3,
-        shot_mass=4,
-        propellant=M17P,
-        start_pressure=10e6,
-        drag_coefficient=5e-2,
-        design_pressure=50e6,
-        design_velocity=120,
-        nozzle_expansion=4,
-        nozzle_efficiency=0.92,
-        chambrage=1.5,
-        tol=1e-3,
-        max_length=100,
-        min_web=1e-6,
-    )
-
-    datas = []
-    for i in range(10):
-        datas.append(test.find_min_v(charge_mass_ratio=0.309 / 4))
-
-    from tabulate import tabulate
-
-    means = [sum(x) / len(datas) for x in zip(*datas)]
-
-    delta = []
-    for line in datas:
-        delta.append((v - m) / m for v, m in zip(line, means))
-
-    print(tabulate(datas, headers=("load fract.", "web", "length")))
-    print(*means)
-    print(tabulate(delta, headers=("load fract.", "web", "length"), floatfmt=".3e"))
+    pass

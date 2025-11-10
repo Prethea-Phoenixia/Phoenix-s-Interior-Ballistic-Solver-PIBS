@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -26,23 +26,9 @@ class GenericEntry:
 
 
 @dataclass
-class GenericErrorEntry:
-    tag: str
-    time: float | None = None
-    travel: float | None = None
-    burnup: float | None = None
-    velocity: float | None = None
-    breech_pressure: float | None = None
-    avg_pressure: float | None = None
-    shot_pressure: float | None = None
-    temperature: float | None = None
-
-
-@dataclass
 class GenericResult:
     gun: Gun
     table_data: list[GenericEntry]
-    error_data: list[GenericEntry]
     pressure_trace: list[PressureTraceEntry]
 
     tubeMass: float = None
@@ -89,6 +75,7 @@ class OutlineEntry:
     x: float
     r_in: float
     r_ex: float
+    r_pej: float  # plastic elastic junction
 
 
 class DelegatesPropellant:

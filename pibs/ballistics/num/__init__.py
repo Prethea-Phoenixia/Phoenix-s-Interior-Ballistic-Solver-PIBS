@@ -1,3 +1,3 @@
-from .general import cubic, intg, quadratic
-from .rkf78 import rkf78
+from .general import cubic, integrate, quadratic
+from .rkf import rkf45 as rkf
 from .umf import bisect, dekker, gss, secant

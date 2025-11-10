@@ -18,7 +18,6 @@ if __name__ == "__main__":
         f"--add-data=pibs/ballistics/resource{sep}ballistics/resource/",
         f"--add-data=pibs/ui{sep}ui/",
         f"--add-data=pibs/examples{sep}examples/",
-        "--exclude-module=pibs.ballistics.therm",
         "--onefile",
     ]
 

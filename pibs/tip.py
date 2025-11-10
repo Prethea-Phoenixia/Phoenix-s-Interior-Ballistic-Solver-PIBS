@@ -1,20 +1,17 @@
-import tkinter.font as tkFont
 from tkinter import Label, StringVar, Toplevel
 
 
 class ToolTip(object):
     """solution found in
-    https://stackoverflow.com/questions/20399243/display-message
-    -when-hovering-over-something-with-mouse-cursor-in-python
+    https://stackoverflow.com/questions/20399243/display-message-when-hovering-over-something-with-mouse-cursor-in-python
     """
 
     def __init__(self, widget, font):
         self.widget = widget
         self.tipwindow = None
-        self.id = None
-        self.x = self.y = 0
         self.font = font
         self.text = None
+        self.initialized: bool = False
 
     def showtip(self, text):
         """Display text in tooltip window"""
@@ -22,33 +19,20 @@ class ToolTip(object):
             self.text = text.get()
         else:
             self.text = text
+
         if self.tipwindow or not self.text:
             return
 
         self.tipwindow = tw = Toplevel(self.widget)
-        tw.wm_overrideredirect(1)
-        root = self.widget.winfo_toplevel()
-
-        # t_Font = tkFont.Font(family="Sarasa Fixed SC", size=8)
-
+        self.initialized = False
+        tw.wm_overrideredirect(True)
+        tw.attributes("-alpha", 0.0)
         t_font = self.font
+
         # we use a fixed width font so any char will do
         column_width = 60
         # apparently this doesn't work correctly with CJK fonts.....
         width, height = t_font.measure(" "), t_font.metrics("linespace")
-
-        x, y, _, _ = self.widget.bbox("insert")
-        # rx, ry, crx, cry = root.bbox()
-        # bounding box coordinate is in relation to origin of widget/window
-
-        if x + self.widget.winfo_rootx() > root.winfo_rootx() + 0.5 * root.winfo_width():
-            x = x + self.widget.winfo_rootx() - width * column_width
-            y = y + self.widget.winfo_rooty()
-        else:
-            x = x + self.widget.winfo_rootx() + self.widget.winfo_width()
-            y = y + self.widget.winfo_rooty()
-
-        # wrappedText = textwrap.fill(self.text, width=columnWidth - 10)
 
         label = Label(
             tw,
@@ -61,18 +45,33 @@ class ToolTip(object):
             font=t_font,
         )
         label.pack(ipadx=width, ipady=height * 0.25, anchor="nw", fill="both")
+        tw.update()
 
-        # tw.update_idletasks()
-        wheight = tw.winfo_height()
+        x = self.widget.winfo_rootx()  # + tw.winfo_width()
+        y = self.widget.winfo_rooty()
 
-        margin = (
-            y + wheight - root.winfo_rooty() - root.winfo_height()
-        )  # ensure that tooltip does not overrun the main window
+        # (x, y): top-left
+        root_window = self.widget.winfo_toplevel()
+        x_r, y_r, w_r, h_r = (
+            root_window.winfo_rootx(),
+            root_window.winfo_rooty(),
+            root_window.winfo_width(),
+            root_window.winfo_height(),
+        )
 
-        if margin > 0:
-            y -= margin
+        y = min(y, y_r + h_r - tw.winfo_height())
+        y = max(y, y_r)
+
+        if x < x_r + w_r / 2:
+            x += self.widget.winfo_width()
+
+        elif x > x_r + w_r / 2:
+            x -= tw.winfo_width()
+
+        # ensure the tip shows up on the correct side:
 
         tw.wm_geometry("+%d+%d" % (x, y))
+        tw.attributes("-alpha", 1.0)
         """
         tw.bind(
             "<Configure>",
@@ -81,12 +80,16 @@ class ToolTip(object):
             ),
         )
         """
+        self.initialized = True
 
     def hidetip(self):
         tw = self.tipwindow
-        self.tipwindow = None
         if tw:
-            tw.after(100, lambda: tw.destroy())
+            if self.initialized:
+                self.tipwindow = None
+                tw.destroy()
+            else:
+                self.tipwindow.after(10, self.hidetip)
 
 
 def create_tool_tip(widget, text, font):

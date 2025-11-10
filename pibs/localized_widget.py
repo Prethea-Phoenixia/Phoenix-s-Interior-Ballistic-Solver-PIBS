@@ -5,12 +5,12 @@ from abc import ABC, abstractmethod
 from functools import wraps
 from tkinter import BooleanVar, Event, Frame, Menu, StringVar, ttk
 from tkinter.font import Font
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, Union
 
 from .misc import format_float_input
 from .tip import create_tool_tip
 
-localize_function_type = Callable[[str, bool], str] | Callable[[str], str]
+localize_function_type = Union[Callable[[str, bool], str], Callable[[str], str]]
 placeholder_loc_func = lambda _: ""
 
 

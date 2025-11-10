@@ -65,7 +65,7 @@ def quadratic(a, b, c):
         return x_1, x_2
 
 
-def intg(f, l, u, tol=1e-3):
+def integrate(f, l, u, tol=1e-3):
     """
     Integration, a.la the HP-34C. For more info see:
     "Handheld Calculator Evaluates Integrals", William M.Kahan
@@ -94,8 +94,8 @@ def intg(f, l, u, tol=1e-3):
     as the weight (1-v^2) is exactly 0 on both end points. We then sample
     evenly along v, take quadrature using the mid-point rule and doubling
     the number of nodes taken for each pass. This helps with suppressing
-    harmonics if the function integrated is periodic. In addition, all of
-    the previously calcualted quadratures can be reused in the next round,
+    harmonics if the function integrated is periodic. In addition, all
+    the previously calculated quadratures can be reused in the next round,
     after dividing by half. This is especially important when function calls
      are expensive. Specifically, for pass k (k>=1 & integer) we consider 2^k-1
     points (besides the end points):
@@ -118,7 +118,7 @@ def intg(f, l, u, tol=1e-3):
     if the quadrature procedure results in a converging result, then the error
     should decrease faster than the increment in the result, speaking in
     absolute terms. Although this is no-way guaranteed, it is convenient to
-    take the increment as an upper bound on error. Therefore we check for three
+    take the increment as an upper bound on error. Therefore, we check for three
     consecutive increments smaller than the specified tolerance before
     submitting the result as a good enough estimate for the integral.
     """

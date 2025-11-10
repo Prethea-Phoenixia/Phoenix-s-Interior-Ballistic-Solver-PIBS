@@ -48,6 +48,7 @@ The return signatures are:
 """
 
 import math
+from typing import Callable
 
 invphi = (math.sqrt(5) - 1) / 2  # 1 / phi
 invphi2 = (3 - math.sqrt(5)) / 2  # 1 / phi^2
@@ -56,16 +57,15 @@ FLOAT_MIN = 1e-16
 
 
 def gss(
-    f,
-    a,
-    b,
-    x_tol=FLOAT_MIN,
-    y_rel_tol=0,
-    y_abs_tol=FLOAT_MIN,
-    find_min=True,
-    it=1e4,
-    debug=False,
-    f_report=None,
+    f: Callable[[float], float],
+    a: float,
+    b: float,
+    x_tol: float = FLOAT_MIN,
+    y_rel_tol: float = 0,
+    y_abs_tol: float = FLOAT_MIN,
+    find_min: bool = True,
+    it: int = 1e4,
+    debug: bool = False,
 ):
     """Golden-section search. improved from the example
     given on wikipedia. Reuse half the evaluations.
@@ -102,9 +102,6 @@ def gss(
 
     k = 0
     while k < n:
-        if f_report is not None:
-            f_report(k / n)
-
         if (yc < yd and find_min) or (yc > yd and not find_min):
             # a---c---d  b
             b = d
@@ -145,9 +142,6 @@ def gss(
 
         k += 1
 
-    if f_report is not None:
-        f_report((k + 1) / n)
-
     if debug:
         print("GSS")
         print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
@@ -161,11 +155,19 @@ def gss(
         return c, b
 
 
-# fmt: off
 def secant(
-    f, x_0, x_1, y=0, x_min=None, x_max=None, x_tol=FLOAT_MIN,
-        y_rel_tol=0, y_abs_tol=FLOAT_MIN, it=100, debug=False):
-    # fmt: on
+    f: Callable[[float], float],
+    x_0: float,
+    x_1: float,
+    y: float = 0.0,
+    x_min: float = None,
+    x_max: float = None,
+    x_tol: float = FLOAT_MIN,
+    y_rel_tol: float = 0,
+    y_abs_tol: float = FLOAT_MIN,
+    it: int = 100,
+    debug: bool = False,
+) -> tuple[float, float]:
     fx_0 = f(x_0) - y
     fx_1 = f(x_1) - y
 
@@ -176,7 +178,7 @@ def secant(
         errStr += "\nf({})-{}={}\nf({})-{}={}".format(x_0, y, fx_0, x_1, y, fx_1)
         raise ValueError(errStr)
 
-    i = 0
+    i, x_2, fx_2 = 0, 0, 0
     for i in range(it):
         x_2 = x_1 - fx_1 * (x_1 - x_0) / (fx_1 - fx_0)
         if x_min is not None and x_2 < x_min:
@@ -212,11 +214,7 @@ def secant(
                     record.sort(key=lambda line: line[1])
                     for line in record:
                         print("{:>4}{:>24}{:>24}".format(*line))
-                raise ValueError(
-                    "Numerical plateau found at f({})-{}=f({})-{}={}".format(
-                        x_1, y, x_2, y, fx_2
-                    )
-                )
+                raise ValueError("Numerical plateau found at f({})-{}=f({})-{}={}".format(x_1, y, x_2, y, fx_2))
 
             x_0, x_1, fx_0, fx_1 = x_1, x_2, fx_1, fx_2
 
@@ -237,12 +235,18 @@ def secant(
         )
 
 
-# fmt: off
 def dekker(
-    f, x_0, x_1, y=0,
-        x_tol=1e-16, y_rel_tol=0, y_abs_tol=1e-16, it=100, debug=False, f_report=None
-):
-    # fmt: on
+    f: Callable[[float], float],
+    x_0: float,
+    x_1: float,
+    y: float = 0.0,
+    x_tol: float = 1e-16,
+    y_rel_tol: float = 0.0,
+    y_abs_tol: float = 1e-16,
+    it: int = 100,
+    debug: bool = False,
+) -> tuple[float, float]:
+
     fx_0 = f(x_0) - y
     fx_1 = f(x_1) - y
 
@@ -277,9 +281,7 @@ def dekker(
         else:
             s = m
 
-        if (
-            min(b_j, m) < s < max(b_j, m)
-        ):  # if secant estimate strictly between current estimate
+        if min(b_j, m) < s < max(b_j, m):  # if secant estimate strictly between current estimate
             # and bisection estimate
             b_k = s  # assign the secant estimation to be the next estimate
         else:
@@ -287,9 +289,7 @@ def dekker(
 
         fb_k = f(b_k) - y  # calculate new value of estimate
 
-        if (
-            fa_j * fb_k < 0
-        ):  # if the contrapoint is of different sign than current estimate
+        if fa_j * fb_k < 0:  # if the contrapoint is of different sign than current estimate
             a_k = a_j  # new contrapoint is still the same
             fa_k = fa_j
         else:
@@ -299,12 +299,6 @@ def dekker(
         if abs(fa_k) < abs(fb_k):  # ensure b is still the best guess
             a_k, b_k = b_k, a_k
             fa_k, fb_k = fb_k, fa_k
-
-        if f_report is not None:
-            log_ini = math.log(max(abs(fx_0), abs(fx_1)))
-            log_eps = math.log(abs(fb_k))
-            log_fin = math.log(y_abs_tol)
-            f_report(min((log_ini - log_eps) / (log_ini - log_fin), 1))
 
         if debug:
             record.append((i, b_k, fb_k))
@@ -341,8 +335,15 @@ def dekker(
 
 
 def bisect(
-    f, x_0, x_1, y=0, x_tol=1e-16, y_abs_tol=1e-16, y_rel_tol=0, debug=False
-):
+    f: Callable[[float], float],
+    x_0: float,
+    x_1: float,
+    y: float = 0,
+    x_tol: float = 1e-16,
+    y_abs_tol: float = 1e-16,
+    y_rel_tol: float = 0,
+    debug: bool = False,
+) -> tuple[float, float]:
     """bisection method to numerically solve for zero
     two initial guesses must be of opposite sign.
     The root found is guaranteed to be within the range specified.

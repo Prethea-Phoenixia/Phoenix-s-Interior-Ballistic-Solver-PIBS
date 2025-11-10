@@ -18,13 +18,13 @@ from . import (
 )
 from .generics import DelegatesPropellant
 from .gun import pidduck
-from .num import dekker, gss, rkf78
+from .num import dekker, gss, rkf
 from .prop import Propellant
 
 """
 Machine-accuracy factor, determines that, if a numerical method
 is used within another, then how much more accurate should the
-inner method be called as compared to the outter. A small value
+inner method be called as compared to the outer. A small value
 is necessary to prevent numerical instability form causing sporadic
 appearance of outlier, at the cost of increased computation times.
 """
@@ -169,7 +169,7 @@ conditions is {v_j:.4g} m/s."
             )
 
         psi_0 = (1 / delta - 1 / rho_p) / (f / p_0 + alpha - 1 / rho_p)
-        z_0, _ = dekker(lambda z: self.propellant.f_psi_z(z) - psi_0, 0, 1, y_rel_tol=tol, y_abs_tol=tol**2)
+        z_0, _ = dekker(lambda _z: self.propellant.f_psi_z(_z) - psi_0, 0, 1, y_rel_tol=tol, y_abs_tol=tol**2)
 
         def _f_p_bar(z, l_bar, v_bar):
             psi = f_psi_z(z)
@@ -205,7 +205,7 @@ conditions is {v_j:.4g} m/s."
             )
         l_bar_d = self.max_length / l_0
 
-        def abort_z(x, ys, record):
+        def _abort_z(x, ys, record):
             z = x
             t_bar, l_bar, v_bar = ys
             p_bar = _f_p_bar(z, l_bar, v_bar)
@@ -224,10 +224,11 @@ conditions is {v_j:.4g} m/s."
             or until the system develops 2x design pressure.
             """
 
-            b = s**2 * e_1**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
+            b_e_1 = s**2 * e_1**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
-            def _ode_z(z, _, l_bar, v_bar, __):
+            def _ode_z(z: float, tlv: tuple[float, float, float], __: float) -> tuple[float, float, float]:
                 """burnup domain ode of internal ballistics"""
+                t_bar, l_bar, v_bar = tlv
                 psi = f_psi_z(z)
                 l_psi_bar = 1 - delta / rho_p - delta * (alpha - 1 / rho_p) * psi
 
@@ -243,67 +244,62 @@ conditions is {v_j:.4g} m/s."
                     p_d_bar = 0
 
                 if z <= z_b:
-                    dt_bar = (2 * b / theta) ** 0.5 * p_bar**-n  # dt_bar/dz
+                    dt_bar = (2 * b_e_1 / theta) ** 0.5 * p_bar**-n  # dt_bar/dz
                     dl_bar = v_bar * dt_bar
                     dv_bar = 0.5 * theta * (p_bar - p_d_bar) * dt_bar
 
                 else:
                     dt_bar, dl_bar, dv_bar = 0, 0, 0
 
-                return [dt_bar, dl_bar, dv_bar]
+                return dt_bar, dl_bar, dv_bar
 
-            record = [[z_0, [0, 0, 0]]]
+            record = [(z_0, (0, 0, 0))]
 
-            z_j, (t_bar_j, l_bar_j, v_bar_j), e = rkf78(
+            z_k, (t_bar_j, l_bar_j, v_bar_j) = rkf(
                 d_func=_ode_z,
                 ini_val=(0, 0, 0),
                 x_0=z_0,
                 x_1=z_b,
                 rel_tol=tol,
                 abs_tol=tol**2,
-                abort_func=abort_z,
+                abort_func=_abort_z,
                 record=record,
             )
 
-            p_bar_j = _f_p_bar(z_j, l_bar_j, v_bar_j)
+            p_bar_j = _f_p_bar(z_k, l_bar_j, v_bar_j)
 
             if p_bar_j >= 2 * p_bar_d:  # case for abort due to excessive pressure
-                return p_bar_j - p_bar_d, z_j, t_bar_j, l_bar_j, v_bar_j
+                return p_bar_j - p_bar_d, z_k, t_bar_j, l_bar_j, v_bar_j
 
             # case for abort due to decreasing pressure
 
             def _f_p_z(z):
-                i = record.index([v for v in record if v[0] <= z][-1])
-                x = record[i][0]
-                ys = record[i][1]
+                j = record.index([v for v in record if v[0] <= z][-1])
+                x = record[j][0]
+                ys = record[j][1]
 
                 r = []
-                _, (t_bar, l_bar, v_bar), _ = rkf78(
+                t_bar, l_bar, v_bar = rkf(
                     d_func=_ode_z, ini_val=ys, x_0=x, x_1=z, rel_tol=tol, abs_tol=tol**2, record=r
-                )
+                )[1]
                 xs = [v[0] for v in record]
                 record.extend(v for v in r if v[0] not in xs)
                 record.sort()
                 return _f_p_bar(z, l_bar, v_bar), z, t_bar, l_bar, v_bar
 
-            """
-            find the peak pressure point.
-            """
-
             if len(record) > 1:
-                z_i = record[-2][0]
+                z_j = record[-2][0]
             else:
-                z_i = z_0
+                z_j = z_0
 
-            z_1, z_2 = gss(lambda z: _f_p_z(z)[0], z_i, z_j, y_rel_tol=tol, y_abs_tol=tol**2, find_min=False)
-            z_p = 0.5 * (z_1 + z_2)
+            z_p = 0.5 * sum(gss(lambda z: _f_p_z(z)[0], z_j, z_k, y_rel_tol=tol, y_abs_tol=tol**2, find_min=False))
 
             p_bar_p, *vals = _f_p_z(z_p)
 
             return p_bar_p - p_bar_d, *vals
 
-        dp_bar_probe = _f_p_e_1(0.5 * self.min_web)[0]
         probe_web = 0.5 * self.min_web
+        dp_bar_probe = _f_p_e_1(probe_web)[0]
 
         if dp_bar_probe < 0:
             raise ValueError("Design pressure cannot be achieved by varying web down to minimum")
@@ -312,22 +308,22 @@ conditions is {v_j:.4g} m/s."
             probe_web *= 2
             dp_bar_probe = _f_p_e_1(probe_web)[0]
 
-        e_1, _ = dekker(
-            lambda x: _f_p_e_1(x)[0],
+        e_1_solved, _ = dekker(
+            lambda _e_1: _f_p_e_1(_e_1)[0],
             probe_web,  # >0
             0.5 * probe_web,  # ?0
             y_rel_tol=tol,
             y_abs_tol=p_bar_d * tol,
         )  # this is the e_1 that satisfies the pressure specification.
 
-        p_bar_dev, z_i, t_bar_i, l_bar_i, v_bar_i = _f_p_e_1(e_1)
+        p_bar_dev, z_i, t_bar_i, l_bar_i, v_bar_i = _f_p_e_1(e_1_solved)
 
         if known_bore:
-            return e_1, length_gun
+            return e_1_solved, length_gun
 
         if v_j * v_bar_i > v_d:
             if suppress:
-                logger.warning("velocity target point occured before peak pressure point.")
+                logger.warning("velocity target point occurred before peak pressure point.")
                 logger.warning("this is currently being suppressed due to program control.")
             else:
                 raise ValueError(f"Design velocity exceeded before peak pressure point (V = {v_bar_i * v_j:.4g} m/s).")
@@ -336,9 +332,10 @@ conditions is {v_j:.4g} m/s."
         step 2, find the requisite muzzle length to achieve design velocity
         """
 
-        b = s**2 * e_1**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
+        b = s**2 * e_1_solved**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
 
-        def _ode_v(v_bar, _, z, l_bar, __):
+        def _ode_v(v_bar: float, tzl: tuple[float, float, float], __: float) -> tuple[float, float, float]:
+            t_bar, z, l_bar = tzl
             psi = f_psi_z(z)
 
             l_psi_bar = 1 - delta / rho_p - delta * (alpha - 1 / rho_p) * psi
@@ -358,22 +355,23 @@ conditions is {v_j:.4g} m/s."
             dz = dt_bar * (0.5 * theta / b) ** 0.5 * p_bar**n
             dl_bar = v_bar * dt_bar
 
-            return [dt_bar, dz, dl_bar]
+            return dt_bar, dz, dl_bar
 
-        def abort_v(x, ys, record):
-            _, _, l_bar = ys
-            return l_bar > l_bar_d
+        def _abort_v(_, ys, record):
+            t_bar, _, l_bar = ys
+            _, (ot_bar, _, _) = record[-1]
+            return l_bar > l_bar_d or t_bar < ot_bar
 
-        vtzl_record = [[v_bar_i, (t_bar_i, z_i, l_bar_i)]]
+        vtzl_record = [(v_bar_i, (t_bar_i, z_i, l_bar_i))]
         try:
-            (v_bar_g, (t_bar_g, z_g, l_bar_g), _) = rkf78(
+            v_bar_g, (t_bar_g, z_g, l_bar_g) = rkf(
                 d_func=_ode_v,
                 ini_val=(t_bar_i, z_i, l_bar_i),
                 x_0=v_bar_i,
                 x_1=v_bar_d,
                 rel_tol=tol,
                 abs_tol=tol**2,
-                abort_func=abort_v,
+                abort_func=_abort_v,
                 record=vtzl_record,
             )
 
@@ -420,9 +418,9 @@ conditions is {v_j:.4g} m/s."
             )
         else:
             logger.info(
-                f"ω/m = {charge_mass_ratio:.2f}, Δ/ρ = {charge_mass_ratio:.2f} -> e_1 = {e_1 * 1e3:.2f} mm, l_g = {l_g * 1e3:.0f} mm ({it} iterations)"
+                f"ω/m = {charge_mass_ratio:.2f}, Δ/ρ = {load_fraction:.2f} -> e_1 = {e_1_solved * 1e3:.2f} mm, l_g = {l_g * 1e3:.0f} mm ({it} iterations)"
             )
-            return e_1, l_g
+            return e_1_solved, l_g
 
     def find_min_v(self, charge_mass_ratio: float, max_guess: int = MAX_GUESSES, **_):
         """
@@ -430,13 +428,6 @@ conditions is {v_j:.4g} m/s."
         """
         logger.info("solving minimum chamber volume for constraint.")
 
-        """
-        Step 1, find a valid range of values for load fraction,
-        using psuedo-bisection.
-
-        high lf -> high web
-        low lf -> low web
-        """
         m = self.m
         omega = m * charge_mass_ratio
         rho_p = self.rho_p
@@ -453,10 +444,9 @@ conditions is {v_j:.4g} m/s."
         elif self.sol == SOL_MAMONTOV:
             labda_1, labda_2 = pidduck(omega / (phi_1 * m), 1, tol)
 
-        def f(load_fraction: float) -> tuple[float, float, float]:
+        def _f(load_fraction: float) -> tuple[float, float, float]:
             v_0 = omega / (rho_p * load_fraction)
-            l_0 = v_0 / s
-            e_1, l_g = self.solve(
+            e_1_delta, l_g_delta = self.solve(
                 load_fraction=load_fraction,
                 charge_mass_ratio=charge_mass_ratio,
                 labda_1=labda_1,
@@ -464,13 +454,13 @@ conditions is {v_j:.4g} m/s."
                 known_bore=False,
                 suppress=True,
             )
-            return e_1, (l_g + l_0), l_g
+            return e_1_delta, (l_g_delta + v_0 / s), l_g_delta
 
         records = []
         for i in range(max_guess):
             start_probe = uniform(tol, 1 - tol)
             try:
-                _, lt_i, lg_i = f(start_probe)
+                _, lt_i, lg_i = _f(start_probe)
                 records.append((start_probe, lt_i))
                 break
             except ValueError:
@@ -488,7 +478,7 @@ conditions is {v_j:.4g} m/s."
         k, n = 0, floor(log(abs(delta_low) / tol, 2)) + 1
         while abs(2 * delta_low) > tol:
             try:
-                _, lt_i, lg_i = f(new_low)
+                _, lt_i, lg_i = _f(new_low)
                 records.append((new_low, lt_i))
                 probe = new_low
             except ValueError:
@@ -509,7 +499,7 @@ conditions is {v_j:.4g} m/s."
         k, n = 0, floor(log(abs(delta_high) / tol, 2)) + 1
         while abs(2 * delta_high) > tol:
             try:
-                _, lt_i, lg_i = f(new_high)
+                _, lt_i, lg_i = _f(new_high)
                 records.append((new_high, lt_i))
                 probe = new_high
             except ValueError:
@@ -532,19 +522,10 @@ conditions is {v_j:.4g} m/s."
                     low = l[0]
                     high = h[0]
 
-        """
-        Step 2, gss to min.
-
-        It was found that at this step, setting the accuracy metric
-        on the x-value (or the load fraction) gives more consistent
-        result than requriing a relative tolerance on the function
-        values.
-        """
-
         logger.info(f"solution constrained to Δ/ρ : {low:.3%} - {high:.3%}")
-        lf_low, lf_high = gss(lambda load_fraction: f(load_fraction)[1], low, high, x_tol=tol, find_min=True)
+        lf_low, lf_high = gss(lambda load_fraction: _f(load_fraction)[1], low, high, x_tol=tol, find_min=True)
         lf = 0.5 * (lf_high + lf_low)
-        e_1, l_t, l_g = f(lf)
+        e_1, l_t, l_g = _f(lf)
         logger.info(f"Optimal Δ/ρ = {lf:.2f}")
         return lf, e_1, l_g
 

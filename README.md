@@ -19,9 +19,9 @@ A preset of propellant is supplied, with definition for many propellants, source
 To facilitate interoperability with design processes, data export and design save/load is provided. Interior ballistic configuration for known guns are supplied as presets for reference.
 
 ### Technical
-Python is an interpreted language, numerically focused projects like this require care to optimize the algorithm in view of limited runtime speed. Additionally, unique abort and terminating conditions precludes the use of pre-compiled numerical routines with C implementation. Therefore, the following algorithms were implemented in pure Python for this application:
+Compromising between ease of development, distribution, and runtime speed, the following algorithms were implemented in Python for this application:
 
-* Integrate up to user specified precision using high-order, adaptive [Runge Kutta Fehlberg](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method) 7(8)-th order method.
+* Numerical integration up to user specified precision using high-order, adaptive [Runge Kutta Fehlberg](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method) method.
 * Root-finding is implemented using the Dekker method, a variant of Brent's method that opportunistically employ polynomial and bisection to speedup root finding.
 * Maximal values are found using the Gold Section Search (GSS) method
 
@@ -34,7 +34,9 @@ For Windows, a single-file executable is provided. This package the Python runti
 
 - Install Python (>=3.9)
 - Setup the virtual environment:`python -m venv .venv`
-- Activate the virtual environment venv `.venv\Scripts\activate.bat`
+- Activate the virtual environment venv 
+  - on Windows: `.venv\Scripts\activate.bat`
+  - on Linux: `source .venv/bin/activate`
 - Install development dependencies:`pip install .[dev]`
 - Run the main script: `python run_pibs.py`
 - Generate executables: `python generate_executable.py`
