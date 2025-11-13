@@ -2189,14 +2189,14 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
             if h_trace is not None and self.trace_hull.get():
 
-                x_hull, r_in, r_out = zip(*[(entry.x, entry.r_in, entry.r_ex) for entry in h_trace])
-                r_in, r_out = [r * 1e3 for r in r_in], [r * 1e3 for r in r_out]
-
-                self.aux_ax_h.plot(x_hull, r_in, c="tab:blue")
-                self.aux_ax_h.plot(x_hull, r_out, c="tab:blue")
+                x_hull, r_in, r_out, r_pej = zip(*[(entry.x, entry.r_in, entry.r_ex, entry.r_pej) for entry in h_trace])
+                r_in, r_out, r_pej = [r * 1e3 for r in r_in], [r * 1e3 for r in r_out], [r * 1e3 for r in r_pej]
 
                 self.aux_ax_h.fill_between(
-                    x_hull, r_in, r_out, alpha=0.5 if self.trace_press.get() else 0.8, color="tab:blue"
+                    x_hull, r_in, r_pej, alpha=0.5 if self.trace_press.get() else 0.8, color="tab:orange"
+                )
+                self.aux_ax_h.fill_between(
+                    x_hull, r_pej, r_out, alpha=0.5 if self.trace_press.get() else 0.8, color="tab:blue"
                 )
 
                 self.aux_ax.set_xlim(left=min(x_hull))

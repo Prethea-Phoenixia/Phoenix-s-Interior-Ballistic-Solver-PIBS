@@ -48,7 +48,7 @@ The return signatures are:
 """
 
 import math
-from typing import Callable, Any
+from typing import Callable
 
 invphi = (math.sqrt(5) - 1) / 2  # 1 / phi
 invphi2 = (3 - math.sqrt(5)) / 2  # 1 / phi^2

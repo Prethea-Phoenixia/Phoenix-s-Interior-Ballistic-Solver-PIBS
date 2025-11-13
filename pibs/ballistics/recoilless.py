@@ -4,7 +4,7 @@ import logging
 import sys
 import traceback
 from dataclasses import dataclass
-from math import inf, pi
+from math import inf, pi, tan
 
 from pibs.ballistics.material import Material
 
@@ -851,12 +851,11 @@ class Recoilless(DelegatesPropellant):
         s = self.s
         gamma = self.theta + 1
 
-        s_j_bar = self.s_j_bar
-        a_bar = self.a_bar
-        r_s = 0.5 * self.caliber  # radius of the shot.
-        r_b = r_s * chi_k**0.5  # chamber/breech radius
-        r_t = r_b * s_j_bar**0.5  # throat radius
-        r_n = r_t * a_bar**0.5  # nozzle exit radius
+        # a_bar = self.a_bar
+        r = 0.5 * self.caliber  # radius of the shot.
+        r_c = r * chi_k**0.5  # chamber/breech radius
+        r_t = r_c * self.s_j_bar**0.5  # throat radius
+        r_n = r_t * self.a_bar**0.5  # nozzle exit radius
 
         x_probes = (
             [i / step * l_c for i in range(step)]
@@ -884,160 +883,84 @@ class Recoilless(DelegatesPropellant):
         for i in range(len(p_probes)):
             p_probes[i] *= self.ssf
 
-        # """
-        # subscript k denote the end of the chamber
-        # subscript b denote the throat of nozzle
-        # subscript a denote the nozzle base.
-        #
-        # beta is the half angle of the constriction section
-        # alpha is the half angle of the expansion section
-        # """
-        # beta = 45
-        # l_b = (r_b - r_t) / tan(beta * pi / 180)
-        # alpha = 15
-        # l_a = (r_n - r_t) / tan(alpha * pi / 180)
-        #
-        # p_entry = p_probes[0]
-        #
-        # neg_x_probes = (
-        #     [-l_b - l_a + l_a * i / step for i in range(step)]
-        #     + [-l_b - tol * l_a]
-        #     + [-l_b + l_b * i / step for i in range(step)]
-        #     + [0]
-        # )
-        # neg_p_probes = []
-        # neg_s_probes = []
-        #
-        # r_probes = []
-        #
-        # for x in neg_x_probes:
-        #     if x < -l_b:
-        #         k = (x + l_b + l_a) / l_a
-        #         r = k * r_t + (1 - k) * r_n
-        #         p = Recoilless.get_pr(gamma, (r / r_t) ** 2, tol)[1] * p_entry
-        #
-        #     else:
-        #         k = (x + l_b) / l_b
-        #         r = k * r_b + (1 - k) * r_t
-        #         p = Recoilless.get_pr(gamma, (r / r_t) ** 2, tol)[0] * p_entry
-        #
-        #     if p > 3**-0.5 * sigma:
-        #         raise ValueError(
-        #             f"Limit to conventional construction ({sigma * 1e-6:.3f} MPa)" + " exceeded in nozzle."
-        #         )
-        #
-        #     r_probes.append(r)
-        #     neg_p_probes.append(p)
-        #     neg_s_probes.append(pi * r**2)
-        #
-        # if self.is_af:
-        #     v_n, rho_n = Gun.vrho_k(neg_x_probes, neg_p_probes, neg_s_probes, sigma, tol)
-        #
-        # else:
-        #     v_n, rho_n = 0, []
-        #
-        #     for p in neg_p_probes:
-        #         y = p / sigma
-        #         rho = ((1 + y * (4 - 3 * y**2) ** 0.5) / (1 - 3 * y**2)) ** 0.5
-        #         rho_n.append(rho)
-        #
-        #     for i in range(len(neg_x_probes) - 1):
-        #         x_0, x_1 = neg_x_probes[i], neg_x_probes[i + 1]
-        #         h = x_1 - x_0
-        #         s_0, s_1 = neg_s_probes[i], neg_s_probes[i + 1]
-        #         rho_0, rho_1 = rho_n[i], rho_n[i + 1]
-        #         dv = 0.5 * ((rho_0**2 - 1) * s_0 + (rho_1**2 - 1) * s_1) * h
-        #         v_n += dv
+        """
+        subscript k denote the end of the chamber
+        subscript b denote the throat of nozzle
+        subscript a denote the nozzle base.
+
+        beta is the half angle of the constriction section
+        alpha is the half angle of the expansion section
+        """
+        beta = 30
+        l_b = (r_c - r_t) / tan(beta * pi / 180)
+        alpha = 15
+        l_a = (r_n - r_t) / tan(alpha * pi / 180)
+
+        p_entry = p_probes[0]
+        neg_x_probes = (
+            [-l_b - l_a + l_a * i / step for i in range(step)]
+            + [-l_b - tol * l_a]
+            + [-l_b + l_b * i / step for i in range(step)]
+            + [0]
+        )
+
+        r_probes, neg_ps, neg_ss = [], [], []
+
+        for x in neg_x_probes:
+            if x < -l_b:
+                k = (x + l_b + l_a) / l_a
+                r = k * r_t + (1 - k) * r_n
+                p = Recoilless.get_pr(gamma, (r / r_t) ** 2, tol)[1] * p_entry
+            else:
+                k = (x + l_b) / l_b
+                r = k * r_c + (1 - k) * r_t
+                p = Recoilless.get_pr(gamma, (r / r_t) ** 2, tol)[0] * p_entry
+
+            r_probes.append(r)
+            neg_ps.append(p)
+            neg_ss.append(pi * r**2)
+
+        if self.is_af:
+            v_n, k_n, m_n = Gun.barrel_autofrettage(neg_x_probes, neg_ps, neg_ss, sigma)
+        else:
+            v_n, k_n, m_n = Gun.barrel_monoblock(neg_x_probes, neg_ps, neg_ss, sigma)
 
         hull = []
-        #
-        # for x, r, rho in zip(neg_x_probes, r_probes, rho_n):
-        #     hull.append(OutlineEntry(x, r, r * rho))
+        for x, r, k, m in zip(neg_x_probes, r_probes, k_n, m_n):
+            hull.append(OutlineEntry(x, r, r * k, r * m))
 
-        # nozzle_mass = v_n * self.material.rho
+        nozzle_mass = v_n * self.material.rho
 
-        rho_probes = []
-        v = 0
+        i = step + 1
+        x_c, p_c = x_probes[:i], p_probes[:i]  # c for chamber
+        x_b, p_b = x_probes[i:], p_probes[i:]  # b for barrel
+
         if self.is_af:
-            """
-            m : r_n / r_i
-            k : r_o / r_i
-            n : p_vM_max / sigma
-            1 < m < k
-            The point of optimum autofrettage, or the minimum autofrettage
-            necessary to contain the working pressure, is
-            """
-            i = step + 1
-            x_c, p_c = x_probes[:i], p_probes[:i]  # c for chamber
-            x_b, p_b = x_probes[i:], p_probes[i:]  # b for barrel
-            # v_c, rho_c = Gun.vrho_k(x_c, p_c, [s * chi_k for _ in x_c], sigma, tol, k_min=rho_n[-1])  # c for chamber
-
-            v_c, rho_c = Gun.vrho_k(x_c, p_c, [s * chi_k for _ in x_c], sigma, tol)
-            v_b, rho_b = Gun.vrho_k(x_b, p_b, [s for _ in x_b], sigma, tol)  # b for bore
-
-            # k_max=rho_c[-1] * chi_k**0.5, p_ref=max(p_c)
-
-            v = v_c + v_b
-            rho_probes = rho_c + rho_b
-
+            v_c, k_c, m_c = Gun.barrel_autofrettage(x_c, p_c, [s * chi_k for _ in x_c], sigma)
+            v_b, k_b, m_b = Gun.barrel_autofrettage(x_b, p_b, [s for _ in x_b], sigma)
         else:
-            """
-            The yield criterion chosen here is the fourth strength
-            theory (von Mises) as it is generally accepted to be the most
-            applicable for this application.
+            v_c, k_c, m_c = Gun.barrel_monoblock(x_c, p_c, [s * chi_k for _ in x_c], sigma)
+            v_b, k_b, m_b = Gun.barrel_monoblock(x_b, p_b, [s for _ in x_b], sigma)
 
-            The limiting stress points circumferentially along the circumference of the barrel.
-
-            P_4 = sigma_e * (rho^2-1)/ (3*rho**4 + 1) ** 0.5
-            lim (x->inf) (x^2-1)/sqrt(3*x**4+1) = 1/sqrt(3)
-
-            the inverse of (x^2-1)/sqrt(3*x**4+1) is:
-            sqrt(
-                [-sqrt(-x**2*(3*x**2-4)) - 1]/(3 * x**2 - 1)
-            )
-            (x < -1 or x > 1)
-            and
-            sqrt(
-                [sqrt(-x**2*(3*x**2-4)) - 1]/(3 * x**2 - 1)
-            )
-            (x from -1 to 1)
-            """
-            for p in p_probes:
-                y = p / sigma
-                if y > 3**-0.5:
-                    raise ValueError(
-                        f"Limit to conventional construction ({sigma * 3*1e-6:.3f} MPa)" + " exceeded in tube section."
-                    )
-                rho = ((1 + y * (4 - 3 * y**2) ** 0.5) / (1 - 3 * y**2)) ** 0.5
-                rho_probes.append(rho)
-
-            for i in range(len(x_probes) - 1):
-                x_0 = x_probes[i]
-                x_1 = x_probes[i + 1]
-                rho_0 = rho_probes[i]
-                rho_1 = rho_probes[i + 1]
-                dv = (rho_1**2 + rho_0**2 - 2) * 0.5 * s * (x_1 - x_0)
-                if x_1 < l_c:
-                    v += dv * chi_k
-                else:
-                    v += dv
+        v = v_c + v_b
+        k_probes = k_c + k_b
+        m_probes = m_c + m_b
 
         tube_mass = v * self.material.rho
-
-        for x, rho in zip(x_probes, rho_probes):
+        for x, k, m in zip(x_probes, k_probes, m_probes):
             if x < l_c:
-                hull.append(OutlineEntry(x, r_b, rho * r_b))
+                hull.append(OutlineEntry(x, r_c, k * r_c, m * r_c))
             else:
-                hull.append(OutlineEntry(x, r_s, rho * r_s))
+                hull.append(OutlineEntry(x, r, k * r, m * r))
 
         recoilless_result.outline = hull
-        recoilless_result.tubeMass = tube_mass  # + nozzle_mass
+        recoilless_result.tubeMass = tube_mass + nozzle_mass
 
         logger.info("conducted structural calculation.")
 
     @staticmethod
     def get_ar(gamma, pr):
-        if pr == 0 or pr == 1:
+        if pr <= 0 or pr >= 1:
             return inf
         return (
             (0.5 * (gamma + 1)) ** (1 / (gamma - 1))
@@ -1054,7 +977,7 @@ class Recoilless(DelegatesPropellant):
 
         Ar: Nozzle cs area at probe point x over throat area
             Ar = Ax / At
-        Pr: pressure ratio at probe point x over upstream pressure
+        Pr: pressure ratio at probe point x over upstream chamber pressure
             Pr = Px / Pc
 
         returns:
@@ -1062,8 +985,7 @@ class Recoilless(DelegatesPropellant):
             Pr_sup: supersonic solution
 
         """
-
-        # pressure ratio of nozzle throat over the upstream pressure
+        # pressure ratio of nozzle throat over the upstream chamber pressure
         pr_c = (2 / (gamma + 1)) ** (gamma / (gamma - 1))
 
         if ar == 1:
@@ -1071,7 +993,6 @@ class Recoilless(DelegatesPropellant):
         else:
             pr_sup, _ = dekker(lambda pr: Recoilless.get_ar(gamma, pr), 0, pr_c, y=ar, y_rel_tol=tol)
             pr_sub, _ = dekker(lambda pr: Recoilless.get_ar(gamma, pr), pr_c, 1, y=ar, y_rel_tol=tol)
-
             return pr_sub, pr_sup
 
 

@@ -75,6 +75,7 @@ class OutlineEntry:
     x: float
     r_in: float
     r_ex: float
+    r_pej: float  # plastic elastic junction
 
 
 class DelegatesPropellant:

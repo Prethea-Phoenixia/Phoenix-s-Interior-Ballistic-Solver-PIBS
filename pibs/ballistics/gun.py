@@ -807,7 +807,7 @@ class Gun(DelegatesPropellant):
         chi_k = self.chi_k
         sigma = self.material.yield_strength
         s = self.s
-        r_c = r * chi_k**0.5  #
+        r_c = r * chi_k**0.5
         x_probes = (
             [i / step * l_c for i in range(step)]
             + [l_c * (1 - tol)]
@@ -832,80 +832,27 @@ class Gun(DelegatesPropellant):
         for i in range(len(p_probes)):
             p_probes[i] *= self.ssf
 
-        rho_probes = []
-        v = 0
+        i = step + 1
+        x_c, p_c = x_probes[:i], p_probes[:i]  # c for chamber
+        x_b, p_b = x_probes[i:], p_probes[i:]  # b for barrel
+
         if self.is_af:
-            """
-            m : r_a / r_i
-            k : r_o / r_i
-            n : p_vM_max / sigma
-
-            1 < m < k
-
-            The point of optimum autofrettage, or the minimum autofrettage
-            necessary to contain the working pressure, is
-            """
-            i = step + 1
-            x_c, p_c = x_probes[:i], p_probes[:i]  # c for chamber
-            x_b, p_b = x_probes[i:], p_probes[i:]  # b for barrel
-
-            v_c, rho_c = Gun.vrho_k(x_c, p_c, [s * chi_k for _ in x_c], sigma, tol)
-            v_b, rho_b = Gun.vrho_k(x_b, p_b, [s for _ in x_b], sigma, tol)
-
-            v = v_c + v_b
-            rho_probes = rho_c + rho_b
-
+            v_c, k_c, m_c = Gun.barrel_autofrettage(x_c, p_c, [s * chi_k for _ in x_c], sigma)
+            v_b, k_b, m_b = Gun.barrel_autofrettage(x_b, p_b, [s for _ in x_b], sigma)
         else:
-            """
-            The yield criterion chosen here is the fourth strength
-            theory (von Mises) as it is generally accepted to be the most
-            applicable for this application.
+            v_c, k_c, m_c = Gun.barrel_monoblock(x_c, p_c, [s * chi_k for _ in x_c], sigma)
+            v_b, k_b, m_b = Gun.barrel_monoblock(x_b, p_b, [s for _ in x_b], sigma)
 
-            The limiting stress points circumferentially along the circumference
-            of the barrel.
-
-            P_4 = sigma_e * (rho^2-1)/ (3*rho**4 + 1) ** 0.5
-            lim (x->inf) (x^2-1)/sqrt(3*x**4+1) = 1/sqrt(3)
-
-            the inverse of (x^2-1)/sqrt(3*x**4+1) is:
-            sqrt(
-                [-sqrt(-x**2*(3*x**2-4)) - 1]/(3 * x**2 - 1)
-            )
-            (x < -1 or x > 1)
-            and
-            sqrt(
-                [sqrt(-x**2*(3*x**2-4)) - 1]/(3 * x**2 - 1)
-            )
-            (x from -1 to 1)
-            """
-
-            for p in p_probes:
-                y = p / sigma
-                if y > 3**-0.5:
-                    raise ValueError(
-                        f"Limit to conventional construction ({sigma * 3*1e-6:.3f} MPa)" + " exceeded in section."
-                    )
-                rho = ((1 + y * (4 - 3 * y**2) ** 0.5) / (1 - 3 * y**2)) ** 0.5
-
-                rho_probes.append(rho)
-
-            for i in range(len(x_probes) - 1):
-                x_0 = x_probes[i]
-                x_1 = x_probes[i + 1]
-                rho_0 = rho_probes[i]
-                rho_1 = rho_probes[i + 1]
-                dv = (rho_1**2 + rho_0**2 - 2) * 0.5 * s * (x_1 - x_0)
-                if x_1 < l_c:
-                    v += dv * chi_k
-                else:
-                    v += dv
+        v = v_c + v_b
+        k_probes = k_c + k_b
+        m_probes = m_c + m_b
 
         hull = []
-        for x, rho in zip(x_probes, rho_probes):
+        for x, k, m in zip(x_probes, k_probes, m_probes):
             if x < l_c:
-                hull.append(OutlineEntry(x, r_c, rho * r_c))
+                hull.append(OutlineEntry(x, r_c, k * r_c, m * r_c))
             else:
-                hull.append(OutlineEntry(x, r, rho * r))
+                hull.append(OutlineEntry(x, r, k * r, m * r))
 
         gun_result.outline = hull
         gun_result.tubeMass = v * self.material.rho
@@ -913,83 +860,70 @@ class Gun(DelegatesPropellant):
         logger.info("conducted structural calculation.")
 
     @staticmethod
-    def vrho_k(
-        x_s: list[float],  # probe location
-        p_s: list[float],  # probe pressure
-        s_s: list[float],  # probe cross-section area
+    def barrel_autofrettage(
+        xs: list[float],  # probe location
+        ps: list[float],  # probe pressure
+        ss: list[float],  # probe cross-section area
         yield_strength: float,  # yield strength
-        tol: float,  # tolerance
-    ):
+    ) -> tuple[float, list[float], list[float]]:
+        """
+        m : r_a / r_i
+        k : r_o / r_i
+        n : p_vM_max / sigma
 
-        def sigma_min(m, p):
-            """
-            the limit as k -> +inf for the stress is:
+        1 < m < k
 
-            lim sigma_tresca =
-             k-> +inf =
-              sigma * [1 - (1 + 2 ln(m))/m**2 ] + 2p/m**2
-            """
-            return (yield_strength * (1 - (1 + 2 * log(m)) / m**2) + 2 * p / m**2) * (3**0.5 * 0.5)
+        m_opt = exp(p / sigma_y)
+        P_y,i = sigma_y / 2 * (2 * ln(m) + 1 - (m/k)^2)
+        P_y,o = sigma_y / 2 * (2 * ln(m) + k^2 - m^2)
+        """
+        v, ks, ms = 0.0, [], []
 
-        rhos = []
-        v = 0
-        for p in p_s:
-            m_opt = exp(p / yield_strength * 3**0.5 * 0.5)  # optimum autofrettage ratio (von Mises)
-            sigma_inf = sigma_min(m_opt, p)  # minimum stress at the autofrettage juncture with infinite thick walls
+        for _p in ps:
+            m_opt = exp(_p / yield_strength)  # Tresca
+            k = m_opt  # full autofrettage
+            ks.append(k)
+            ms.append(m_opt)
 
-            if sigma_inf > yield_strength:
-                raise ValueError(
-                    "Plastic-elastic junction stress exceeds material "
-                    + f"yield ({yield_strength * 1e-6:.3f} MPa) for autofrettage construction."
-                )
-            else:  # finite thickness exist able to contain the pressure.
-                rho, _ = secant(
-                    lambda k: Gun.sigma_von_mises(k, p, m_opt, yield_strength),
-                    1 + tol,
-                    1 + 2 * tol,
-                    y=yield_strength,
-                    x_min=1,
-                    y_rel_tol=tol,
-                )
-
-            rhos.append(rho)
-
-        for i in range(len(x_s) - 1):
-            x_0, x_1 = x_s[i], x_s[i + 1]
-            s_0, s_1 = s_s[i], s_s[i + 1]
-            rho_0, rho_1 = rhos[i], rhos[i + 1]
-            dv = 0.5 * ((rho_0**2 - 1) * s_0 + (rho_1**2 - 1) * s_1) * (x_1 - x_0)
+        for i in range(len(xs) - 1):
+            x_0, x_1 = xs[i], xs[i + 1]
+            s_0, s_1 = ss[i], ss[i + 1]
+            k_0, k_1 = ks[i], ks[i + 1]
+            dv = 0.5 * ((k_0**2 - 1) * s_0 + (k_1**2 - 1) * s_1) * (x_1 - x_0)
             v += dv
-        return v, rhos
+        return v, ks, ms
 
     @staticmethod
-    def sigma_von_mises(k, p, m, sigma):
+    def barrel_monoblock(
+        xs: list[float],  # probe location
+        ps: list[float],  # probe pressure
+        ss: list[float],  # probe cross-section area
+        yield_strength: float,  # yield strength
+    ) -> tuple[float, list[float], list[float]]:
         """
-        k       : probing point, radius ratio
-        p       : working pressure (from within)
-        m       : autofrettage (plastically yielded region) rim radius over barrel radius.
-        sigma   : material yield strength
-
-        Calculate the von Misses stress at point radius ratio k.
-        When supplied with k = m, the result is for at plastic-elastic
-        juncture. This is the limiting stress point for an autofrettage
-        gun barrel under internal pressure loading.
-
-        In general, for increasing m up until m=k, the ability of a barrel to
-        tolerate stress increase.
+        P_tr, i = sigma_y (k^2 - 1)/(2 * k^2)
+        P_tr, o = sigma_y (k^2 - 1)/2
         """
+        v, ks, ms = 0.0, [], []
 
-        if k == 1:
-            sigma_tresca = inf
-        else:
-            if m == 1:
-                sigma_tresca = 2 * p * k**2 / (k**2 - 1)
-            else:
-                sigma_tresca = (
-                    sigma * (k / m) ** 2 * ((m / k) ** 2 - (1 - (m / k) ** 2 + 2 * log(m)) / (k**2 - 1))
-                    + 2 * p / (k**2 - 1) * (k / m) ** 2
+        for p in ps:
+            if p > yield_strength * 0.5:
+                raise ValueError(
+                    f"Limit to conventional construction ({yield_strength * 0.5 * 1e-6:.3f} MPa)"
+                    + " exceeded in section."
                 )
-        return sigma_tresca * 3**0.5 * 0.5  # convert Tresca to von Misses equivalent stress
+            k = (1 - 2 * p / yield_strength) ** -0.5  # Tresca criteria
+            ks.append(k)
+            ms.append(1)
+
+        for i in range(len(xs) - 1):
+            x_0, x_1 = xs[i], xs[i + 1]
+            s_0, s_1 = ss[i], ss[i + 1]
+            k_0, k_1 = ks[i], ks[i + 1]
+            dv = 0.5 * ((k_0**2 - 1) * s_0 + (k_1**2 - 1) * s_1) * (x_1 - x_0)
+            v += dv
+
+        return v, ks, ms
 
 
 if __name__ == "__main__":
