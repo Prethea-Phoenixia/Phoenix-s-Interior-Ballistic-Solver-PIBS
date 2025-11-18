@@ -156,3 +156,8 @@ cython_debug/
 # VSCode
 # Exclude .vscode folder
 .vscode/
+
+
+# Proxy AI stuff
+.proxyai/
+*proxyAI*

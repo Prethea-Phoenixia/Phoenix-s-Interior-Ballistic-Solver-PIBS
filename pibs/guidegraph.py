@@ -1,125 +1,96 @@
+from __future__ import annotations
+
 import logging
 import multiprocessing
-
 from itertools import repeat
-from math import inf
-from typing import Optional
 
 import psutil
+from tqdm import tqdm
 
-from .ballistics import (
-    CONVENTIONAL,
-    POINT_BURNOUT,
-    RECOILLESS,
-    Constrained,
-    ConstrainedRecoilless,
-    Domains,
-    Gun,
-    GunTypes,
-    Points,
-    Propellant,
-    Recoilless,
-    Solutions,
-)
-
-logger = logging.getLogger(__name__)
+from .ballistics import CONVENTIONAL, POINT_BURNOUT, RECOILLESS, POINT_EXIT
+from .ballistics.constrained_gun import ConstrainedGun
+from .ballistics.constrained_recoilless import ConstrainedRecoilless
+from .ballistics.gun import Gun
+from .ballistics.recoilless import Recoilless
 
 
-def starstarmap(pool, fn, args_iter, kwargs_iter):
+class TqdmLogger:
+    """File-like class redirecting tqdm progress bar to given logging logger."""
+
+    def __init__(self, logger: logging.Logger):
+        self.logger = logger
+        self.string_buffer = ""
+
+    def write(self, msg: str) -> None:
+        self.string_buffer += msg.strip("\r\n\t ")
+
+    def flush(self) -> None:
+        self.logger.info(self.string_buffer)
+        self.string_buffer = ""
+
+
+def starstarmap(
+    pool,
+    fn,
+    args_iter,
+    kwargs_iter,
+    tqdm_kwargs: dict,
+    tqdm_total: int,
+    chunksize: int | None = None,
+):
     args_for_starmap = zip(repeat(fn), args_iter, kwargs_iter)
-    return pool.starmap(apply_args_and_kwargs, args_for_starmap)
+    return pool.starmap(
+        func=apply_args_and_kwargs,
+        iterable=tqdm(args_for_starmap, total=tqdm_total, **tqdm_kwargs),
+        chunksize=chunksize,
+    )
 
 
 def apply_args_and_kwargs(fn, args, kwargs):
     return fn(*args, **kwargs)
 
 
-OptionalFloat = Optional[float]
-
-
 def f(
-    target: Constrained,
+    target: ConstrainedGun,
     load_fraction: float,
     charge_mass_ratio: float,
-    caliber: float,
-    propellant: Propellant,
-    drag_coefficient: float,
-    nozzle_expansion: float,
-    nozzle_efficiency: float,
-    tol: float,
-    min_web: float,
-    max_length: float,
-    ambient_rho: float,
-    ambient_p: float,
-    ambient_gamma: float,
-    control: Points,
-    sol: Solutions,
-    dom: Domains,
-    typ: GunTypes,
-    *_,
-    **__,
-):
+    **kwargs,
+) -> tuple[float, float, float | None, float | None, float | None, float | None]:
 
     charge_mass = target.m * charge_mass_ratio
     load_density = load_fraction * target.propellant.rho_p
     try:
-        half_web, length_gun = target.solve(
-            load_fraction,
-            charge_mass_ratio,
-            tol=tol,
-            minWeb=min_web,
-            maxLength=max_length,
-            sol=sol,
-            ambientRho=ambient_rho,
-            ambientP=ambient_p,
-            ambientGamma=ambient_gamma,
-            control=control,
-        )
+        half_web, length_gun = target.solve(load_fraction=load_fraction, charge_mass_ratio=charge_mass_ratio)
 
         chamber_volume = charge_mass / load_density
 
-        if typ == CONVENTIONAL:
-            gun = Gun(
-                caliber=caliber,
-                shot_mass=target.m,
-                propellant=propellant,
-                web=2 * half_web,
-                charge_mass=charge_mass,
-                chamber_volume=chamber_volume,
-                start_pressure=target.p_0,
-                length_gun=length_gun,
-                chambrage=target.chi_k,
-                drag_coefficient=drag_coefficient,
-            )
-        elif typ == RECOILLESS:
-            gun = Recoilless(
-                caliber=caliber,
-                shot_mass=target.m,
-                propellant=propellant,
-                web=2 * half_web,
-                charge_mass=charge_mass,
-                chamber_volume=chamber_volume,
-                start_pressure=target.p_0,
-                length_gun=length_gun,
-                chambrage=target.chi_k,
-                drag_coefficient=drag_coefficient,
-                nozzle_expansion=nozzle_expansion,
-                nozzle_efficiency=nozzle_efficiency,
-            )
+        if kwargs["typ"] == CONVENTIONAL:
+            gun_class = Gun
+        elif kwargs["typ"] == RECOILLESS:
+            gun_class = Recoilless
         else:
-            raise ValueError("unknown gun type")
+            raise ValueError("Unknown gun type")
 
-        gun_result = gun.integrate(
-            step=0, tol=tol, dom=dom, sol=sol, ambient_rho=ambient_rho, ambient_p=ambient_p, ambient_gamma=ambient_gamma
+        gun = gun_class(
+            **{
+                **kwargs,
+                **{
+                    "web": 2 * half_web,
+                    "charge_mass": charge_mass,
+                    "chamber_volume": chamber_volume,
+                    "length_gun": length_gun,
+                },
+            }
         )
+
+        gun_result = gun.integrate(**{**kwargs, **{"step": 0}})
 
         try:
             burnout = gun_result.read_table_data(POINT_BURNOUT).travel / length_gun
         except ValueError:
-            burnout = inf
+            burnout = 1 / gun_result.read_table_data(POINT_EXIT).burnup
 
-        tube_volume = length_gun * target.s
-        volume = chamber_volume + tube_volume  # convert to liters
+        volume = chamber_volume + length_gun * target.s  # convert to liters
 
     except ValueError:
         half_web, length_gun, volume, burnout = None, None, None, None
@@ -127,49 +98,63 @@ def f(
     return load_density, charge_mass, half_web, length_gun, volume, burnout
 
 
-def guide_graph(*_, **kwargs):
+def guide_graph(*_, logger: logging.Logger | None = None, **kwargs):
+    logger = logger if logger else logging.getLogger(__name__)
+    tqdm_logger = TqdmLogger(logger)
+    tqdm_kwargs = dict(
+        file=tqdm_logger,
+        ascii=False,
+        miniters=1,
+        ncols=40,
+        bar_format="[{elapsed_s:5.1f}s]{bar}[{remaining_s:5.1f}s]{percentage:5.1f}%",
+        smoothing=0.3,
+    )
+
     typ = kwargs["typ"]
 
     if typ == CONVENTIONAL:
-        target = Constrained(**kwargs)
+        target = ConstrainedGun(**kwargs)
     elif typ == RECOILLESS:
         target = ConstrainedRecoilless(**kwargs)
     else:
         raise ValueError("unknown gun type")
 
-    load_fractions, charge_mass_ratios, charge_masses, load_densities = [], [], [], []
+    cmrs = []
 
-    min_cmr, max_cmr, step_cmr = (kwargs[k] for k in ("min_cmr", "max_cmr", "step_cmr"))
+    min_cmr, max_cmr, step_cmr, step_lf = (kwargs[k] for k in ("min_cmr", "max_cmr", "step_cmr", "step_lf"))
+
     charge_mass_ratio = min_cmr
     while charge_mass_ratio < max_cmr + 0.5 * step_cmr:
-        charge_mass_ratios.append(charge_mass_ratio)
-        charge_masses.append(charge_mass_ratio * target.m)
+        cmrs.append(charge_mass_ratio)
         charge_mass_ratio += step_cmr
 
-    min_lf, max_lf, step_lf = (kwargs[k] for k in ("min_lf", "max_lf", "step_lf"))
-    load_fraction = min_lf
+    processes = psutil.cpu_count(logical=False)
+    logger.info(f"Dispatching {processes:} processes for finding maximum load fractions.")
 
-    while load_fraction < max_lf + 0.5 * step_lf:
-        load_fractions.append(load_fraction)
-        load_densities.append(load_fraction * target.propellant.rho_p)
-        load_fraction += step_lf
+    with multiprocessing.Pool(processes=processes) as pool:
+        lfmaxs = pool.map(func=target.maximum_load_fraction, iterable=tqdm(cmrs, **tqdm_kwargs))
 
     parameters = []
-    for charge_mass_ratio in charge_mass_ratios:
-        for load_fraction in load_fractions:
+    for charge_mass_ratio, max_lf in zip(cmrs, lfmaxs):
+        load_fraction = target.minimum_load_fraction
+
+        while load_fraction < max_lf + 0.5 * step_lf:
+            load_fraction += step_lf
+
             kv = {k: v for k, v in kwargs.items()}
             kv.update({"load_fraction": load_fraction, "charge_mass_ratio": charge_mass_ratio})
             parameters.append(kv)
 
-    processes = psutil.cpu_count(logical=False)
-    logger.info(f"dispatching {processes:}-process for constructing guidance diagram.")
+    logger.info(f"Dispatching {processes:} processes for constructing guidance diagram.")
 
-    # parallel implementation
     with multiprocessing.Pool(processes=processes) as pool:
-        results = starstarmap(pool, f, repeat([target], len(parameters)), parameters)
+        results = starstarmap(
+            pool=pool,
+            fn=f,
+            args_iter=repeat([target], len(parameters)),
+            kwargs_iter=parameters,
+            tqdm_kwargs=tqdm_kwargs,
+            tqdm_total=len(parameters),
+        )
 
-    shaped_results = [
-        results[i * len(load_fractions) : (i + 1) * len(load_fractions)] for i in range(len(charge_mass_ratios))
-    ]
-
-    return shaped_results
+    return [result for result in results if result[2]]
