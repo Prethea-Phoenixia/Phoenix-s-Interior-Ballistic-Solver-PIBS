@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import logging
 import sys
 import traceback
 from math import inf
-from typing import TypeVar, Callable
-import logging
+from typing import Callable, TypeVar
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def rkf(
     betas: tuple[tuple[float, ...], ...] = (),
     cs: tuple[float, ...] = (),
     c_hats: tuple[float, ...] = (),
-) -> tuple[float, T]:
+) -> tuple[float, T, bool]:
     """
     use Runge Kutta Fehlberg of 7(8)th power to solve system of equation
     as defined by dFunc
@@ -70,7 +70,7 @@ def rkf(
         c_hats      : as above
 
     Returns:
-        x_1, (y1, y2, y3...)|x = x_1
+        x_1, (y1, y2, y3...)|x = x_1, abort
     """
     if record is None:
         record = []
@@ -82,7 +82,7 @@ def rkf(
     all_k = [list() for _ in range(13)]
 
     if h == 0:
-        return x, y_this
+        return x, y_this, False
 
     while (h > 0 and x < x_1) or (h < 0 and x > x_1):
         if (x + h) == x:
@@ -152,9 +152,9 @@ def rkf(
                 if debug:
                     handle_record(record=record)
 
-                return x, y_this
+                return x, y_this, True
 
-            record.append((x, list(y_this)))
+            record.append((x, tuple(y_this)))
 
         delta = beta * abs(1 / max_relative_error) ** (1 / (order + 1)) if max_relative_error else inf
         h *= min(max(delta, 0.125), 2)
@@ -168,7 +168,7 @@ def rkf(
             "Premature Termination of Integration due to vanishing step size," + " x at {}, h at {}.".format(x, h)
         )
 
-    return x, y_this
+    return x, y_this, False
 
 
 def rkf78(
@@ -182,7 +182,7 @@ def rkf78(
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] = None,
     record: list[tuple[float, T]] = None,
     debug: bool = False,
-) -> tuple[float, T]:
+) -> tuple[float, T, bool]:
     """
     use Runge Kutta Fehlberg of 7(8)th order to solve system of equation
     defined by dFunc
@@ -266,7 +266,7 @@ def rkf45(
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] = None,
     record: list[tuple[float, T]] = None,
     debug: bool = False,
-) -> tuple[float, T]:
+) -> tuple[float, T, bool]:
     """
     use Runge Kutta Fehlberg of 4(5)th order to solve system of equation
     as defined by dFunc
@@ -341,7 +341,7 @@ def rkf34(
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] = None,
     record: list[tuple[float, T]] = None,
     debug: bool = False,
-) -> tuple[float, T]:
+) -> tuple[float, T, bool]:
     """
     use Runge Kutta Fehlberg of 3(4)th order to solve system of equation
     as defined by dFunc
@@ -409,7 +409,7 @@ def rkf23(
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] = None,
     record: list[tuple[float, T]] = None,
     debug: bool = False,
-) -> tuple[float, T]:
+) -> tuple[float, T, bool]:
     """
     use Runge Kutta Fehlberg of 2nd(3rd) order to solve system of equation
     defined by dFunc
@@ -480,7 +480,7 @@ def main():
         t_0 = time.time()
         v = (0,)
         for _ in range(100):
-            _, v = function(df, (3,), 2, 0, rel_tol=1e-4, abs_tol=1e-4, min_tol=1e-14, debug=False)
+            _, v, _ = function(df, (3,), 2, 0, rel_tol=1e-4, abs_tol=1e-4, min_tol=1e-14, debug=False)
         t_1 = time.time()
 
         print(f"time: {t_1 - t_0}")

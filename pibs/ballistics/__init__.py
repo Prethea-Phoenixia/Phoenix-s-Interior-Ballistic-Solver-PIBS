@@ -1,6 +1,5 @@
 from __future__ import annotations
-
-from typing import Literal, Union
+from typing import Literal, Union, TypeVar
 
 DOMAIN_TIME = "DOMAIN_TIME"
 DOMAIN_LEN = "DOMAIN_LEN"
@@ -38,6 +37,11 @@ SOL_LAGRANGE = "SOL_LAGRANGE"
 SOL_PIDDUCK = "SOL_PIDDUCK"
 SOL_MAMONTOV = "SOL_MAMONTOV"
 
+
+MIN_BARR_VOLUME = "MIN_BARR_VOLUME"  # minimum bore volume
+MIN_PROJ_TRAVEL = "MIN_PROJ_TRAVEL"  # minimum barrel length
+Optimization_Targets = Union[Literal["MIN_BARR_VOLUME", "MIN_PROJ_TRAVEL"], str]
+
 Solutions = Union[Literal["SOL_LAGRANGE", "SOL_PIDDUCK", "SOL_MAMONTOV"], str]
 
 CONVENTIONAL = "CONVENTIONAL"
@@ -45,21 +49,23 @@ RECOILLESS = "RECOILLESS"
 
 GunTypes = Union[Literal["CONVENTIONAL", "RECOILLESS"], str]
 
-#  maximum number of guesses taken to find valid load fraction.
-MAX_GUESSES = 100
 # maximum iteration to correct for chambrage effects.
 MAX_ITER = 10
 
-from .gun import (
-    GenericEntry,
-    GenericResult,
-    Gun,
-    OutlineEntry,
-    PressureProbePoint,
-    PressureTraceEntry,
-)
+
+T = TypeVar("T")
+
+
+class JSONable:
+    def to_json(self) -> str: ...
+
+    @classmethod
+    def from_json(cls: T, json_dict: dict) -> T: ...
+
+
+from .gun import GenericEntry, GenericResult, Gun, OutlineEntry, PressureProbePoint, PressureTraceEntry
 from .material import Material
-from .optimize_gun import Constrained
-from .optimize_recoilless import ConstrainedRecoilless
+from .constrained_gun import ConstrainedGun
+from .constrained_recoilless import ConstrainedRecoilless
 from .prop import Composition, Geometry, MultPerfGeometry, Propellant, SimpleGeometry
 from .recoilless import Recoilless

@@ -1,8 +1,8 @@
 type,description,adiabatic index,density kg/m^3,force J/kg,covolume m^3/kg,pressure exponent,burnrate coefficient m/s/Pa^n,isochoric adb flame temp K
 P-5 BPfl,"High Nitrogen Single Base\n*---------- High Nitrated Pyroxylin\n 2.2 - 4.1% Dimethacrylate (Bis-Triethylene Glycol) Phthalate\n 1.4 - 3.2% Volatile\n 1.0 - 2.0% Diphenyl Amine\n 0.1 - 0.5% Potassium Sulphate\n 0.05-0.15% Graphite. From table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.236,1600,988000,1.038e-3,1.0,7.1951e-10,2800
 Pyroxylin (BP),"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.255,1600,904000,1.098e-3,0.83,2e-8,2375
-Pyroxylin,"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.227,1600,1000000,1.016e-3,0.83,1.8e-8,2870
-Pyroxylin (V/A),"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.222,1600,1016000,1.007e-3,0.83,1.9e-8,2970
+Pyroxylin,"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.227,1600,1000000,1.016e-3,0.83,2e-8,2870
+Pyroxylin (V/A),"See table P.14 in физические основы устройства и функционирования стрелково-пушечного, артиллерийского и ракетного еружия часть 1",1.222,1600,1016000,1.007e-3,0.83,2e-8,2970
 High Nitration Single Base,"86式100滑主装药高氮量单基药的研制",1.235,1600,1047000,0.92e-3,0.83,2e-8,3075
 ZT,"64.0% Nitrocellulose (13.15% Nitration)\n16.0% Nitroglycerin\n11.0% TEGN\n 6.5% DNT\n 2.0% Centralite\n0.5% TiO2\nDeveloped as TG-110",1.2375,1600,1078550,1.0e-3,1.0,0.83e-9,3136
 ZT-12A,"60.0% Nitrocellulose\n28.0% Nitroglycerin\n 9.5% TEGN\n 2.0% Centralite\n 0.5% TiO2\nThermalchemical properties assumed the same as TG-115/ZT-2",1.23,1600,1127800,1.0e-3,0.67,5e-7,3381

@@ -1,5 +1,7 @@
 import os
+
 import PyInstaller.__main__
+
 from pibs import __version__
 
 if __name__ == "__main__":
