@@ -45,6 +45,7 @@ class RecoillessTableEntry(GenericEntry):
     outflow_velocity: float
     stag_pressure: float
     outflow_fraction: float
+    rel_stag_point: float
 
 
 @dataclass
@@ -645,7 +646,7 @@ class Recoilless(DelegatesPropellant):
             p = p_bar * p_scale
             temp = tau * self.T_v if self.T_v else None
 
-            ps, p0, pb, vb = self.to_ps_p0_pb_vb(l, v, p, tau, eta)
+            ps, p0, pb, vb, stag = self.to_ps_p0_pb_vb(l, v, p, tau, eta)
 
             p_line = []
             for i in range(trace_step):  # 0....step -1
@@ -671,6 +672,7 @@ class Recoilless(DelegatesPropellant):
                     shot_pressure=ps,
                     temperature=temp,
                     outflow_fraction=eta,
+                    rel_stag_point=stag,
                 )
             )
 
@@ -680,7 +682,7 @@ class Recoilless(DelegatesPropellant):
                 continue
             l, v, p, temp = (l_bar * self.l_0, v_bar * self.v_j, p_bar * p_scale, tau * self.T_v if self.T_v else None)
 
-            ps, p0, pb, vb = self.to_ps_p0_pb_vb(l, v, p, tau, eta)
+            ps, p0, pb, vb, stag = self.to_ps_p0_pb_vb(l, v, p, tau, eta)
 
             p_line = []
             for i in range(trace_step):  # 0....step -1
@@ -706,6 +708,7 @@ class Recoilless(DelegatesPropellant):
                     shot_pressure=ps,
                     temperature=temp,
                     outflow_fraction=eta,
+                    rel_stag_point=stag,
                 )
             )
 
@@ -735,7 +738,7 @@ class Recoilless(DelegatesPropellant):
         if tag == POINT_PEAK_AVG:
             return p_bar, (z, l_bar, v_bar, eta, tau)
 
-        ps_bar, p0_bar, pb_bar, _ = self.to_ps_p0_pb_vb(l_bar * self.l_0, v_bar * self.v_j, p_bar, tau, eta)
+        ps_bar, p0_bar, pb_bar, _, _ = self.to_ps_p0_pb_vb(l_bar * self.l_0, v_bar * self.v_j, p_bar, tau, eta)
 
         if tag == POINT_PEAK_BREECH:
             return ps_bar, (z, l_bar, v_bar, eta, tau)
@@ -796,15 +799,13 @@ class Recoilless(DelegatesPropellant):
         vb = m_dot * (self.V_0 + self.s * l) / (sb * (self.w - y))
         # velocity impinging upon the rear of the breech before nozzle constriction
 
-        h_1 = vb / v if v != 0 else inf
-        h_2 = 2 * self.phi_1 * self.m / (self.w - y) + 1
-        h = min(h_1, h_2)
+        h = min(inf if v == 0 else (vb / v), 2 * self.phi_1 * self.m / (self.w - y) + 1)
 
         ps = p / (1 + (self.w - y) / (3 * self.phi_1 * self.m) * (1 - 0.5 * h))  # shot base pressure
         p0 = ps * (1 + (self.w - y) / (2 * self.phi_1 * self.m) * (1 + h) ** -1)  # stagnation point pressure
-        pb = ps * (1 + (self.w - y) / (2 * self.phi_1 * self.m) * (1 - h)) if h == h_1 else 0  # breech pressure
-        # l0 = H / (1 + H) * l  # location of the stagnation point
-        return ps, p0, pb, vb
+        pb = ps * (1 + (self.w - y) / (2 * self.phi_1 * self.m) * (1 - h))  # breech pressure
+        stag = h / (1 + h)  # relative location of the stagnation point
+        return ps, p0, pb, vb, stag
 
     def to_px(self, l, v, vb, ps, eta, x):
         m = self.m
@@ -828,10 +829,7 @@ class Recoilless(DelegatesPropellant):
         else:
             z = (l_0 * a_0 + (x - l_0) * a_1) / (l_0 * a_0 + l_1 * a_1)
 
-        h_1 = vb / v if v != 0 else inf
-        h_2 = 2 * phi_1 * self.m / (self.w - y) + 1
-        h = min(h_1, h_2)
-
+        h = min(inf if v == 0 else (vb / v), 2 * phi_1 * self.m / (self.w - y) + 1)
         px = ps * (1 + (w - y) / (2 * phi_1 * m) * (1 + h) * (1 - z**2) - (w - y) / (phi_1 * m) * h * (1 - z))
         return px
 

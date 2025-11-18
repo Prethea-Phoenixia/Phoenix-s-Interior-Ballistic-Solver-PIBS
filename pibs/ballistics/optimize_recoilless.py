@@ -193,17 +193,14 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 m_dot = c_a * v_j * s_j * p_bar * delta / (tau**0.5)
                 vb = m_dot * (vol_0 + s * l_bar * l_0) / (sb * (w - y))
 
-                h_1, h_2 = vb / (v_j * v_bar) if v_bar != 0 else inf, 2 * phi_1 * m / (w - y) + 1
-
-                h = min(h_1, h_2)
-
+                h = min(inf if v_bar == 0 else (vb / (v_j * v_bar)), 2 * phi_1 * m / (w - y) + 1)
                 p_s_bar = p_bar / (1 + (w - y) / (3 * phi_1 * m) * (1 - 0.5 * h))
                 if self.control == POINT_PEAK_SHOT:
                     return p_s_bar
                 elif self.control == POINT_PEAK_STAG:
                     return p_s_bar * (1 + (w - y) / (2 * phi_1 * m) * (1 + h) ** -1)
                 elif self.control == POINT_PEAK_BREECH:
-                    return p_s_bar * (1 + (w - y) / (2 * phi_1 * m) * (1 - h)) if h == h_1 else 0
+                    return p_s_bar * (1 + (w - y) / (2 * phi_1 * m) * (1 - h))
                 else:
                     raise ValueError("tag unhandled.")
 
@@ -371,9 +368,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
         ) -> tuple[float, float, float, float, float]:
             _, z, l_bar, eta, tau = tzletatau
             psi = f_psi_z(z)
-
-            dpsi = f_sigma_z(z)  # dpsi/dZ
-
+            dpsi = f_sigma_z(z)
             l_psi_bar = 1 - delta * ((1 - psi) / rho_p + alpha * (psi - eta))
             p_bar = max(tau / (l_bar + l_psi_bar) * (psi - eta), p_a_bar)
 

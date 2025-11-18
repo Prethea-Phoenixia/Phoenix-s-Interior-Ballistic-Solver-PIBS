@@ -454,15 +454,21 @@ class InteriorBallisticsFrame(LocalizedFrame):
             plot_frm.columnconfigure(i, weight=1)
 
         j = 1
-        self.plot_avg_p, self.plot_base_p, self.plot_breech_p, self.plot_stag_p = (
+        self.plot_avg_p, self.plot_base_p, self.plot_breech_p = (
             self.add_localized_label_check(parent=plot_frm, label_loc_key=label, desc_label_key=None, row=j, col=k)
-            for k, label in enumerate(("plotAvgP", "plotBaseP", "plotBreechP", "plotStagP"))
+            for k, label in enumerate(("plotAvgP", "plotBaseP", "plotBreechP"))
         )
 
         j += 1
-        self.plot_vel, self.plot_nozzle_v, self.plot_burnup, self.plot_eta = (
+        self.plot_vel, self.plot_nozzle_v, self.plot_burnup = (
             self.add_localized_label_check(parent=plot_frm, label_loc_key=label, desc_label_key=None, row=j, col=k)
-            for k, label in enumerate(("plotVel", "plotNozzleV", "plotBurnup", "plotEta"))
+            for k, label in enumerate(("plotVel", "plotNozzleV", "plotBurnup"))
+        )
+
+        j += 1
+        self.plot_stag_p, self.plot_stag_l, self.plot_eta = (
+            self.add_localized_label_check(parent=plot_frm, label_loc_key=label, desc_label_key=None, row=j, col=k)
+            for k, label in enumerate(("plotStagP", "plotStagL", "plotEta"))
         )
 
         plot_frm.columnconfigure(0, weight=1)
@@ -1433,6 +1439,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.plot_base_p,
             self.plot_breech_p,
             self.plot_stag_p,
+            self.plot_stag_l,
             self.plot_vel,
             self.plot_nozzle_v,
             self.plot_burnup,
@@ -1992,10 +1999,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 gun_type = self.kwargs["typ"]
                 dom = self.kwargs["dom"]
 
-                xs, vs, vxs, pas, pss, pbs, p0s, psis, etas = [], [], [], [], [], [], [], [], []
+                xs, vs, vxs, pas, pss, pbs, p0s, psis, etas, stags = [], [], [], [], [], [], [], [], [], []
 
                 for entry in self.gun_result.table_data:
-                    tag, (time, l, psi, v, pb, p, ps, temp, vx, p0, eta) = "", repeat(0.0, 11)
+                    tag, (time, l, psi, v, pb, p, ps, temp, vx, p0, eta, stag) = "", repeat(0.0, 12)
 
                     tag = entry.tag
                     time = entry.time
@@ -2008,13 +2015,13 @@ class InteriorBallisticsFrame(LocalizedFrame):
                         vx = entry.outflow_velocity
                         p0 = entry.stag_pressure
                         eta = entry.outflow_fraction
+                        stag = entry.rel_stag_point
 
                     p = entry.avg_pressure
                     ps = entry.shot_pressure
 
                     if tag == self.p_control.get():
                         x_peak = (time * 1e3) if dom == DOMAIN_TIME else l
-                        # noinspection PyTypeChecker
                         self.ax_p.spines.left.set_position(("data", x_peak))
 
                     if dom == DOMAIN_TIME:
@@ -2024,34 +2031,34 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
                     vs.append(v)
                     vxs.append(vx)
-                    pas.append(p / 1e6)
-                    pss.append(ps / 1e6)
-                    pbs.append(pb / 1e6)
-                    p0s.append(p0 / 1e6)
+                    pas.append(p * 1e-6)
+                    pss.append(ps * 1e-6)
+                    pbs.append(pb * 1e-6)
+                    p0s.append(p0 * 1e-6)
                     psis.append(psi)
                     etas.append(eta)
+                    stags.append(stag)
 
                 if self.plot_breech_p.get():
                     self.ax_p.plot(
                         xs,
                         pbs,
                         c="xkcd:goldenrod",
-                        label=(
-                            self.get_loc_str("figBreech")
-                            if gun_type == CONVENTIONAL
-                            else self.get_loc_str("figNozzleP")
-                        ),
+                        label=(self.get_loc_str("figBreech" if gun_type == CONVENTIONAL else "figNozzleP")),
                     )
 
                 if gun_type == RECOILLESS:
                     if self.plot_stag_p.get():
                         self.ax_p.plot(xs, p0s, "seagreen", label=self.get_loc_str("figStagnation"))
 
+                    if self.plot_stag_l.get():
+                        self.ax.plot(xs, stags, "mediumorchid", label=self.get_loc_str("figStagL"))
+
                     if self.plot_nozzle_v.get():
-                        self.ax_v.plot(xs, vxs, "royalblue", label=self.get_loc_str("figNozzleV"))
+                        self.ax_v.plot(xs, vxs, "steelblue", label=self.get_loc_str("figNozzleV"))
 
                     if self.plot_eta.get():
-                        self.ax.plot(xs, etas, "crimson", label=self.get_loc_str("figOutflow"))
+                        self.ax.plot(xs, etas, "maroon", label=self.get_loc_str("figOutflow"))
 
                 if self.plot_avg_p.get():
                     self.ax_p.plot(xs, pas, "tab:green", label=self.get_loc_str("figAvgP"))
@@ -2069,7 +2076,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 self.ax_v.axhline(v_tgt, c="tab:blue", linestyle=":", label=self.get_loc_str("figTgtV"))
 
                 if self.plot_burnup.get():
-                    self.ax.plot(xs, psis, c="tab:red", label=self.get_loc_str("figPsi"))
+                    self.ax.plot(xs, psis, c="crimson", label=self.get_loc_str("figPsi"))
 
                 lines_labeled = []
                 for lines, xvals in zip(
@@ -2085,7 +2092,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
                     lines_labeled.append(lines)
 
                 self.ax.set_xlim(left=0, right=xs[-1])
-                # noinspection SpellCheckingInspection
                 pmax = max(pas + pbs + pss + p0s)
                 self.ax_p.set(ylim=(0, pmax * 1.1))
                 self.ax_v.set(ylim=(0, max(vs + vxs) * 1.15))
@@ -2513,6 +2519,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
             self.plot_breech_p.localize("plotBreechP")
             self.plot_stag_p.remove()
+            self.plot_stag_l.remove()
             self.plot_eta.remove()
             self.p_control.reset({point: point for point in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH)})
 
@@ -2527,6 +2534,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.plot_breech_p.localize("plotNozzleP")
             self.plot_stag_p.restore()
             self.plot_stag_p.localize("plotStagP")
+            self.plot_stag_l.restore()
+            self.plot_stag_l.localize("plotStagL")
             self.plot_eta.restore()
             self.plot_eta.localize("plotEtaEsc")
             self.p_control.reset(
