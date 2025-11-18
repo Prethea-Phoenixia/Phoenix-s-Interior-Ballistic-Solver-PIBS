@@ -1,17 +1,164 @@
+from __future__ import annotations
+
 import json
-import os
-import sys
-import shutil
-from pathlib import Path
-from ctypes import byref, create_string_buffer, create_unicode_buffer
-import platform
 import logging
+import os
+import platform
+import shutil
+import sys
+from ctypes import byref, create_string_buffer, create_unicode_buffer
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 if platform.system() == "Windows":
     from ctypes import windll
+
 from math import floor, log, log10
+
+_superscript_map = {
+    "0": "⁰",
+    "1": "¹",
+    "2": "²",
+    "3": "³",
+    "4": "⁴",
+    "5": "⁵",
+    "6": "⁶",
+    "7": "⁷",
+    "8": "⁸",
+    "9": "⁹",
+    "a": "ᵃ",
+    "b": "ᵇ",
+    "c": "ᶜ",
+    "d": "ᵈ",
+    "e": "ᵉ",
+    "f": "ᶠ",
+    "g": "ᵍ",
+    "h": "ʰ",
+    "i": "ᶦ",
+    "j": "ʲ",
+    "k": "ᵏ",
+    "l": "ˡ",
+    "m": "ᵐ",
+    "n": "ⁿ",
+    "o": "ᵒ",
+    "p": "ᵖ",
+    "q": "۹",
+    "r": "ʳ",
+    "s": "ˢ",
+    "t": "ᵗ",
+    "u": "ᵘ",
+    "v": "ᵛ",
+    "w": "ʷ",
+    "x": "ˣ",
+    "y": "ʸ",
+    "z": "ᶻ",
+    "A": "ᴬ",
+    "B": "ᴮ",
+    "C": "ᶜ",
+    "D": "ᴰ",
+    "E": "ᴱ",
+    "F": "ᶠ",
+    "G": "ᴳ",
+    "H": "ᴴ",
+    "I": "ᴵ",
+    "J": "ᴶ",
+    "K": "ᴷ",
+    "L": "ᴸ",
+    "M": "ᴹ",
+    "N": "ᴺ",
+    "O": "ᴼ",
+    "P": "ᴾ",
+    "Q": "Q",
+    "R": "ᴿ",
+    "S": "ˢ",
+    "T": "ᵀ",
+    "U": "ᵁ",
+    "V": "ⱽ",
+    "W": "ᵂ",
+    "X": "ˣ",
+    "Y": "ʸ",
+    "Z": "ᶻ",
+    "+": "⁺",
+    "-": "⁻",
+    "=": "⁼",
+    "(": "⁽",
+    ")": "⁾",
+}
+
+_subscript_map = {
+    "0": "₀",
+    "1": "₁",
+    "2": "₂",
+    "3": "₃",
+    "4": "₄",
+    "5": "₅",
+    "6": "₆",
+    "7": "₇",
+    "8": "₈",
+    "9": "₉",
+    "a": "ₐ",
+    "b": "♭",
+    "c": "꜀",
+    "d": "ᑯ",
+    "e": "ₑ",
+    "f": "բ",
+    "g": "₉",
+    "h": "ₕ",
+    "i": "ᵢ",
+    "j": "ⱼ",
+    "k": "ₖ",
+    "l": "ₗ",
+    "m": "ₘ",
+    "n": "ₙ",
+    "o": "ₒ",
+    "p": "ₚ",
+    "q": "૧",
+    "r": "ᵣ",
+    "s": "ₛ",
+    "t": "ₜ",
+    "u": "ᵤ",
+    "v": "ᵥ",
+    "w": "w",
+    "x": "ₓ",
+    "y": "ᵧ",
+    "z": "₂",
+    "A": "ₐ",
+    "B": "₈",
+    "C": "C",
+    "D": "D",
+    "E": "ₑ",
+    "F": "բ",
+    "G": "G",
+    "H": "ₕ",
+    "I": "ᵢ",
+    "J": "ⱼ",
+    "K": "ₖ",
+    "L": "ₗ",
+    "M": "ₘ",
+    "N": "ₙ",
+    "O": "ₒ",
+    "P": "ₚ",
+    "Q": "Q",
+    "R": "ᵣ",
+    "S": "ₛ",
+    "T": "ₜ",
+    "U": "ᵤ",
+    "V": "ᵥ",
+    "W": "w",
+    "X": "ₓ",
+    "Y": "ᵧ",
+    "Z": "Z",
+    "+": "₊",
+    "-": "₋",
+    "=": "₌",
+    "(": "₍",
+    ")": "₎",
+}
+
+sup_trans = str.maketrans("".join(_superscript_map.keys()), "".join(_superscript_map.values()))
+
+sub_trans = str.maketrans("".join(_subscript_map.keys()), "".join(_subscript_map.values()))
 
 _prefix = {
     "y": 1e-24,  # yocto
@@ -38,7 +185,7 @@ _prefix = {
 }
 
 
-def get_font_dir():
+def get_font_dir() -> Path | None:
     if platform.system() == "Windows":
         return None
     else:
@@ -48,7 +195,7 @@ def get_font_dir():
 
 
 # noinspection PyTypeChecker
-def resolvepath(path):
+def resolvepath(path: str) -> str:
     if getattr(sys, "frozen", False):
         # If the 'frozen' flag is set, we are in bundled-app mode!
         resolved_path = os.path.abspath(os.path.join(sys._MEIPASS, path))
@@ -63,7 +210,7 @@ FR_PRIVATE = 0x10
 FR_NOT_ENUM = 0x20
 
 
-def loadfont(fontpath, private=True, enumerable=False):
+def loadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool:
     """
     Makes fonts located in file `fontpath` available to the font system.
         `private`     if True, other processes cannot see this font, and this
@@ -100,7 +247,7 @@ def loadfont(fontpath, private=True, enumerable=False):
         return True
 
 
-def unloadfont(fontpath, private=True, enumerable=False):
+def unloadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool:
     """
     Unloads the fonts in the specified file.
 
@@ -130,56 +277,41 @@ def unloadfont(fontpath, private=True, enumerable=False):
         return True
 
 
-def to_si(v: float, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: bool = False):
+def to_si(v: float, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: bool = False) -> str:
     if v is None:
         return "N/A"
     elif isinstance(v, int) or isinstance(v, float):
-        pass
+        if v == 0:
+            return " " + "{:#.{:}g}".format(v, dec) + ("     " if use_sn else "  ") + (unit if unit is not None else "")
+        else:
+            if v > 0:
+                positive = True
+            else:
+                positive = False
+
+            v = abs(v)
+            for prefix, magnitude, next_magnitude in zip(
+                _prefix.keys(),
+                tuple(_prefix.values())[:-1],
+                tuple(_prefix.values())[1:],
+            ):
+                if 1 <= (v / (magnitude**unit_dim)) < (next_magnitude / (magnitude**unit_dim)):
+                    # allows handling of non-uniformly log10 spaced prefixes
+                    vstr = "{:#.{:}g}".format(v / magnitude**unit_dim, dec)
+                    return (
+                        (" " if positive else "-")
+                        + vstr
+                        + " " * (dec + 1 - len(vstr) + vstr.find("."))
+                        + (("×⏨" + f"{int(log(magnitude, 10)): <3d}".translate(sup_trans)) if use_sn else prefix)
+                        + (unit if unit is not None else "")
+                    )
+
+        raise ValueError(f"Cannot convert {v} to SI notation")
+
+    elif isinstance(v, str):
+        return v
     else:
         raise ValueError(f"Cannot convert type of {type(v):} to SI notation")
-
-    if v >= 0:
-        positive = True
-    else:
-        positive = False
-    v = abs(v)
-    for prefix, magnitude, next_magnitude in zip(
-        _prefix.keys(),
-        tuple(_prefix.values())[:-1],
-        tuple(_prefix.values())[1:],
-    ):
-        if 1 <= (v / magnitude**unit_dim) < (next_magnitude / magnitude) ** unit_dim:
-            # allows handling of non-uniformly log10 spaced prefixes
-            vstr = "{:#.{:}g}".format(v / magnitude**unit_dim, dec)
-            return (
-                (" " if positive else "-")
-                + vstr
-                + " " * (dec + 1 - len(vstr) + vstr.find("."))
-                + (
-                    ("E{:<+3d}".format(round(log(magnitude, 10))) if magnitude != 1 else "    ")  # 4 SPACES!
-                    if use_sn
-                    else prefix
-                )
-                + (unit if unit is not None else "")
-            )
-    if v == 0:
-        return (
-            (" " if positive else "-")
-            + "{:#.{:}g}".format(v, dec)
-            + ("     " if use_sn else "  ")
-            + (unit if unit is not None else "")
-        )
-    else:  # return a result in SI as a last resort
-        closest = log(v, 10) // 3
-        magnitude = 10 ** (closest * 3)
-        vstr = "{:#.{:}g}".format(v / magnitude, dec)
-        return (
-            (" " if positive else "-")
-            + vstr
-            + " " * (dec + 1 - len(vstr) + vstr.find("."))
-            + ("E{:<+3d}".format(round(log(magnitude, 10))))
-            + (unit if unit is not None else "")
-        )
 
 
 def validate_nn(inp):
@@ -263,8 +395,8 @@ def format_int_input(event, var):
         var.set(int(v))
 
 
-def dot_aligned(matrix, units, use_sn, strip_ws=True):
-    transposed = []
+def dot_aligned(matrix, units: tuple[str, ...], use_sn: tuple[bool, ...], strip_ws: bool = True):
+    transposed = []  # TODO: properly annotate this thing.
 
     for seq, unit, isSN in zip(zip(*matrix), units, use_sn):
         snums = []
@@ -283,25 +415,33 @@ def dot_aligned(matrix, units, use_sn, strip_ws=True):
     return tuple(zip(*transposed))
 
 
-def round_sig(x, n=4):
+def round_sig(x: float, n: int = 4):
     return round(x, (n - 1) - int(floor(log10(abs(x)))))
 
 
-def format_mass(m, n=4):
+def format_mass(m: float, n: int = 4) -> str:
     if m:
-        if m < 1e-3:
+        if m < 1e-6:
+            return "{:.{:}g} μg".format(m * 1e9, n)
+        elif m < 1e-3:
             return "{:.{:}g} mg".format(m * 1e6, n)
         elif m < 1:
-            return "{:.{:}g} g".format(m * 1e3, n)
+            return "{:.{:}g}  g".format(m * 1e3, n)
         elif m < 1000:
             return "{:.{:}g} kg".format(m, n)
         elif m < 1e6:
-            return "{:.{:}g} t".format(m * 1e-3, n)
+            return "{:.{:}g}  t".format(m * 1e-3, n)
         elif m < 1e9:
             return "{:.{:}g} kt".format(m * 1e-6, n)
         elif m < 1e12:
             return "{:.{:}g} Mt".format(m * 1e-9, n)
 
+    return "N/A"
+
+
+def format_temp(t: float) -> str:
+    if t:
+        return f"{t:.0f} K "
     return "N/A"
 
 

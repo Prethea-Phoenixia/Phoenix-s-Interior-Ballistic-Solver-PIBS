@@ -37,6 +37,12 @@ class LocalizableWidget(Localizable):
     @abstractmethod
     def localize(self, *args: Any, **kwargs: Any) -> None: ...
 
+    def trace_add(self, *args):
+        self.var.trace_add(*args)
+
+    def get(self):
+        return self.var.get()
+
 
 class Descriptive(ABC):
     @abstractmethod
@@ -46,12 +52,12 @@ class Descriptive(ABC):
         """
         ...
 
-    @abstractmethod
-    def get(self) -> Any:
-        """
-        returns the object containing the data this widget holds.
-        """
-        ...
+    # @abstractmethod
+    # def get(self) -> Any:
+    #     """
+    #     returns the object containing the data this widget holds.
+    #     """
+    #     ...
 
     @abstractmethod
     def reset(self, *_) -> None:
@@ -257,8 +263,8 @@ class Loc2Input(LocalizableWidget, Descriptive):
     def reset(self, *_) -> None:
         self.var.set(self.default)
 
-    def get(self) -> Any:
-        return self.dtype(self.var.get())
+    def get(self) -> float:
+        return float(self.var.get())
 
     def set(self, val) -> None:
         self.var.set(val)
@@ -420,9 +426,6 @@ class LocDropdown(LocalizableWidget, Descriptive):
     def grid(self, **kwargs):
         self.widget.grid(**kwargs)
 
-    def trace_add(self, *args):
-        self.var.trace_add(*args)
-
     def disable(self):
         self.widget.configure(state="disabled")
 
@@ -481,6 +484,7 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         loc_func: localize_function_type = placeholder_loc_func,
         font: Font | None = None,
         default: bool = True,
+        skip_grid: bool = False,
         row: int = 0,
         col: int = 0,
         columnspan: int = 1,
@@ -495,7 +499,8 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         self.nominal_state = "normal"
         self.loc_func = loc_func
         self.check_widget = ttk.Checkbutton(parent, text=loc_func(label_loc_key), variable=self.var, width=width)
-        self.check_widget.grid(row=row, column=col, sticky="nsew", columnspan=columnspan, padx=2, pady=2)
+        if not skip_grid:
+            self.check_widget.grid(row=row, column=col, sticky="nsew", columnspan=columnspan, padx=2, pady=2)
 
         self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
         create_tool_tip(self.check_widget, self.loc_tooltip_var, font=font)
@@ -521,9 +526,6 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
 
     def restore(self):
         self.check_widget.grid()
-
-    def get(self) -> bool:
-        return bool(self.var.get())
 
     def set(self, value):
         self.var.set(value)
@@ -599,7 +601,6 @@ class LocalizedFrame(Frame):
     @warn
     @wraps(Loc12Disp.__init__)
     def add_localized_12_display(self, *args, **kwargs) -> Loc12Disp:
-        # logging.warn("")
         return Loc12Disp(*args, loc_func=self.get_loc_str, all_localized=self.locs, font=self.font, **kwargs)
 
     @warn

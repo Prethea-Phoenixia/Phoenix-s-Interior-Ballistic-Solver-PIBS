@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
+T = TypeVar("T")
 if TYPE_CHECKING:
     from .gun import Gun
     from . import Points
 
 from . import POINT_EXIT, POINT_PEAK_AVG
-from .prop import Propellant
 
 
 @dataclass
@@ -76,48 +75,3 @@ class OutlineEntry:
     r_in: float
     r_ex: float
     r_pej: float  # plastic elastic junction
-
-
-class DelegatesPropellant:
-    def __init__(self, propellant: Propellant):
-        self.propellant = propellant
-
-    @property
-    def f(self) -> float:
-        return self.propellant.f
-
-    @property
-    def alpha(self) -> float:
-        return self.propellant.alpha
-
-    @property
-    def rho_p(self) -> float:
-        return self.propellant.rho_p
-
-    @property
-    def theta(self) -> float:
-        return self.propellant.theta
-
-    @property
-    def u_1(self) -> float:
-        return self.propellant.u_1
-
-    @property
-    def n(self) -> float:
-        return self.propellant.n
-
-    @property
-    def T_v(self) -> float:
-        return self.propellant.T_v
-
-    @property
-    def z_b(self) -> float:
-        return self.propellant.z_b
-
-    @wraps(Propellant.f_psi_z)
-    def f_psi_z(self, *args, **kwargs):
-        return self.propellant.f_psi_z(*args, **kwargs)
-
-    @wraps(Propellant.f_sigma_z)
-    def f_sigma_z(self, *args, **kwargs):
-        return self.propellant.f_sigma_z(*args, **kwargs)
