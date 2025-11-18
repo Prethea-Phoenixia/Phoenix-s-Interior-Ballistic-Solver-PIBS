@@ -1,8 +1,11 @@
 import os
+import argparse
 import PyInstaller.__main__
+
 from pibs import __version__
 
-if __name__ == "__main__":
+
+def generate_executables(mult_file: bool = False):
     name = "PIBSv" + __version__
 
     sep = os.pathsep  # ':' on POSIX, ';' on Windows
@@ -18,8 +21,7 @@ if __name__ == "__main__":
         f"--add-data=pibs/ballistics/resource{sep}ballistics/resource/",
         f"--add-data=pibs/ui{sep}ui/",
         f"--add-data=pibs/examples{sep}examples/",
-        "--onefile",
-    ]
+    ] + (["--onefile"] if not mult_file else [])
 
     PyInstaller.__main__.run(options)
 
@@ -35,10 +37,8 @@ if __name__ == "__main__":
     excluded keywords corresponds to:
     - api-ms-win, ucrtbase: MikTex (LaTeX) compiler on Windows machines
     These can be safely excluded since the functionality of PIBS does not depend on them.
-    
     """
-    dll_exclusion = """
-# exclude excessive DLL collected by pyinstaller
+    dll_exclusion = """# exclude excessive DLL collected by pyinstaller
 key_words = ['api-ms-win', 'ucrtbase']
 new_binaries = []
 excluded = []
@@ -59,6 +59,7 @@ a.binaries = new_binaries
 mpl_font_path = os.path.join('matplotlib', 'mpl-data', 'fonts')
 a.datas = [entry for entry in a.datas if not entry[0].startswith(mpl_font_path)]
 
+# Filter out all 
 mpl_data_path = os.path.join('matplotlib', 'mpl-data', 'sample_data')
 a.datas = [entry for entry in a.datas if not entry[0].startswith(mpl_data_path)]
 """
@@ -71,3 +72,13 @@ a.datas = [entry for entry in a.datas if not entry[0].startswith(mpl_data_path)]
         f.writelines(content)
 
     os.system("pyinstaller " + name + ".spec" + " --noconfirm")
+
+
+if __name__ == "__main__":
+    # parser = argparse.ArgumentParser(description="script to generate PIBS executable")
+    # parser.add_argument("--mult_file", action="store_true", default=False)
+    #
+    # args = parser.parse_args()
+
+    generate_executables(False)
+    generate_executables(True)

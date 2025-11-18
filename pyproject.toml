@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools >= 77.0.3"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.isort]
@@ -22,7 +22,7 @@ requires-python = ">3.8"
 readme = "README.md"
 license = "unlicense"
 license-files = ["LICENSE"]
-dependencies = ["matplotlib", "matplotlib-label-lines", "tabulate", "psutil"] # pip install .
+dependencies = ["matplotlib", "matplotlib-label-lines", "tabulate", "psutil", "tqdm", "screeninfo"] # pip install .
 authors = [{name = "Jinpeng Zhai", email = "914962409@qq.com"}]
 keywords = ["interior ballistics"]
 classifiers = ["Development Status :: 4 - Beta", "Programming Language :: Python"]
