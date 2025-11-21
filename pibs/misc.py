@@ -1,16 +1,20 @@
+from __future__ import annotations
+
 import json
-import os
-import sys
-import shutil
-from pathlib import Path
-from ctypes import byref, create_string_buffer, create_unicode_buffer
-import platform
 import logging
+import os
+import platform
+import shutil
+import sys
+from ctypes import byref, create_string_buffer, create_unicode_buffer
+from pathlib import Path
+from typing import TypeVar
 
 logger = logging.getLogger(__name__)
 
 if platform.system() == "Windows":
     from ctypes import windll
+
 from math import floor, log, log10
 
 _prefix = {
@@ -38,7 +42,7 @@ _prefix = {
 }
 
 
-def get_font_dir():
+def get_font_dir() -> Path | None:
     if platform.system() == "Windows":
         return None
     else:
@@ -48,7 +52,7 @@ def get_font_dir():
 
 
 # noinspection PyTypeChecker
-def resolvepath(path):
+def resolvepath(path: str) -> str:
     if getattr(sys, "frozen", False):
         # If the 'frozen' flag is set, we are in bundled-app mode!
         resolved_path = os.path.abspath(os.path.join(sys._MEIPASS, path))
@@ -63,7 +67,7 @@ FR_PRIVATE = 0x10
 FR_NOT_ENUM = 0x20
 
 
-def loadfont(fontpath, private=True, enumerable=False):
+def loadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool:
     """
     Makes fonts located in file `fontpath` available to the font system.
         `private`     if True, other processes cannot see this font, and this
@@ -100,7 +104,7 @@ def loadfont(fontpath, private=True, enumerable=False):
         return True
 
 
-def unloadfont(fontpath, private=True, enumerable=False):
+def unloadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool:
     """
     Unloads the fonts in the specified file.
 
@@ -130,7 +134,7 @@ def unloadfont(fontpath, private=True, enumerable=False):
         return True
 
 
-def to_si(v: float, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: bool = False):
+def to_si(v: float, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: bool = False) -> str:
     if v is None:
         return "N/A"
     elif isinstance(v, int) or isinstance(v, float):
@@ -263,8 +267,10 @@ def format_int_input(event, var):
         var.set(int(v))
 
 
-def dot_aligned(matrix, units, use_sn, strip_ws=True):
-    transposed = []
+def dot_aligned(
+    matrix: list[tuple[float, ...]], units: tuple[str, ...], use_sn: tuple[bool, ...], strip_ws: bool = True
+):
+    transposed = []  # TODO: properly annotate this thing.
 
     for seq, unit, isSN in zip(zip(*matrix), units, use_sn):
         snums = []
@@ -283,11 +289,11 @@ def dot_aligned(matrix, units, use_sn, strip_ws=True):
     return tuple(zip(*transposed))
 
 
-def round_sig(x, n=4):
+def round_sig(x: float, n: int = 4):
     return round(x, (n - 1) - int(floor(log10(abs(x)))))
 
 
-def format_mass(m, n=4):
+def format_mass(m: float, n: int = 4):
     if m:
         if m < 1e-3:
             return "{:.{:}g} mg".format(m * 1e6, n)

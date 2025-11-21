@@ -5,6 +5,8 @@ GEOMETRIES:
 
 """
 
+from __future__ import annotations
+
 import csv
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumType
@@ -73,7 +75,7 @@ class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
 
         return chi, labda, mu, 0.0, 0.0, 1.0
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.desc
 
     SPHERE = ("SPHERE", 1, 1)  # 立方体, alpha = beta = 1
@@ -88,9 +90,9 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
     def __init__(
         self,
         desc: str,
-        A: float,
-        B: float,
-        C: float,
+        _a: float,
+        _b: float,
+        _c: float,
         rho_div: float,
         n_hole: int,
         a_factors: tuple[float, float],
@@ -99,7 +101,7 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
 
         super().__init__()
         self.desc = desc
-        self.A, self.B, self.C = A, B, C
+        self.A, self.B, self.C = _a, _b, _c
         self.rho_div, self.n_hole, self.a_factors, self.b_factors = rho_div, n_hole, a_factors, b_factors
 
     # fmt: off
@@ -112,7 +114,7 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
     NINETEEN_PERF_ROUNDED_HEXAGON = ("NINETEEN_PERF_ROUNDED_HEXAGON", 3**0.5 + 12 / pi, 19, 3 - 3**0.5 + 12 * (4 * 3**0.5 - 1) / pi, 0.1977, 19, (1, 2), (1, 2))
     # fmt: on
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.desc
 
     def get_form_function_coefficients(self, r1: float, r2: float) -> tuple[float, float, float, float, float, float]:
@@ -225,7 +227,7 @@ class Composition:
         Composition.all_compositions = compositions
         return Composition.get_name_composition_dict()
 
-    def get_lbr(self, p):
+    def get_lbr(self, p: float) -> float:
         """
         get linear burn rate, given a pressure supplied in Pa
 
@@ -233,7 +235,7 @@ class Composition:
         """
         return self.u_1 * p**self.n
 
-    def get_isp(self, p_ratio=None):
+    def get_isp(self, p_ratio: float | None = None) -> float:
         # Tp = Tv/gamma
         if p_ratio:
             # pressure ratio is interpreted as chamber/exit
@@ -243,7 +245,7 @@ class Composition:
             return (2 * self.f / self.theta) ** 0.5
 
     @staticmethod
-    def get_name_composition_dict() -> dict:
+    def get_name_composition_dict() -> dict[str, str]:
         name_composition_dict = {}
         for composition in Composition.all_compositions:
             name_composition_dict[composition.name] = composition

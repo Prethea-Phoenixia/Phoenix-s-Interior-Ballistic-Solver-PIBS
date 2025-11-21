@@ -1,71 +1,8 @@
 import math
+from typing import Callable
 
 
-def cubic(a, b, c, d):
-    """
-    returns the 3 roots of
-    ax^3 + bx^2 + cx + d = 0
-    assuming **real** coefficients.
-    """
-    if any(isinstance(i, complex) for i in (a, b, c, d)):
-        raise ValueError("coefficients must be real")
-    if a == 0:
-        return quadratic(b, c, d)
-    delta = 18 * a * b * c * d - 4 * b**3 * d + b**2 * c**2 - 4 * a * c**3 - 27 * a**2 * d**2
-    """
-    Δ>0: distinct real roots.
-    Δ=0: repeating real roots.
-    Δ<0: one real and 2 imaginary roots.
-    """
-    delta_0, delta_1 = b**2 - 3 * a * c, 2 * b**3 - 9 * a * b * c + 27 * a**2 * d
-
-    c_1 = (0.5 * (delta_1 + (delta_1**2 - 4 * delta_0**3) ** 0.5)) ** (1 / 3)
-    c_2 = (0.5 * (delta_1 - (delta_1**2 - 4 * delta_0**3) ** 0.5)) ** (1 / 3)
-
-    xs = []
-    if any(c != 0 for c in (c_1, c_2)):
-        c = c_1 if c_1 != 0 else c_2
-        epsilons = (
-            1,
-            complex(-0.5, 3**0.5 / 2),
-            complex(-0.5, -(3**0.5) / 2),
-        )
-        for epsilon in epsilons:
-            x = -1 / (3 * a) * (b + c * epsilon + delta_0 / (c * epsilon))
-            xs.append(x)
-    else:
-        for _ in range(3):
-            xs.append(-b / (3 * a))
-
-    if delta >= 0:
-        xs = list(z.real for z in xs)
-    else:
-        # one real and 2 imaginary roots.
-        xs = list(z.real if abs(z.imag) == min(abs(z.imag) for z in xs) else z for z in xs)
-    # put the first real solution at first.
-    xs.sort(key=lambda z: 1 if isinstance(z, complex) else 0)
-    return tuple(xs)
-
-
-def quadratic(a, b, c):
-    """
-    solve the quadratic equation
-    defined by:
-    y = a*x**2 + b * x + c
-    """
-
-    delta = b**2 - 4 * a * c
-
-    x_1 = 0.5 * (-b - delta**0.5) / a
-    x_2 = 0.5 * (-b + delta**0.5) / a
-
-    if delta > 0:
-        return min(x_1, x_2), max(x_1, x_2)
-    else:
-        return x_1, x_2
-
-
-def integrate(f, l, u, tol=1e-3):
+def integrate(f: Callable[[float], float], l: float, u: float, tol: float = 1e-3) -> tuple[float, float]:
     """
     Integration, a.la the HP-34C. For more info see:
     "Handheld Calculator Evaluates Integrals", William M.Kahan

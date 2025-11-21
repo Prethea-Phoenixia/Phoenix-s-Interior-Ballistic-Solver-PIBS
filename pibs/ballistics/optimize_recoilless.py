@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
-from math import floor, inf, log, pi
+from math import inf, pi
 from random import uniform
+from .optimize_gun import probe_func
 
 from . import (
     MAX_GUESSES,
@@ -10,8 +11,10 @@ from . import (
     POINT_PEAK_BREECH,
     POINT_PEAK_SHOT,
     POINT_PEAK_STAG,
-    Points,
+    MIN_BORE_VOLUME,
+    MIN_PROJ_TRAVEL,
 )
+from . import Points, Optimization_Targets
 from .generics import DelegatesPropellant
 from .num import dekker, gss, rkf
 from .prop import Propellant
@@ -73,9 +76,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
         self.propellant = propellant
         self.p_0 = start_pressure
         self.phi_1 = 1 / (1 - drag_coefficient)
-
-        # design limits
-        self.p_d = design_pressure
+        self.p_g = design_pressure
         self.v_d = design_velocity
 
         self.chi_0 = nozzle_efficiency
@@ -93,6 +94,17 @@ class ConstrainedRecoilless(DelegatesPropellant):
 
         self.traveling_charge = traveling_charge
 
+    def _f_p_bar_ad(self, v_bar: float, c_a_bar: float, p_a_bar: float) -> float:
+        if c_a_bar and v_bar > 0.0:
+            v_r = v_bar / c_a_bar
+            return (
+                +0.25 * self.ambient_gamma * (self.ambient_gamma + 1) * v_r**2
+                + self.ambient_gamma * v_r * (1 + (0.25 * (self.ambient_gamma + 1)) ** 2 * v_r**2) ** 0.5
+            ) * p_a_bar
+
+        else:
+            return 0
+
     def solve(
         self,
         load_fraction: float,
@@ -101,75 +113,45 @@ class ConstrainedRecoilless(DelegatesPropellant):
         known_bore: bool = False,
         suppress: bool = False,
         **_,
-    ):
+    ) -> tuple[float, float]:
         if any((charge_mass_ratio <= 0, load_fraction <= 0, load_fraction > 1)):
             raise ValueError("Invalid parameters to solve constrained design problem")
         """
         minWeb  : represents minimum possible grain size
         """
-        m = self.m
-        rho_p = self.rho_p
-        theta = self.theta
-        f = self.f
-        chi_k = self.chi_k
-        s = self.s
-        phi_1 = self.phi_1
-        p_0 = self.p_0
-        v_d = self.v_d
-        p_d = self.p_d
-        u_1 = self.u_1
-        n = self.n
-        alpha = self.alpha
-        z_b = self.z_b
-
-        f_psi_z = self.f_psi_z
-        f_sigma_z = self.f_sigma_z
-
-        chi_0 = self.chi_0
-        a_bar = self.a_bar
-
-        sb = s * chi_k
-        tol = self.tol
-
-        is_tc = self.traveling_charge
-
-        w = m * charge_mass_ratio
-        vol_0 = w / (rho_p * load_fraction)
+        w = self.m * charge_mass_ratio
+        vol_0 = w / (self.rho_p * load_fraction)
         delta = w / vol_0
-        l_0 = vol_0 / s
+        l_0 = vol_0 / self.s
+        gamma = self.theta + 1
+        phi = self.phi_1 + w / (3 * self.m)
 
-        gamma = theta + 1
-
-        phi = phi_1 + w / (3 * m)
-
-        s_j_bar = 1 / (Recoilless.get_cf(gamma, a_bar, tol) * chi_0)
-        if s_j_bar > chi_k:
+        s_j_bar = 1 / (Recoilless.get_cf(gamma, self.a_bar, self.tol) * self.chi_0)
+        if s_j_bar > self.chi_k:
             raise ValueError(
                 "Achieving recoilless condition necessitates a larger throat area than could be fit into breech face."
             )
-        s_j = s_j_bar * s
+        s_j = s_j_bar * self.s
 
         k_0 = (2 / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1))) * gamma**0.5
 
         phi_2 = 1
-        c_a = (0.5 * theta * phi * m / w) ** 0.5 * k_0 * phi_2  # flow rate value
+        c_a = (0.5 * self.theta * phi * self.m / w) ** 0.5 * k_0 * phi_2  # flow rate value
 
         """
         it is impossible to account for the chambrage effect given unspecified
         barrel length, in our formulation
         """
-        v_j = (2 * f * w / (theta * phi * m)) ** 0.5
+        v_j = (2 * self.f * w / (self.theta * phi * self.m)) ** 0.5
 
         if self.ambient_rho != 0:
             c_a_bar = (self.ambient_gamma * self.ambient_p / self.ambient_rho) ** 0.5 / v_j
-            p_a_bar = self.ambient_p / (f * delta)
+            p_a_bar = self.ambient_p / (self.f * delta)
         else:
             c_a_bar = 0
             p_a_bar = 0
 
-        gamma_1 = self.ambient_gamma
-
-        if v_j < v_d and not known_bore:
+        if v_j < self.v_d and not known_bore:
             raise ValueError(
                 "Propellant load too low to achieve design velocity. "
                 + " The 2nd ballistic limit for this loading conditions is"
@@ -177,103 +159,84 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 + " and recoilless guns only achieve a part of that as well."
             )
 
-        psi_0 = (1 / delta - 1 / rho_p) / (f / p_0 + alpha - 1 / rho_p)
-        z_0, _ = dekker(lambda _z: self.propellant.f_psi_z(_z), 0, 1, y=psi_0, y_rel_tol=tol, y_abs_tol=tol**2)
+        psi_0 = (1 / delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
+        z_0, _ = dekker(
+            lambda _z: self.propellant.f_psi_z(_z), 0, 1, y=psi_0, y_rel_tol=self.tol, y_abs_tol=self.tol**2
+        )
 
-        def _f_p_bar(z, l_bar, v_bar, eta, tau):
-            psi = f_psi_z(z)
-            l_psi_bar = 1 - delta * ((1 - psi) / rho_p + alpha * (psi - eta))
+        def _f_p_bar(z: float, l_bar: float, v_bar: float, eta: float, tau: float) -> float:
+            psi = self.f_psi_z(z)
+            l_psi_bar = 1 - delta * ((1 - psi) / self.rho_p + self.alpha * (psi - eta))
             p_bar = max(tau / (l_bar + l_psi_bar) * (psi - eta), p_a_bar)
 
             if self.control == POINT_PEAK_AVG:
                 return p_bar
-
             else:
-                y = w * eta
                 m_dot = c_a * v_j * s_j * p_bar * delta / (tau**0.5)
-                vb = m_dot * (vol_0 + s * l_bar * l_0) / (sb * (w - y))
+                vb = m_dot * (vol_0 + self.s * l_bar * l_0) / (self.s * self.chi_k * w * (1 - eta))
 
-                h = min(inf if v_bar == 0 else (vb / (v_j * v_bar)), 2 * phi_1 * m / (w - y) + 1)
-                p_s_bar = p_bar / (1 + (w - y) / (3 * phi_1 * m) * (1 - 0.5 * h))
+                h = min(inf if v_bar == 0 else (vb / (v_j * v_bar)), 2 * self.phi_1 * self.m / (w * (1 - eta)) + 1)
+                p_s_bar = p_bar / (1 + w * (1 - eta) / (3 * self.phi_1 * self.m) * (1 - 0.5 * h))
                 if self.control == POINT_PEAK_SHOT:
                     return p_s_bar
                 elif self.control == POINT_PEAK_STAG:
-                    return p_s_bar * (1 + (w - y) / (2 * phi_1 * m) * (1 + h) ** -1)
+                    return p_s_bar * (1 + w * (1 - eta) / (2 * self.phi_1 * self.m) * (1 + h) ** -1)
                 elif self.control == POINT_PEAK_BREECH:
-                    return p_s_bar * (1 + (w - y) / (2 * phi_1 * m) * (1 - h))
+                    return p_s_bar * (1 + w * (1 - eta) / (2 * self.phi_1 * self.m) * (1 - h))
                 else:
-                    raise ValueError("tag unhandled.")
+                    raise ValueError(f"unknown control {self.control}")
 
-        p_bar_d = p_d / (f * delta)  # convert to unitless
+        p_bar_d = self.p_g / (self.f * delta)  # convert to unitless
         l_bar_d = self.max_length / l_0
 
         """
         step 1, find grain size that satisfies design pressure
         """
 
-        def _abort_z(x, ys, _):
+        def _abort_z(
+            x: float,
+            ys: tuple[float, float, float, float, float],
+            _: list[tuple[float, tuple[float, float, float, float, float]]],
+        ) -> bool:
             z, (_, l_bar, v_bar, eta, tau) = x, ys
             p_bar = _f_p_bar(z, l_bar, v_bar, eta, tau)
             return (p_bar > 2 * p_bar_d) or l_bar > l_bar_d
 
-        def _f_p_e_1(e_1):
-            """
-            Find pressure maximum bracketed by the range of
-            Z_0 < Z < Z_d
-            l_bar < l_bar_d,
-            p_bar < 2 * p_bar_d.
-            """
-            b_e_1 = (s**2 * e_1**2) / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
-
-            # integrate this to end of burn
+        def _f_p_e_1(e_1: float) -> tuple[float, float, float, float, float, float, float]:
+            b_e_1 = (
+                (self.s**2 * e_1**2)
+                / (self.f * phi * w * self.m * self.u_1**2)
+                * (self.f * delta) ** (2 * (1 - self.n))
+            )
 
             def _ode_z(
                 z: float, tlvetatau: tuple[float, float, float, float, float], _: float
             ) -> tuple[float, float, float, float, float]:
-                """burnout domain ode of internal ballistics"""
                 t_bar, l_bar, v_bar, eta, tau = tlvetatau
-                psi = f_psi_z(z)
-                dpsi = f_sigma_z(z)  # dpsi/dZ
+                psi = self.f_psi_z(z)
+                dpsi = self.f_sigma_z(z)
 
-                l_psi_bar = 1 - delta * ((1 - psi) / rho_p + alpha * (psi - eta))
+                l_psi_bar = 1 - delta * ((1 - psi) / self.rho_p + self.alpha * (psi - eta))
                 p_bar = max(tau / (l_bar + l_psi_bar) * (psi - eta), p_a_bar)
 
-                if c_a_bar != 0 and v_bar > 0:
-                    v_r = v_bar / c_a_bar
-                    p_d_bar = (
-                        +0.25 * gamma_1 * (gamma_1 + 1) * v_r**2
-                        + gamma_1 * v_r * (1 + (0.25 * (gamma_1 + 1)) ** 2 * v_r**2) ** 0.5
-                    ) * p_a_bar
-                else:
-                    p_d_bar = 0
+                dt_bar = (2 * b_e_1 / self.theta) ** 0.5 * p_bar**-self.n
+                dl_bar = v_bar * dt_bar
+                dv_bar = 0.5 * self.theta * (p_bar - self._f_p_bar_ad(v_bar, c_a_bar, p_a_bar)) * dt_bar
 
-                if z <= z_b:
-                    dt_bar = (2 * b_e_1 / theta) ** 0.5 * p_bar**-n
-                    dl_bar = v_bar * dt_bar
-                    dv_bar = 0.5 * theta * (p_bar - p_d_bar) * dt_bar
-                    dv_bar /= (1 + w / m * (1 - psi)) if is_tc else 1
-
-                else:
-                    # technically speaking it is undefined in this area
-                    dt_bar = 0  # dt_bar/dZ
-                    dl_bar = 0  # dl_bar/dZ
-                    dv_bar = 0  # dv_bar/dZ
-
-                deta = c_a * s_j_bar * p_bar / tau**0.5 * dt_bar  # deta / dZ
-                dtau = ((1 - tau) * dpsi - 2 * v_bar * dv_bar - theta * tau * deta) / (psi - eta)
+                deta = c_a * s_j_bar * p_bar / tau**0.5 * dt_bar
+                dtau = ((1 - tau) * dpsi - 2 * v_bar * dv_bar - self.theta * tau * deta) / (psi - eta)
 
                 return dt_bar, dl_bar, dv_bar, deta, dtau
 
-            # stepVanished = False
             record = [(z_0, (0.0, 0.0, 0.0, 0.0, 1.0))]
             try:
                 z_k, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j) = rkf(
                     d_func=_ode_z,
                     ini_val=(0.0, 0.0, 0.0, 0.0, 1.0),
                     x_0=z_0,
-                    x_1=z_b,
-                    rel_tol=tol,
-                    abs_tol=tol**2,
+                    x_1=self.z_b,
+                    rel_tol=self.tol,
+                    abs_tol=self.tol**2,
                     abort_func=_abort_z,
                     record=record,
                 )
@@ -301,30 +264,30 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 # no peak, so it suffice to compare the end points.
                 if p_bar_j == 0:
                     p_bar_j = inf
-                return p_bar_j - p_bar_d, record[-1][0], *record[-1][-1]
+                z_j, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j) = record[-1]
+                return p_bar_j - p_bar_d, z_j, t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j
             else:  # peak exist, must compare the peak and the two end points.
                 z_j = record[peak - 1][0]
                 z_k = record[peak + 1][0]
 
-                def _f_p_z(z):
+                def _f_p_z(z: float) -> tuple[float, float, float, float, float, float, float]:
                     i = record.index([v for v in record if v[0] <= z][-1])
                     x = record[i][0]
                     ys = record[i][1]
 
                     r = []
                     t_bar, l_bar, v_bar, eta, tau = rkf(
-                        d_func=_ode_z, ini_val=ys, x_0=x, x_1=z, rel_tol=tol, abs_tol=tol**2, record=r
+                        d_func=_ode_z, ini_val=ys, x_0=x, x_1=z, rel_tol=self.tol, abs_tol=self.tol**2, record=r
                     )[1]
 
                     xs = [v[0] for v in record]
                     record.extend(v for v in r if v[0] not in xs)
                     record.sort()
-                    return _f_p_bar(z, l_bar, v_bar, eta, tau), z, t_bar, l_bar, v_bar, eta, tau
+                    return _f_p_bar(z, l_bar, v_bar, eta, tau) - p_bar_d, z, t_bar, l_bar, v_bar, eta, tau
 
-                z_1, z_2 = gss(lambda _z: _f_p_z(_z)[0], z_j, z_k, y_rel_tol=tol, find_min=False)
-                z_p = 0.5 * (z_1 + z_2)
-                p_bar_p, *vals = _f_p_z(z_p)
-                return p_bar_p - p_bar_d, *vals
+                z_p = 0.5 * sum(gss(lambda _z: _f_p_z(_z)[0], z_j, z_k, y_rel_tol=self.tol, find_min=False))
+
+                return _f_p_z(z_p)
 
         probe_web = 0.5 * self.min_web
         dp_bar_probe, z_probe, *_ = _f_p_e_1(probe_web)
@@ -333,7 +296,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
             raise ValueError(
                 "Design pressure cannot be achieved by varying web down to minimum. "
                 + "Peak pressure found at phi = {:.4g} at {:.4g} MPa".format(
-                    f_psi_z(z_probe), (dp_bar_probe + p_bar_d) * 1e-6 * f * delta
+                    self.f_psi_z(z_probe), (dp_bar_probe + p_bar_d) * 1e-6 * self.f * delta
                 )
             )
 
@@ -341,7 +304,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
             probe_web *= 2
             dp_bar_probe = _f_p_e_1(probe_web)[0]
 
-        e_1_solved, _ = dekker(lambda _e_1: _f_p_e_1(_e_1)[0], probe_web, 0.5 * probe_web, y_rel_tol=tol)
+        e_1_solved, _ = dekker(lambda _e_1: _f_p_e_1(_e_1)[0], probe_web, 0.5 * probe_web, y_rel_tol=self.tol)
 
         dp_bar_i, *vals_1 = _f_p_e_1(e_1_solved)
         z_i, t_bar_i, l_bar_i, v_bar_i, eta_i, tau_i = vals_1
@@ -352,7 +315,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
         """
         step 2, find the requisite muzzle length to achieve design velocity
         """
-        v_bar_d = v_d / v_j
+        v_bar_d = self.v_d / v_j
 
         if v_bar_i > v_bar_d:
             if suppress:
@@ -361,41 +324,42 @@ class ConstrainedRecoilless(DelegatesPropellant):
             else:
                 raise ValueError(f"Design velocity exceeded before peak pressure point (V = {v_bar_i * v_j:.4g} m/s).")
 
-        b = s**2 * e_1_solved**2 / (f * phi * w * m * u_1**2) * (f * delta) ** (2 * (1 - n))
+        b = (
+            self.s**2
+            * e_1_solved**2
+            / (self.f * phi * w * self.m * self.u_1**2)
+            * (self.f * delta) ** (2 * (1 - self.n))
+        )
 
         def _ode_v(
             v_bar: float, tzletatau: tuple[float, float, float, float, float], __: float
         ) -> tuple[float, float, float, float, float]:
             _, z, l_bar, eta, tau = tzletatau
-            psi = f_psi_z(z)
-            dpsi = f_sigma_z(z)
-            l_psi_bar = 1 - delta * ((1 - psi) / rho_p + alpha * (psi - eta))
+            psi = self.f_psi_z(z)
+            dpsi = self.f_sigma_z(z)
+            l_psi_bar = 1 - delta * ((1 - psi) / self.rho_p + self.alpha * (psi - eta))
             p_bar = max(tau / (l_bar + l_psi_bar) * (psi - eta), p_a_bar)
 
-            if c_a_bar != 0 and v_bar > 0:
-                v_r = v_bar / c_a_bar
-                p_d_bar = (
-                    +0.25 * gamma_1 * (gamma_1 + 1) * v_r**2
-                    + gamma_1 * v_r * (1 + (0.25 * (gamma_1 + 1)) ** 2 * v_r**2) ** 0.5
-                ) * p_a_bar
-            else:
-                p_d_bar = 0
+            dt_bar = 2 / (self.theta * (p_bar - self._f_p_bar_ad(v_bar, c_a_bar, p_a_bar)))
 
-            dt_bar = 2 / (theta * (p_bar - p_d_bar))
-            dt_bar *= (1 + w / m * (1 - psi)) if is_tc else 1
-
-            dz = dt_bar * (0.5 * theta / b) ** 0.5 * p_bar**n
+            dz = dt_bar * (0.5 * self.theta / b) ** 0.5 * p_bar**self.n
 
             dl_bar = v_bar * dt_bar
 
             deta = c_a * s_j_bar * p_bar / tau**0.5 * dt_bar  # deta / dv_bar
             dtau = (
-                (1 - tau) * (dpsi * dz) - 2 * v_bar - theta * tau * deta  # dZ/dt_bar  # dv_bar/dt_bar  # deta/dt_bar
+                (1 - tau) * (dpsi * dz)
+                - 2 * v_bar
+                - self.theta * tau * deta  # dZ/dt_bar  # dv_bar/dt_bar  # deta/dt_bar
             ) / (psi - eta)
 
             return dt_bar, dz, dl_bar, deta, dtau
 
-        def _abort_v(_, ys, record):
+        def _abort_v(
+            _: float,
+            ys: tuple[float, float, float, float, float],
+            record: list[tuple[float, tuple[float, float, float, float, float]]],
+        ) -> bool:
             t_bar, _, l_bar, _, _ = ys
             ot_bar, *_ = record[-1][-1]
             return l_bar > l_bar_d or t_bar < ot_bar
@@ -407,15 +371,15 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 ini_val=(t_bar_i, z_i, l_bar_i, eta_i, tau_i),
                 x_0=v_bar_i,
                 x_1=v_bar_d,
-                rel_tol=tol,
-                abs_tol=tol**2,
+                rel_tol=self.tol,
+                abs_tol=self.tol**2,
                 abort_func=_abort_v,
                 record=vtzlet_record,
             )
 
         except ValueError:
             v_bar_m, (t_bar_m, z_m, l_bar_m, eta_m, tau_m) = vtzlet_record[-1]
-            pmax = _f_p_bar(z_m, l_bar_m, v_bar_m, eta_m, tau_m) * f * delta
+            pmax = _f_p_bar(z_m, l_bar_m, v_bar_m, eta_m, tau_m) * self.f * delta
             vmax = v_bar_m * v_j
             lmax = l_bar_m * l_0
             raise ValueError(
@@ -429,7 +393,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
 
         v_g = v_bar_g * v_j
         l_g = l_bar_g * l_0
-        p_g = p_bar_g * f * delta
+        p_g = p_bar_g * self.f * delta
 
         if l_bar_g > l_bar_d:
             raise ValueError(
@@ -450,99 +414,65 @@ class ConstrainedRecoilless(DelegatesPropellant):
         )
         return e_1_solved, l_bar_g * l_0
 
-    def find_min_v(self, charge_mass_ratio: float, max_guess: int = MAX_GUESSES, **_):
+    def find_min_v(
+        self,
+        charge_mass_ratio: float,
+        max_guess: int = MAX_GUESSES,
+        target: Optimization_Targets = MIN_BORE_VOLUME,
+        **_,
+    ) -> tuple[float, float, float]:
         """
         find the minimum volume solution.
         """
 
-        w = self.m * charge_mass_ratio
-        rho_p = self.rho_p
-        s = self.s
-        solve = self.solve
-        tol = self.tol
-
-        def f(load_fraction):
-            vol_0 = w / (rho_p * load_fraction)
-            l_0 = vol_0 / s
-
-            e_1_delta, l_g_delta = solve(
+        def _f(load_fraction: float) -> tuple[float, float, float]:
+            e_1_delta, l_g_delta = self.solve(
                 load_fraction=load_fraction, charge_mass_ratio=charge_mass_ratio, known_bore=False, suppress=True
             )
-            return e_1_delta, (l_g_delta + l_0), l_g_delta
+            return (
+                e_1_delta,
+                l_g_delta,
+                l_g_delta + (self.m * charge_mass_ratio / (self.rho_p * load_fraction) / self.s),
+            )
 
         records = []
         for i in range(max_guess):
-            start_probe = uniform(tol, 1 - tol)
+            start_probe = uniform(self.tol, 1 - self.tol)
             try:
-                _, lt_i, lg_i = f(start_probe)
-                records.append((start_probe, lt_i))
+                records.append((start_probe, _f(start_probe)))
                 break
             except ValueError:
                 pass
         else:
-            raise ValueError(f"Unable to find any valid load fraction with {max_guess:d} random samples.")
+            raise ValueError(f"Unable to find any valid load fraction with {max_guess} random samples.")
 
         logger.info(f"valid Δ/ρ = {start_probe:.3%}.")
 
-        low = tol
-        probe = start_probe
-        delta_low = low - probe
-        new_low = probe + delta_low
-
-        k, n = 0, floor(log(abs(delta_low) / tol, 2)) + 1
-        while abs(2 * delta_low) > tol:
-            try:
-                _, lt_i, lg_i = f(new_low)
-                records.append((new_low, lt_i))
-                probe = new_low
-            except ValueError:
-                delta_low *= 0.5
-                k += 1
-            finally:
-                new_low = probe + delta_low
-
-        low = probe
-
+        low, low_record = probe_func(_f, start_probe, self.tol, self.tol)
+        records.extend(low_record)
         logger.info(f"min Δ/ρ = {low:.3%}.")
 
-        high = 1 - tol
-        probe = start_probe
-        delta_high = high - probe
-        new_high = probe + delta_high
-
-        k, n = 0, floor(log(abs(delta_high) / tol, 2)) + 1
-        while abs(2 * delta_high) > tol:
-            try:
-                _, lt_i, lg_i = f(new_high)
-                records.append((new_high, lt_i))
-                probe = new_high
-            except ValueError:
-                delta_high *= 0.5
-                k += 1
-            finally:
-                new_high = probe + delta_high
-
-        high = probe
-
+        high, high_record = probe_func(_f, start_probe, 1 - self.tol, self.tol)
+        records.extend(high_record)
         logger.info(f"max Δ/ρ = {high:.3%}.")
 
-        if abs(high - low) < tol:
-            raise ValueError("No range of values satisfying constraint.")
+        if target == MIN_PROJ_TRAVEL:
+            _f_index = 1
+        elif target == MIN_BORE_VOLUME:
+            _f_index = 2
+        else:
+            raise ValueError(f"unknown target {target}")
 
         if len(records) > 2:
-            records.sort(key=lambda x: x[0])
+            records.sort(key=lambda x: x[0])  # sort by e_1
             for l, m, h in zip(records[:-2], records[1:-1], records[2:]):
-                if l[1] > m[1] and h[1] > m[1]:
-                    low = l[0]
-                    high = h[0]
+                if l[1][_f_index] > m[1][_f_index] and h[1][_f_index] > m[1][_f_index]:
+                    low, high = l[0], h[0]
 
-        """
-        Step 2, gss to min.
-        """
         logger.info(f"solution constrained Δ/ρ : {low:.3%} - {high:.3%}")
-        lf_low, lf_high = gss(lambda _lf: f(_lf)[1], low, high, y_rel_tol=tol, find_min=True)
+        lf_low, lf_high = gss(lambda _lf: _f(_lf)[1], low, high, x_tol=self.tol, find_min=True)
         lf = 0.5 * (lf_high + lf_low)
-        e_1, l_t, l_g = f(lf)
+        e_1, l_g, _ = _f(lf)
         logger.info(f"Optimal Δ/ρ = {lf:.2f}")
         return lf, e_1, l_g
 

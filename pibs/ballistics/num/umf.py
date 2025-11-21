@@ -155,84 +155,85 @@ def gss(
         return c, b
 
 
-def secant(
-    f: Callable[[float], float],
-    x_0: float,
-    x_1: float,
-    y: float = 0.0,
-    x_min: float = None,
-    x_max: float = None,
-    x_tol: float = FLOAT_MIN,
-    y_rel_tol: float = 0,
-    y_abs_tol: float = FLOAT_MIN,
-    it: int = 100,
-    debug: bool = False,
-) -> tuple[float, float]:
-    fx_0 = f(x_0) - y
-    fx_1 = f(x_1) - y
-
-    record = []
-
-    if x_0 == x_1 or fx_0 == fx_1:
-        errStr = "Impossible to calculate initial slope for secant search."
-        errStr += "\nf({})-{}={}\nf({})-{}={}".format(x_0, y, fx_0, x_1, y, fx_1)
-        raise ValueError(errStr)
-
-    i, x_2, fx_2 = 0, 0, 0
-    for i in range(it):
-        x_2 = x_1 - fx_1 * (x_1 - x_0) / (fx_1 - fx_0)
-        if x_min is not None and x_2 < x_min:
-            x_2 = 0.9 * x_min + 0.1 * x_1
-        if x_max is not None and x_2 > x_max:
-            x_2 = 0.9 * x_max + 0.1 * x_1
-
-        fx_2 = f(x_2) - y
-
-        if debug:
-            record.append((i, x_2, fx_2))
-
-        if any(
-            (
-                abs(x_2 - x_1) < x_tol,
-                abs(fx_2) < y_abs_tol,
-                abs(fx_2) < (abs(y) * y_rel_tol),
-            ),
-        ):
-            if debug:
-                print("SECANT")
-                print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
-                record.sort(key=lambda line: line[1])
-                for line in record:
-                    print("{:>4}{:>24}{:>24}".format(*line))
-
-            return x_2, x_1
-        else:
-            if fx_2 == fx_1:
-                if debug:
-                    print("SECANT")
-                    print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
-                    record.sort(key=lambda line: line[1])
-                    for line in record:
-                        print("{:>4}{:>24}{:>24}".format(*line))
-                raise ValueError("Numerical plateau found at f({})-{}=f({})-{}={}".format(x_1, y, x_2, y, fx_2))
-
-            x_0, x_1, fx_0, fx_1 = x_1, x_2, fx_1, fx_2
-
-    else:
-        if debug:
-            print("SECANT")
-            print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
-            record.sort(key=lambda line: line[1])
-            for line in record:
-                print("{:>4}{:>24}{:>24}".format(*line))
-
-        raise ValueError(
-            f"Secant method called from {x_min} to {x_max}\n"
-            + f"Maximum iteration exceeded at it = {i}/{it}"
-            + ",\n[0] f({})-{}={}->\n[1] f({})-{}={}->\n[2] f({})-{}={}".format(
-                x_0, y, fx_0, x_1, y, fx_1, x_2, y, fx_2
-            )
-        )
+#
+# def secant(
+#     f: Callable[[float], float],
+#     x_0: float,
+#     x_1: float,
+#     y: float = 0.0,
+#     x_min: float = None,
+#     x_max: float = None,
+#     x_tol: float = FLOAT_MIN,
+#     y_rel_tol: float = 0,
+#     y_abs_tol: float = FLOAT_MIN,
+#     it: int = 100,
+#     debug: bool = False,
+# ) -> tuple[float, float]:
+#     fx_0 = f(x_0) - y
+#     fx_1 = f(x_1) - y
+#
+#     record = []
+#
+#     if x_0 == x_1 or fx_0 == fx_1:
+#         errStr = "Impossible to calculate initial slope for secant search."
+#         errStr += "\nf({})-{}={}\nf({})-{}={}".format(x_0, y, fx_0, x_1, y, fx_1)
+#         raise ValueError(errStr)
+#
+#     i, x_2, fx_2 = 0, 0, 0
+#     for i in range(it):
+#         x_2 = x_1 - fx_1 * (x_1 - x_0) / (fx_1 - fx_0)
+#         if x_min is not None and x_2 < x_min:
+#             x_2 = 0.9 * x_min + 0.1 * x_1
+#         if x_max is not None and x_2 > x_max:
+#             x_2 = 0.9 * x_max + 0.1 * x_1
+#
+#         fx_2 = f(x_2) - y
+#
+#         if debug:
+#             record.append((i, x_2, fx_2))
+#
+#         if any(
+#             (
+#                 abs(x_2 - x_1) < x_tol,
+#                 abs(fx_2) < y_abs_tol,
+#                 abs(fx_2) < (abs(y) * y_rel_tol),
+#             ),
+#         ):
+#             if debug:
+#                 print("SECANT")
+#                 print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
+#                 record.sort(key=lambda line: line[1])
+#                 for line in record:
+#                     print("{:>4}{:>24}{:>24}".format(*line))
+#
+#             return x_2, x_1
+#         else:
+#             if fx_2 == fx_1:
+#                 if debug:
+#                     print("SECANT")
+#                     print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
+#                     record.sort(key=lambda line: line[1])
+#                     for line in record:
+#                         print("{:>4}{:>24}{:>24}".format(*line))
+#                 raise ValueError("Numerical plateau found at f({})-{}=f({})-{}={}".format(x_1, y, x_2, y, fx_2))
+#
+#             x_0, x_1, fx_0, fx_1 = x_1, x_2, fx_1, fx_2
+#
+#     else:
+#         if debug:
+#             print("SECANT")
+#             print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
+#             record.sort(key=lambda line: line[1])
+#             for line in record:
+#                 print("{:>4}{:>24}{:>24}".format(*line))
+#
+#         raise ValueError(
+#             f"Secant method called from {x_min} to {x_max}\n"
+#             + f"Maximum iteration exceeded at it = {i}/{it}"
+#             + ",\n[0] f({})-{}={}->\n[1] f({})-{}={}->\n[2] f({})-{}={}".format(
+#                 x_0, y, fx_0, x_1, y, fx_1, x_2, y, fx_2
+#             )
+#         )
 
 
 def dekker(
@@ -334,55 +335,55 @@ def dekker(
         )
 
 
-def bisect(
-    f: Callable[[float], float],
-    x_0: float,
-    x_1: float,
-    y: float = 0,
-    x_tol: float = 1e-16,
-    y_abs_tol: float = 1e-16,
-    y_rel_tol: float = 0,
-    debug: bool = False,
-) -> tuple[float, float]:
-    """bisection method to numerically solve for zero
-    two initial guesses must be of opposite sign.
-    The root found is guaranteed to be within the range specified.
-    """
-    a, b = min(x_0, x_1), max(x_0, x_1)
-    fa = f(a) - y
-    fb = f(b) - y
-
-    record = []
-
-    if x_tol > 0:
-        n = math.ceil(math.log((b - a) / x_tol, 2))
-    else:
-        n = math.inf
-
-    if fa * fb >= 0:
-        raise ValueError("Initial Guesses Must Be Of Opposite Sign")
-
-    for i in range(n):
-        if abs(fa - fb) < max(y_abs_tol, y * y_rel_tol):
-            break
-
-        c = 0.5 * (a + b)
-        fc = f(c) - y
-
-        record.append((i, c, fc))
-
-        if fc * fa > 0:
-            a = c
-            fa = fc
-        else:
-            b = c
-            fb = fc
-
-    if debug:
-        print("BISECT")
-        print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
-        record.sort(key=lambda r: r[1])
-        for line in record:
-            print("{:>4}{:>24}{:>24}".format(*line))
-
-    return a, b
+# def bisect(
+#     f: Callable[[float], float],
+#     x_0: float,
+#     x_1: float,
+#     y: float = 0,
+#     x_tol: float = 1e-16,
+#     y_abs_tol: float = 1e-16,
+#     y_rel_tol: float = 0,
+#     debug: bool = False,
+# ) -> tuple[float, float]:
+#     """bisection method to numerically solve for zero
+#     two initial guesses must be of opposite sign.
+#     The root found is guaranteed to be within the range specified.
+#     """
+#     a, b = min(x_0, x_1), max(x_0, x_1)
+#     fa = f(a) - y
+#     fb = f(b) - y
+#
+#     record = []
+#
+#     if x_tol > 0:
+#         n = math.ceil(math.log((b - a) / x_tol, 2))
+#     else:
+#         n = math.inf
+#
+#     if fa * fb >= 0:
+#         raise ValueError("Initial Guesses Must Be Of Opposite Sign")
+#
+#     for i in range(n):
+#         if abs(fa - fb) < max(y_abs_tol, y * y_rel_tol):
+#             break
+#
+#         c = 0.5 * (a + b)
+#         fc = f(c) - y
+#
+#         record.append((i, c, fc))
+#
+#         if fc * fa > 0:
+#             a = c
+#             fa = fc
+#         else:
+#             b = c
+#             fb = fc
+#
+#     if debug:
+#         print("BISECT")
+#         print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
+#         record.sort(key=lambda r: r[1])
+#         for line in record:
+#             print("{:>4}{:>24}{:>24}".format(*line))
+#
+#     return a, b

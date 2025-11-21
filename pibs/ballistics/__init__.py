@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Literal, Union
+from enum import Enum
 
 DOMAIN_TIME = "DOMAIN_TIME"
 DOMAIN_LEN = "DOMAIN_LEN"
@@ -38,6 +39,11 @@ SOL_LAGRANGE = "SOL_LAGRANGE"
 SOL_PIDDUCK = "SOL_PIDDUCK"
 SOL_MAMONTOV = "SOL_MAMONTOV"
 
+
+MIN_BORE_VOLUME = "MIN_BORE_VOLUME"  # minimum bore volume
+MIN_PROJ_TRAVEL = "MIN_PROJ_TRAVEL"  # minimum barrel length
+Optimization_Targets = Union[Literal["MIN_BORE_VOLUME", "MIN_PROJ_TRAVEL"], str]
+
 Solutions = Union[Literal["SOL_LAGRANGE", "SOL_PIDDUCK", "SOL_MAMONTOV"], str]
 
 CONVENTIONAL = "CONVENTIONAL"
@@ -50,14 +56,7 @@ MAX_GUESSES = 100
 # maximum iteration to correct for chambrage effects.
 MAX_ITER = 10
 
-from .gun import (
-    GenericEntry,
-    GenericResult,
-    Gun,
-    OutlineEntry,
-    PressureProbePoint,
-    PressureTraceEntry,
-)
+from .gun import GenericEntry, GenericResult, Gun, OutlineEntry, PressureProbePoint, PressureTraceEntry
 from .material import Material
 from .optimize_gun import Constrained
 from .optimize_recoilless import ConstrainedRecoilless

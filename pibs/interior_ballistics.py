@@ -9,21 +9,12 @@ import traceback
 
 if platform.system() == "Windows":
     from ctypes import windll
-from itertools import repeat
+
 from logging.handlers import QueueHandler, QueueListener
 from math import ceil, inf, log10
 from multiprocessing import Process, Queue
 from queue import Empty
-from tkinter import (
-    IntVar,
-    Menu,
-    StringVar,
-    Text,
-    Tk,
-    filedialog,
-    messagebox,
-    ttk,
-)
+from tkinter import IntVar, Menu, StringVar, Text, Tk, filedialog, messagebox, ttk
 from tkinter.font import Font
 from tkinter.ttk import Frame
 from typing import Literal
@@ -1963,7 +1954,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 self.bop.set(self.get_loc_str("uncontained"))
 
             try:
-                self.sj.set(f"{to_si(self.gun.S_j, unit='m²', unit_dim=2):}")
+                self.sj.set(f"{to_si(self.gun.s_j, unit='m²', unit_dim=2):}")
             except AttributeError:
                 self.sj.set("N/A")
 
@@ -2002,8 +1993,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 xs, vs, vxs, pas, pss, pbs, p0s, psis, etas, stags = [], [], [], [], [], [], [], [], [], []
 
                 for entry in self.gun_result.table_data:
-                    tag, (time, l, psi, v, pb, p, ps, temp, vx, p0, eta, stag) = "", repeat(0.0, 12)
-
                     tag = entry.tag
                     time = entry.time
                     l = entry.travel
@@ -2016,12 +2005,15 @@ class InteriorBallisticsFrame(LocalizedFrame):
                         p0 = entry.stag_pressure
                         eta = entry.outflow_fraction
                         stag = entry.rel_stag_point
+                    else:
+                        vx, p0, eta, stag = 0, 0, 0, 0
 
                     p = entry.avg_pressure
                     ps = entry.shot_pressure
 
                     if tag == self.p_control.get():
                         x_peak = (time * 1e3) if dom == DOMAIN_TIME else l
+                        # noinspection PyTypeChecker
                         self.ax_p.spines.left.set_position(("data", x_peak))
 
                     if dom == DOMAIN_TIME:
@@ -2589,7 +2581,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 if "cvldlf_consistency_callback" in name:
                     entry.var.trace_remove(*trace)
 
-    def cvldlf_consistency_callback(self, val_name="", *_):
+    def cvldlf_consistency_callback(self, *_):
         try:
             compo = self.drop_prop.get_obj()
             sigfig = int(self.acc_exp.get()) + 1

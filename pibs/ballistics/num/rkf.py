@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import logging
 import sys
 import traceback
 from math import inf
-from typing import TypeVar, Callable
-import logging
+from typing import Callable, TypeVar
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)

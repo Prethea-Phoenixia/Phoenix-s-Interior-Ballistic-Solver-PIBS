@@ -1,6 +1,5 @@
 import logging
 import multiprocessing
-
 from itertools import repeat
 from math import inf
 from typing import Optional
@@ -90,6 +89,7 @@ def f(
                 length_gun=length_gun,
                 chambrage=target.chi_k,
                 drag_coefficient=drag_coefficient,
+                tol=tol,
             )
         elif typ == RECOILLESS:
             gun = Recoilless(
@@ -105,6 +105,7 @@ def f(
                 drag_coefficient=drag_coefficient,
                 nozzle_expansion=nozzle_expansion,
                 nozzle_efficiency=nozzle_efficiency,
+                tol=tol,
             )
         else:
             raise ValueError("unknown gun type")

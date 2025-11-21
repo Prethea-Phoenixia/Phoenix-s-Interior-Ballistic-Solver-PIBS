@@ -39,7 +39,7 @@
 	"Min Charge / Shot Mass": 0.25,
 	"Min Load Fraction (%)": 10.0,
 	"Minimize Total Volume": false,
-	"Minimum Web (μm)": 1.0,
+	"Minimum Web (μm)": 100.0,
 	"Mixed Charge": false,
 	"Nozzle Efficiency (%)": 92.0,
 	"Pressure Constraint": "PEAK_BREECH_P",
