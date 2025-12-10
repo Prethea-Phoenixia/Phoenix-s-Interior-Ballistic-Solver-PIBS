@@ -154,7 +154,7 @@ class TextHandler(logging.Handler):
 class PIBS(Tk):
     def __init__(self, *args, loc: str, debug: bool, **kwargs):
         super().__init__(*args, **kwargs)
-        # Only works on windows:(
+        # Only works on Windows:(
         if platform.system() == "Windows":
             super().iconbitmap(default=resolvepath("ui/logo.ico"))
         super().option_add("*tearOff", False)
@@ -1744,7 +1744,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
             "sol": self.drop_soln.get_obj(),
             "control": self.p_control.get_obj(),
             "structural_material": (
-                Material(rho=float(self.material_density.get()), yield_strength=float(self.material_yield.get()) * 1e6)
+                Material(
+                    density=float(self.material_density.get()), yield_strength=float(self.material_yield.get()) * 1e6
+                )
                 if self.use_material.get()
                 else None
             ),
@@ -1784,13 +1786,19 @@ class InteriorBallisticsFrame(LocalizedFrame):
         if atmosphere:
             self.kwargs.update(
                 {
-                    "ambient_p": float(self.amb_p.get()) * 1e3,
-                    "ambient_rho": float(self.amb_rho.get()),
-                    "ambient_gamma": float(self.amb_gamma.get()),
+                    "ambient_pressure": float(self.amb_p.get()) * 1e3,
+                    "ambient_density": float(self.amb_rho.get()),
+                    "ambient_adb_index": float(self.amb_gamma.get()),
                 }
             )
         else:
-            self.kwargs.update({"ambient_p": 0, "ambient_rho": 0, "ambient_gamma": 1})
+            self.kwargs.update(
+                {
+                    "ambient_pressure": 0.0,
+                    "ambient_density": 0.0,
+                    "ambient_adb_index": 1.0,
+                }
+            )
 
     def on_guide(self):
         self.focus()  # remove focus to force widget entry validation
@@ -2207,10 +2215,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         compo = self.drop_prop.get_obj()
         self.specs.delete("1.0", "end")
 
-        if compo.T_v:
+        if compo.temp_v:
             self.specs.insert(
                 "end",
-                "{:}: {:>4.0f} K {:}\n".format(self.get_loc_str("TvDesc"), compo.T_v, self.get_loc_str("isochorDesc")),
+                "{:}: {:>4.0f} K {:}\n".format(
+                    self.get_loc_str("TvDesc"), compo.temp_v, self.get_loc_str("isochorDesc")
+                ),
             )
         self.specs.insert("end", "{:}: {:>4.0f} kg/m³\n".format(self.get_loc_str("densityDesc"), compo.rho_p))
         self.specs.insert("end", "{:}: {:>4.0f} kJ/kg\n".format(self.get_loc_str("force"), compo.f / 1e3))
@@ -2812,7 +2822,13 @@ def calculate(job_queue, log_queue, kwargs):
         else:
             raise ValueError("unknown gun type")
 
+        root_logger.info(gun.to_json())
+
         gun_result = gun.integrate(**kwargs)
+
+        if kwargs["structural_material"]:
+            gun.structure(gun_result, **kwargs)
+
         root_logger.info("calculation concluded.")
 
     except Exception as e:

@@ -7,7 +7,7 @@ GEOMETRIES:
 
 from __future__ import annotations
 
-import csv
+import csv, json
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumType
 from math import pi
@@ -16,8 +16,16 @@ from math import pi
 class Geometry(ABC):
     all_geometries = list()
 
-    def __init__(self):
+    def __init__(self, desc: str):
+        self.desc = desc
         Geometry.all_geometries.append(self)
+
+    @staticmethod
+    def from_desc(desc: str) -> Geometry:
+        for geometry in Geometry.all_geometries:
+            if geometry.desc == desc:
+                return geometry
+        raise ValueError(f"unknown desc: {desc}")
 
     @abstractmethod
     def get_form_function_coefficients(self, r1: float, r2: float) -> tuple[float, float, float, float, float, float]:
@@ -45,8 +53,7 @@ class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
     """table 1-3 from ref[1] page 23"""
 
     def __init__(self, desc: str, alpha: int, beta: int):
-        super().__init__()
-        self.desc = desc
+        super().__init__(desc)
         self.alpha = alpha
         self.beta = beta
 
@@ -99,8 +106,7 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
         b_factors: tuple[float, float],
     ):
 
-        super().__init__()
-        self.desc = desc
+        super().__init__(desc)
         self.A, self.B, self.C = _a, _b, _c
         self.rho_div, self.n_hole, self.a_factors, self.b_factors = rho_div, n_hole, a_factors, b_factors
 
@@ -187,10 +193,30 @@ class Composition:
         self.theta = reduced_adiabatic_index
         self.u_1 = burn_rate_coefficient
         self.n = pressure_exponent
-        self.T_v = adiabatic_flame_temperature  # isochoric (const volume) adiabatic temperature
+        self.temp_v = adiabatic_flame_temperature  # isochoric (const volume) adiabatic temperature
 
     def __str__(self):
         return self.name
+
+    def to_json(self) -> str:
+        return json.dumps(
+            {
+                "name": self.name,
+                "desc": self.desc,
+                "force": self.f,
+                "covolume": self.alpha,
+                "density": self.rho_p,
+                "reduced_adiabatic_index": self.theta,
+                "burn_rate_coefficient": self.u_1,
+                "pressure_exponent": self.n,
+                "adiabatic_flame_temperature": self.temp_v,
+            },
+            ensure_ascii=False,
+        )
+
+    @staticmethod
+    def from_json(json_dict: dict) -> Composition:
+        return Composition(**json_dict)
 
     @staticmethod
     def read_file(file_name: str):
@@ -283,6 +309,12 @@ class Propellant:
         if any((main_r1 and main_r1 < 0, main_r2 and main_r2 < 0)):
             raise ValueError("Geometry is impossible")
 
+        self.main_r1 = main_r1
+        self.main_r2 = main_r2
+        self.aux_geom = aux_geom
+        self.aux_r1 = aux_r1
+        self.aux_r2 = aux_r2
+
         self.composition = composition
         self.geometry = main_geom
 
@@ -301,6 +333,29 @@ class Propellant:
 
         if self.mass_ratio > 0 and z_b2 > self.z_b / self.web_ratio:
             raise ValueError("Auxiliary grains must complete combustion in advance of the primary grains.")
+
+    def to_json(self) -> str:
+        return json.dumps(
+            {
+                "composition": json.loads(self.composition.to_json()),
+                "geometry": self.geometry.desc,
+                "main_r1": self.main_r1,
+                "main_r2": self.main_r2,
+                "aux_geom": self.aux_geom.desc,
+                "aux_r1": self.aux_r1,
+                "aux_r2": self.aux_r2,
+                "web_ratio": self.web_ratio,
+                "mass_ratio": self.mass_ratio,
+                "combustible_fraction": self.combustible_fraction,
+                "combustible_force": self.combustible_force,
+                "force_fudge": self.force_fudge,
+            },
+            ensure_ascii=False,
+        )
+
+    @staticmethod
+    def from_json(json_dict: dict) -> Propellant:
+        return Propellant(**json_dict)
 
     @property
     def f(self) -> float:
@@ -329,8 +384,8 @@ class Propellant:
         return self.composition.n
 
     @property
-    def T_v(self) -> float:
-        return self.composition.T_v
+    def temp_v(self) -> float:
+        return self.composition.temp_v
 
     @staticmethod
     def f_sigma(z_i: float, params: tuple[float, float, float, float, float, float]) -> float:

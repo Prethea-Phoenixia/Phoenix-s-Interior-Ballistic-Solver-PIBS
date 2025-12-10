@@ -107,8 +107,8 @@ class DelegatesPropellant:
         return self.propellant.n
 
     @property
-    def T_v(self) -> float:
-        return self.propellant.T_v
+    def temp_v(self) -> float:
+        return self.propellant.temp_v
 
     @property
     def z_b(self) -> float:

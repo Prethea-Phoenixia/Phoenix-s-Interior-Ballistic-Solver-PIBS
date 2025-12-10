@@ -1,12 +1,10 @@
 from __future__ import annotations
 
+import json
 import logging
-import sys
-import traceback
 from dataclasses import dataclass
 from math import exp, inf, log, pi
 from typing import Callable
-
 from . import (
     COMPUTE,
     DOMAIN_LEN,
@@ -93,7 +91,6 @@ def pidduck(wpm: float, k: float, tol: float) -> tuple[float, float]:
     else:
         labda_1 = ((1 - omega) ** (k / (1 - k)) - 1) / wpm
 
-    # Pidduck's solution
     i_u, _ = integrate(lambda x: g(omega, x), 0, 1, tol)
     i_l, _ = integrate(lambda x: f(omega, x), 0, 1, tol)
     labda_2 = i_u / i_l
@@ -114,14 +111,11 @@ class Gun(DelegatesPropellant):
         length_gun: float,
         chambrage: float,
         tol: float,
-        structural_material: Material | None = None,
-        structural_safety_factor: float = 1.1,
         drag_coefficient: float = 0.0,
-        autofrettage: bool = True,
         sol: Solutions = SOL_PIDDUCK,
-        ambient_rho: float = 1.204,
-        ambient_p: float = 101.325e3,
-        ambient_gamma: float = 1.4,
+        ambient_density: float = 1.204,
+        ambient_pressure: float = 101.325e3,
+        ambient_adb_index: float = 1.4,
         **_,
     ):
 
@@ -140,11 +134,14 @@ class Gun(DelegatesPropellant):
         self.l_0 = self.vol_0 / self.s
         self.l_c = self.l_0 / self.chi_k
         self.delta = self.w / self.vol_0
+        self.tol = tol
+        self.sol = sol
 
         self.phi_1 = 1 / (1 - drag_coefficient)  # drag work coefficient
-        self.material = structural_material
-        self.ssf = structural_safety_factor
-        self.is_af = autofrettage
+
+        self.ambient_density = ambient_density
+        self.ambient_pressure = ambient_pressure
+        self.ambient_adb_index = ambient_adb_index
 
         if self.p_0 == 0:
             raise NotImplementedError(
@@ -195,17 +192,39 @@ class Gun(DelegatesPropellant):
             lambda _z: self.propellant.f_psi_z(_z) - self.psi_0, 0, 1, x_tol=tol, y_rel_tol=tol, y_abs_tol=tol**2
         )
 
-        ambient_p, ambient_gamma = max(ambient_p, 1), max(ambient_gamma, 1)
-        if ambient_rho < 0:
+        ambient_pressure, ambient_adb_index = max(ambient_pressure, 1), max(ambient_adb_index, 1)
+        if ambient_density < 0:
             raise ValueError("Invalid ambient condition")
 
-        self.p_a_bar = ambient_p / (self.f * self.delta)
-        if ambient_rho != 0:
-            self.c_a_bar = (ambient_gamma * ambient_p / ambient_rho) ** 0.5 / self.v_j
+        self.p_a_bar = ambient_pressure / (self.f * self.delta)
+        if ambient_density != 0:
+            self.c_a_bar = (ambient_adb_index * ambient_pressure / ambient_density) ** 0.5 / self.v_j
         else:
             self.c_a_bar = 0
 
-        self.k_1 = ambient_gamma
+        self.k_1 = ambient_adb_index
+
+    def to_json(self) -> str:
+        return json.dumps(
+            {
+                "caliber": self.caliber,
+                "shot_mass": self.m,
+                "propellant": json.loads(self.propellant.to_json()),
+                "web": self.e_1 * 2,
+                "charge_mass": self.w,
+                "chamber_volume": self.vol_0,
+                "start_pressure": self.p_0,
+                "length_gun": self.l_g,
+                "chambrage": self.chi_k,
+                "tol": self.tol,
+                "drag_coefficient": 1 - 1 / self.phi_1,
+                "sol": self.sol,
+                "ambient_density": self.ambient_density,
+                "ambient_pressure": self.ambient_pressure,
+                "ambient_adb_index": self.ambient_adb_index,
+            },
+            ensure_ascii=False,
+        )
 
     def f_p_bar(self, z: float, l_bar: float, v_bar: float) -> float:
         psi = self.f_psi_z(z)
@@ -263,8 +282,8 @@ class Gun(DelegatesPropellant):
         given pressure and travel, return temperature
         using the Nobel-Abel EOS
         """
-        if self.T_v:
-            r = self.f / self.T_v
+        if self.temp_v:
+            r = self.f / self.temp_v
             l_psi = self.l_0 * (1 - self.delta / self.rho_p - self.delta * (self.alpha * -1 / self.rho_p) * psi)
             return self.s * p * (l + l_psi) / (self.w * psi * r)
         else:
@@ -601,19 +620,6 @@ class Gun(DelegatesPropellant):
         # calculate a pressure and flow velocity tracing.
         gun_result = GunResult(self, data, p_trace)
 
-        if self.material is None:
-            logger.warning("material is not specified, skipping structural calculation.")
-        else:
-
-            try:
-                self.get_structural(gun_result, step, tol)
-
-            except Exception:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                logger.error("exception occurred during structural calculation:")
-                logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
-                logger.info("structural calculation skipped.")
-
         return gun_result
 
     def append_bar_data(
@@ -681,29 +687,34 @@ class Gun(DelegatesPropellant):
         p_b: pressure of breech
         x: probe point, start from the breech face.
         """
-        l_1 = l
-        a_1 = self.s
-        a_0 = a_1 * self.chi_k
+
         r = self.chi_k * x if x < self.l_c else (x - self.l_c) + self.l_0
         k = (r / (self.l_0 + l)) ** 2
         p_x = p_s * k + p_b * (1 - k)
 
         if x < self.l_c:
-            u = a_1 * x * v / (self.vol_0 + a_1 * l_1)
+            u = x * v / (self.l_0 + l)
         else:
-            u = (a_1 * x + (a_0 - a_1) * self.l_c) * v / (self.vol_0 + a_1 * l_1)
+            u = (x + (self.chi_k - 1) * self.l_c) * v / (self.l_0 + l)
 
         return p_x, u
 
-    def get_structural(self, gun_result: GunResult, step: int, tol: float) -> None:
-        if not self.material:
-            raise ValueError("Material must be supplied for structural calculation.")
+    def structure(
+        self,
+        gun_result: GunResult,
+        step: int,
+        tol: float,
+        structural_material: Material,
+        structural_safety_factor: float = 1.1,
+        autofrettage: bool = True,
+        **_,
+    ) -> None:
 
         step = max(step, 1)
 
         # step 1. calculate the barrel mass
-        r = 0.5 * self.caliber
-        r_c = r * self.chi_k**0.5
+        r_b = 0.5 * self.caliber
+        r_c = r_b * self.chi_k**0.5
         x_probes = (
             [i / step * self.l_c for i in range(step)]
             + [self.l_c * (1 - tol)]
@@ -726,22 +737,22 @@ class Gun(DelegatesPropellant):
 
         # strength requirement given structural safety factor.
         for i in range(len(p_probes)):
-            p_probes[i] *= self.ssf
+            p_probes[i] *= structural_safety_factor
 
         i = step + 1
         x_c, p_c = x_probes[:i], p_probes[:i]  # c for chamber
         x_b, p_b = x_probes[i:], p_probes[i:]  # b for barrel
 
-        if self.is_af:
+        if autofrettage:
             v_c, k_c, m_c = Gun.barrel_autofrettage(
-                x_c, p_c, [self.s * self.chi_k for _ in x_c], self.material.yield_strength
+                x_c, p_c, [self.s * self.chi_k for _ in x_c], structural_material.yield_strength
             )
-            v_b, k_b, m_b = Gun.barrel_autofrettage(x_b, p_b, [self.s for _ in x_b], self.material.yield_strength)
+            v_b, k_b, m_b = Gun.barrel_autofrettage(x_b, p_b, [self.s for _ in x_b], structural_material.yield_strength)
         else:
             v_c, k_c, m_c = Gun.barrel_monoblock(
-                x_c, p_c, [self.s * self.chi_k for _ in x_c], self.material.yield_strength
+                x_c, p_c, [self.s * self.chi_k for _ in x_c], structural_material.yield_strength
             )
-            v_b, k_b, m_b = Gun.barrel_monoblock(x_b, p_b, [self.s for _ in x_b], self.material.yield_strength)
+            v_b, k_b, m_b = Gun.barrel_monoblock(x_b, p_b, [self.s for _ in x_b], structural_material.yield_strength)
 
         v = v_c + v_b
         k_probes = k_c + k_b
@@ -752,10 +763,10 @@ class Gun(DelegatesPropellant):
             if x < self.l_c:
                 hull.append(OutlineEntry(x, r_c, k * r_c, m * r_c))
             else:
-                hull.append(OutlineEntry(x, r, k * r, m * r))
+                hull.append(OutlineEntry(x, r_b, k * r_b, m * r_b))
 
         gun_result.outline = hull
-        gun_result.tubeMass = v * self.material.rho
+        gun_result.tubeMass = v * structural_material.density
 
         logger.info("conducted structural calculation.")
 

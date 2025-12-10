@@ -1,8 +1,7 @@
 from __future__ import annotations
 
+import json
 import logging
-import sys
-import traceback
 from dataclasses import dataclass
 from math import inf, pi, tan
 from typing import Callable
@@ -72,42 +71,38 @@ class Recoilless(DelegatesPropellant):
         tol: float,
         drag_coefficient: float = 0.0,
         nozzle_efficiency: float = 0.92,
-        structural_material: Material = None,
-        structural_safety_factor: float = 1.1,
-        autofrettage: bool = True,
-        ambient_rho: float = 1.204,
-        ambient_p: float = 101.325e3,
-        ambient_gamma: float = 1.4,
+        ambient_density: float = 1.204,
+        ambient_pressure: float = 101.325e3,
+        ambient_adb_index: float = 1.4,
         **_,
     ):
         super().__init__(propellant=propellant)
 
         self.propellant = propellant
         self.caliber = caliber
-        e_1 = 0.5 * web
         self.s = (caliber / 2) ** 2 * pi
         self.m = shot_mass
         self.w = charge_mass
-        self.V_0 = chamber_volume
+        self.vol_0 = chamber_volume
         self.p_0 = start_pressure
         self.l_g = length_gun
         self.chi_0 = nozzle_efficiency
         self.a_bar = nozzle_expansion
-
+        self.e_1 = web / 2
+        self.tol = tol
         self.chi_k = chambrage  # ration of l_0 / l_chamber
-        self.l_0 = self.V_0 / self.s
+        self.l_0 = self.vol_0 / self.s
         self.l_c = self.l_0 / self.chi_k
 
-        self.Delta = self.w / self.V_0
+        self.ambient_density = ambient_density
+        self.ambient_pressure = ambient_pressure
+        self.ambient_adb_index = ambient_adb_index
+
+        self.Delta = self.w / self.vol_0
         self.phi_1 = 1 / (1 - drag_coefficient)  # drag work coefficient
         self.phi = self.phi_1 + self.w / (3 * self.m)
 
         self.v_j = (2 * self.f * self.w / (self.theta * self.phi * self.m)) ** 0.5
-
-        self.material = structural_material
-        self.ssf = structural_safety_factor
-        self.is_af = autofrettage
-
         if self.p_0 == 0:
             raise NotImplementedError(
                 "Current implementation use exponential burn rate and does not"
@@ -130,7 +125,7 @@ class Recoilless(DelegatesPropellant):
 
         self.B = (
             self.s**2
-            * e_1**2
+            * self.e_1**2
             / (self.f * self.phi * self.w * self.m * self.u_1**2)
             * (self.f * self.Delta) ** (2 * (1 - self.n))
         )
@@ -150,8 +145,8 @@ class Recoilless(DelegatesPropellant):
             * phi_2
         )
 
-        ambient_p = max(ambient_p, 1)
-        ambient_gamma = max(ambient_gamma, 1)
+        ambient_pressure = max(ambient_pressure, 1)
+        ambient_adb_index = max(ambient_adb_index, 1)
 
         self.psi_0 = (1 / self.Delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
         if self.psi_0 <= 0:
@@ -170,7 +165,7 @@ class Recoilless(DelegatesPropellant):
             lambda _z: self.propellant.f_psi_z(_z), 0, 1, y=self.psi_0, x_tol=tol, y_rel_tol=tol, y_abs_tol=tol**2
         )
 
-        if ambient_rho < 0:
+        if ambient_density < 0:
             raise ValueError("Invalid ambient condition")
 
         gamma = self.theta + 1
@@ -187,13 +182,36 @@ class Recoilless(DelegatesPropellant):
             )
         self.s_j = self.s_j_bar * self.s
 
-        self.p_a_bar = ambient_p / (self.f * self.Delta)
-        if ambient_rho != 0:
-            self.c_a_bar = (ambient_gamma * ambient_p / ambient_rho) ** 0.5 / self.v_j
+        self.p_a_bar = ambient_pressure / (self.f * self.Delta)
+        if ambient_density != 0:
+            self.c_a_bar = (ambient_adb_index * ambient_pressure / ambient_density) ** 0.5 / self.v_j
         else:
             self.c_a_bar = 0
 
-        self.k_1 = ambient_gamma
+        self.k_1 = ambient_adb_index
+
+    def to_json(self) -> str:
+        return json.dumps(
+            {
+                "caliber": self.caliber,
+                "shot_mass": self.m,
+                "propellant": json.loads(self.propellant.to_json()),
+                "web": self.e_1 * 2,
+                "charge_mass": self.w,
+                "chamber_volume": self.vol_0,
+                "start_pressure": self.p_0,
+                "length_gun": self.l_g,
+                "chambrage": self.chi_k,
+                "tol": self.tol,
+                "drag_coefficient": 1 - 1 / self.phi_1,
+                "nozzle_expansion": self.a_bar,
+                "nozzle_efficiency": self.chi_0,
+                "ambient_density": self.ambient_density,
+                "ambient_pressure": self.ambient_pressure,
+                "ambient_adb_index": self.ambient_adb_index,
+            },
+            ensure_ascii=False,
+        )
 
     def f_p_bar(self, z: float, l_bar: float, eta: float, tau: float, psi: None | float = None) -> float:
         psi = psi if psi else self.f_psi_z(z)
@@ -348,7 +366,7 @@ class Recoilless(DelegatesPropellant):
             except ValueError as e:
                 ztlvet_record.extend(ztlvet_record_i)
                 z, (t_bar, l_bar, v_bar, eta, tau) = ztlvet_record[-1]
-                dt_bar, dl_bar, dv_bar, deta, dtau = self.ode_z(z, (t_bar, l_bar, v_bar, eta, tau), _)
+                dt_bar, dl_bar, dv_bar, deta, dtau = self.ode_z(z, (t_bar, l_bar, v_bar, eta, tau), 0)
 
                 if all((dt_bar > 0, dl_bar > 0, dv_bar < 0)):
                     raise ValueError(
@@ -579,7 +597,7 @@ class Recoilless(DelegatesPropellant):
             psi = self.f_psi_z(z)
             v = v_bar * self.v_j
             p = p_bar * p_scale
-            temp = tau * self.T_v if self.T_v else None
+            temp = tau * self.temp_v if self.temp_v else None
 
             ps, p0, pb, vb, stag = self.to_ps_p0_pb_vb_stag(l, v, p, tau, eta)
 
@@ -615,7 +633,12 @@ class Recoilless(DelegatesPropellant):
             t = t_bar * t_scale
             if t in [tableEntry.time for tableEntry in data]:
                 continue
-            l, v, p, temp = (l_bar * self.l_0, v_bar * self.v_j, p_bar * p_scale, tau * self.T_v if self.T_v else None)
+            l, v, p, temp = (
+                l_bar * self.l_0,
+                v_bar * self.v_j,
+                p_bar * p_scale,
+                tau * self.temp_v if self.temp_v else None,
+            )
 
             ps, p0, pb, vb, stag = self.to_ps_p0_pb_vb_stag(l, v, p, tau, eta)
 
@@ -650,19 +673,6 @@ class Recoilless(DelegatesPropellant):
         data, p_trace = zip(*((a, b) for a, b in sorted(zip(data, p_trace), key=lambda entries: entries[0].time)))
 
         recoilless_result = RecoillessResult(self, data, p_trace)
-
-        if self.material is None:
-            logger.warning("material is not specified, skipping structural calculation.")
-        else:
-
-            try:
-                self.get_structural(recoilless_result, step, tol)
-
-            except Exception:
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                logger.error("exception occured during structural calculation:")
-                logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
-                logger.info("structural calculation skipped.")
 
         return recoilless_result
 
@@ -740,7 +750,7 @@ class Recoilless(DelegatesPropellant):
         m_dot = self.c_a * self.v_j * self.s_j * p / (self.f * tau**0.5)
         # mass flow rate, rearward
         sb = self.s * self.chi_k
-        vb = m_dot * (self.V_0 + self.s * l) / (sb * (self.w - y))
+        vb = m_dot * (self.vol_0 + self.s * l) / (sb * (self.w - y))
         # velocity impinging upon the rear of the breech before nozzle constriction
 
         h = min(inf if v == 0 else (vb / v), 2 * self.phi_1 * self.m / (self.w - y) + 1)
@@ -794,21 +804,28 @@ class Recoilless(DelegatesPropellant):
 
         return cf
 
-    def get_structural(self, recoilless_result: RecoillessResult, step: int, tol: float) -> None:
-        if not self.material:
-            raise ValueError("Material must be supplied for structural calculation.")
-
+    def structure(
+        self,
+        recoilless_result: RecoillessResult,
+        step: int,
+        tol: float,
+        structural_material: Material,
+        structural_safety_factor: float = 1.1,
+        autofrettage: bool = True,
+        **_,
+    ) -> None:
         step = max(step, 1)
         l_c = self.l_c
         l_g = self.l_g
-        chi_k = self.chi_k
-        sigma = self.material.yield_strength
+
+        sigma = structural_material.yield_strength
         s = self.s
         gamma = self.theta + 1
 
         # a_bar = self.a_bar
-        r = 0.5 * self.caliber  # radius of the shot.
-        r_c = r * chi_k**0.5  # chamber/breech radius
+        r_b = 0.5 * self.caliber  # radius of the shot.
+
+        r_c = r_b * self.chi_k**0.5  # chamber/breech radius
         r_t = r_c * self.s_j_bar**0.5  # throat radius
         r_n = r_t * self.a_bar**0.5  # nozzle exit radius
 
@@ -836,7 +853,7 @@ class Recoilless(DelegatesPropellant):
 
         # strength requirement given structural safety factor.
         for i in range(len(p_probes)):
-            p_probes[i] *= self.ssf
+            p_probes[i] *= structural_safety_factor
 
         """
         subscript k denote the end of the chamber
@@ -875,7 +892,7 @@ class Recoilless(DelegatesPropellant):
             neg_ps.append(p)
             neg_ss.append(pi * r**2)
 
-        if self.is_af:
+        if autofrettage:
             v_n, k_n, m_n = Gun.barrel_autofrettage(neg_x_probes, neg_ps, neg_ss, sigma)
         else:
             v_n, k_n, m_n = Gun.barrel_monoblock(neg_x_probes, neg_ps, neg_ss, sigma)
@@ -884,29 +901,29 @@ class Recoilless(DelegatesPropellant):
         for x, r, k, m in zip(neg_x_probes, r_probes, k_n, m_n):
             hull.append(OutlineEntry(x, r, r * k, r * m))
 
-        nozzle_mass = v_n * self.material.rho
+        nozzle_mass = v_n * structural_material.density
 
         i = step + 1
         x_c, p_c = x_probes[:i], p_probes[:i]  # c for chamber
         x_b, p_b = x_probes[i:], p_probes[i:]  # b for barrel
 
-        if self.is_af:
-            v_c, k_c, m_c = Gun.barrel_autofrettage(x_c, p_c, [s * chi_k for _ in x_c], sigma)
+        if autofrettage:
+            v_c, k_c, m_c = Gun.barrel_autofrettage(x_c, p_c, [s * self.chi_k for _ in x_c], sigma)
             v_b, k_b, m_b = Gun.barrel_autofrettage(x_b, p_b, [s for _ in x_b], sigma)
         else:
-            v_c, k_c, m_c = Gun.barrel_monoblock(x_c, p_c, [s * chi_k for _ in x_c], sigma)
+            v_c, k_c, m_c = Gun.barrel_monoblock(x_c, p_c, [s * self.chi_k for _ in x_c], sigma)
             v_b, k_b, m_b = Gun.barrel_monoblock(x_b, p_b, [s for _ in x_b], sigma)
 
         v = v_c + v_b
         k_probes = k_c + k_b
         m_probes = m_c + m_b
 
-        tube_mass = v * self.material.rho
+        tube_mass = v * structural_material.density
         for x, k, m in zip(x_probes, k_probes, m_probes):
             if x < l_c:
                 hull.append(OutlineEntry(x, r_c, k * r_c, m * r_c))
             else:
-                hull.append(OutlineEntry(x, r, k * r, m * r))
+                hull.append(OutlineEntry(x, r_b, k * r_b, m * r_b))
 
         recoilless_result.outline = hull
         recoilless_result.tubeMass = tube_mass + nozzle_mass

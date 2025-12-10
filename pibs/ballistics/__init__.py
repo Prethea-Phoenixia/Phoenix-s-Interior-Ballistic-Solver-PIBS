@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Literal, Union
-from enum import Enum
 
 DOMAIN_TIME = "DOMAIN_TIME"
 DOMAIN_LEN = "DOMAIN_LEN"
