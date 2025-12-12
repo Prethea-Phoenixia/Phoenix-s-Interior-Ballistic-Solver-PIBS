@@ -7,6 +7,7 @@ import platform
 import sys
 import traceback
 
+
 if platform.system() == "Windows":
     from ctypes import windll
 
@@ -28,11 +29,10 @@ from matplotlib.figure import Figure
 from pibs.guidegraph import guide_graph
 
 from . import __version__
+from .ballistics import JSONable
+from .ballistics import MIN_BORE_VOLUME, MIN_PROJ_TRAVEL, DOMAIN_LEN, DOMAIN_TIME, CONVENTIONAL, RECOILLESS
+
 from .ballistics import (
-    COMPUTE,
-    CONVENTIONAL,
-    DOMAIN_LEN,
-    DOMAIN_TIME,
     POINT_BURNOUT,
     POINT_EXIT,
     POINT_FRACTURE,
@@ -41,12 +41,14 @@ from .ballistics import (
     POINT_PEAK_SHOT,
     POINT_PEAK_STAG,
     POINT_START,
-    RECOILLESS,
+)
+from .ballistics import (
+    COMPUTE,
     SOL_LAGRANGE,
     SOL_MAMONTOV,
     SOL_PIDDUCK,
     Composition,
-    Constrained,
+    ConstrainedGun,
     ConstrainedRecoilless,
     Geometry,
     Gun,
@@ -190,13 +192,13 @@ class PIBS(Tk):
         self.frame.grid(row=0, column=0, sticky="nsew")
 
         self.minsize(self.winfo_width(), self.winfo_height())  # set minimum size
-        # self.is_fullscreen = False
+        self.is_fullscreen = False
 
-        # self.bind("<F4>", lambda *_: self.toggle_fullscreen())
+        self.bind("<F4>", lambda *_: self.toggle_fullscreen())
 
-    # def toggle_fullscreen(self):
-    #     self.wm_attributes("-fullscreen", self.is_fullscreen)
-    #     self.is_fullscreen = not self.is_fullscreen
+    def toggle_fullscreen(self):
+        self.wm_attributes("-fullscreen", self.is_fullscreen)
+        self.is_fullscreen = not self.is_fullscreen
 
     def quit(self):
         # explicitly unload the font at the end of program.
@@ -289,11 +291,18 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.rowconfigure(1, weight=2)
 
         ## nameplate
-        name_frm = self.add_localized_label_frame(self, label_loc_key="nameFrm")
-        name_frm.grid(row=0, column=0, sticky="nsew", columnspan=2)
+
+        dummy_frame = Frame(self)
+        dummy_frame.grid(row=0, column=0, sticky="nsew", columnspan=2)
+
+        dummy_frame.columnconfigure(0, weight=1)
+        dummy_frame.rowconfigure(0, weight=1)
+
+        name_frm = self.add_localized_label_frame(dummy_frame, label_loc_key="nameFrm")
+        name_frm.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+
         name_frm.columnconfigure(0, weight=1)
         name_frm.rowconfigure(1, weight=1)
-
         self.name = StringVar(self)
         name_plate = ttk.Entry(
             name_frm, textvariable=self.name, state="disabled", justify="left", font=(FONTNAME, FONTSIZE + 2)
@@ -317,7 +326,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         info_frame.rowconfigure(0, weight=1)
 
         par_frm = self.add_localized_label_frame(info_frame, label_loc_key="parFrmLabel")
-        par_frm.grid(row=0, column=0, sticky="nsew")
+        par_frm.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
         par_frm.columnconfigure(0, weight=1)
 
         i = 0
@@ -393,7 +402,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         ## table frame
         tbl_frm = self.add_localized_label_frame(self.table_tab, label_loc_key="tblFrmLabel")
-        tbl_frm.grid(row=0, column=0, sticky="nsew")
+        tbl_frm.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
         tbl_frm.columnconfigure(0, weight=1)
         tbl_frm.rowconfigure(0, weight=1)
@@ -417,7 +426,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         ## error frame
         error_frm = self.add_localized_label_frame(self.errorTab, label_loc_key="errFrmLabel")
-        error_frm.grid(row=0, column=0, columnspan=3, sticky="nsew")
+        error_frm.grid(row=0, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         error_frm.columnconfigure(0, weight=1)
         error_frm.rowconfigure(0, weight=1)
 
@@ -439,7 +448,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         plot_frm = self.add_localized_label_frame(
             self.plot_tab, label_loc_key="plotFrmLabel", tooltip_loc_key="plotText"
         )
-        plot_frm.grid(row=0, column=0, sticky="nsew")
+        plot_frm.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
         for i in range(5):
             plot_frm.columnconfigure(i, weight=1)
@@ -490,7 +499,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.plt_canvas.get_tk_widget().place(relheight=1, relwidth=1)
 
         aux_frm = self.add_localized_label_frame(self.plot_tab, label_loc_key="auxFrmLabel", tooltip_loc_key="auxText")
-        aux_frm.grid(row=1, column=0, sticky="nsew")
+        aux_frm.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
 
         for i in range(2):
             aux_frm.columnconfigure(i, weight=1)
@@ -532,95 +541,40 @@ class InteriorBallisticsFrame(LocalizedFrame):
         right_frm = Frame(self)
         right_frm.grid(row=0, column=4, rowspan=2, sticky="nsew")
         right_frm.columnconfigure(0, weight=1)
-        right_frm.rowconfigure(0, weight=1)
+        # right_frm.rowconfigure(0, weight=1)
 
         validation_nn = self.register(validate_nn)
         validation_pi = self.register(validate_pi)
         validation_ce = self.register(validate_ce)
 
         i = 1
-        environment_frame = self.add_localized_label_frame(right_frm, label_loc_key="envFrmLabel")
-        environment_frame.grid(row=i, column=0, sticky="nsew")
-        i += 1
-        environment_frame.columnconfigure(0, weight=1)
-
-        j = 0
-        self.in_atmos, j = (
-            self.add_localized_label_check(
-                parent=environment_frame, label_loc_key="atmosLabel", desc_label_key="atmosLabel", row=j, columnspan=3
-            ),
-            j + 1,
-        )
-
-        self.amb_p, j = (
-            self.add_localized_3_input(
-                parent=environment_frame,
-                row=j,
-                label_loc_key="ambPresLabel",
-                unit_text="kPa",
-                default="101.325",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
-        )
-        self.amb_rho, j = (
-            self.add_localized_3_input(
-                parent=environment_frame,
-                row=j,
-                label_loc_key="ambRhoLabel",
-                unit_text="kg/m³",
-                default="1.204",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
-        )
-
-        self.amb_gamma, j = (
-            self.add_localized_3_input(
-                parent=environment_frame,
-                row=j,
-                label_loc_key="ambGamLabel",
-                default="1.400",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
-        )
 
         sol_frm = self.add_localized_label_frame(right_frm, label_loc_key="solFrmLabel")
-        sol_frm.grid(row=i, column=0, sticky="nsew")
+        sol_frm.grid(row=i, column=0, sticky="nsew", padx=2, pady=2)
         i += 1
         sol_frm.columnconfigure(0, weight=1)
 
         self.drop_soln = self.add_localized_dropdown(
             parent=sol_frm,
-            str_obj_dict={soln: soln for soln in (SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV)},
+            str_obj_dict={solution: solution for solution in (SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV)},
             desc_label_key="solFrmLabel",
         )
         self.drop_soln.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
 
         op_frm = self.add_localized_label_frame(right_frm, label_loc_key="opFrmLabel")
-        op_frm.grid(row=4, column=0, sticky="nsew")
+        op_frm.grid(row=4, column=0, sticky="nsew", padx=2, pady=2)
         op_frm.columnconfigure(0, weight=1)
 
-        self.solve_W_Lg, i = (
-            self.add_localized_label_check(
-                parent=op_frm,
-                row=i,
-                columnspan=3,
-                default=False,
-                label_loc_key="consButton",
-                desc_label_key="consButton",
-                tooltip_loc_key="useConsText",
-            ),
-            i + 1,
+        self.use_cons = self.add_localized_label_check(
+            parent=op_frm,
+            default=False,
+            label_loc_key="consButton",
+            desc_label_key="consButton",
+            tooltip_loc_key="useConsText",
+            skip_grid=True,
         )
 
-        cons_frm = self.add_localized_label_frame(
-            op_frm, label_loc_key="consFrmLabel"
-        )  # style="SubLabelFrame.TLabelframe"
+        cons_frm = self.add_localized_label_frame(op_frm, labelwidget=self.use_cons.check_widget)
         cons_frm.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         i += 1
         cons_frm.columnconfigure(0, weight=1)
@@ -639,18 +593,26 @@ class InteriorBallisticsFrame(LocalizedFrame):
             j + 1,
         )
 
-        self.opt_lf, j = (
+        self.opt, j = (
             self.add_localized_label_check(
                 parent=cons_frm,
                 row=j,
                 columnspan=3,
                 default=False,
-                desc_label_key="minTVButton",
-                label_loc_key="minTVButton",
-                tooltip_loc_key="optLFText",
+                desc_label_key="optButton",
+                label_loc_key="optButton",
+                tooltip_loc_key="optText",
             ),
             j + 1,
         )
+
+        self.opt_tgt = self.add_localized_dropdown(
+            parent=cons_frm,
+            str_obj_dict={MIN_BORE_VOLUME: MIN_BORE_VOLUME, MIN_PROJ_TRAVEL: MIN_PROJ_TRAVEL},
+            desc_label_key="optTgtLabel",
+        )
+        self.opt_tgt.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        j += 1
 
         self.v_tgt, j = (
             self.add_localized_3_input(
@@ -789,7 +751,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         create_tool_tip(self.calc_button, self.calc_button_tip, font=self.font)
 
         ctrl_frm = self.add_localized_label_frame(right_frm, label_loc_key="guideCtrlFrmLabel")
-        ctrl_frm.grid(row=i, column=0, columnspan=3, sticky="nsew")
+        ctrl_frm.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         i += 1
         ctrl_frm.columnconfigure(0, weight=1)
 
@@ -828,14 +790,10 @@ class InteriorBallisticsFrame(LocalizedFrame):
         left_frame = Frame(self)
         left_frame.grid(row=0, column=2, rowspan=2, sticky="nsew")
         left_frame.columnconfigure(0, weight=1)
-        left_frame.rowconfigure(0, weight=1)
+        # left_frame.rowconfigure(0, weight=1)
 
-        ## spec frame
         specs_frame = self.add_localized_label_frame(left_frame, label_loc_key="specFrmLabel")
-        specs_frame.grid(row=0, column=0, sticky="nsew")
-        specs_frame.columnconfigure(0, weight=1)
-
-        validation_nn, validation_ce = self.register(validate_nn), self.register(validate_ce)
+        specs_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
         i = 0
         self.type_optn = self.add_localized_dropdown(
@@ -1017,19 +975,15 @@ class InteriorBallisticsFrame(LocalizedFrame):
             i + 1,
         )
 
-        self.use_material, i = (
-            self.add_localized_label_check(
-                specs_frame,
-                row=i,
-                label_loc_key="useMaterialLabel",
-                desc_label_key="useMaterialLabel",
-                default=False,
-                columnspan=3,
-            ),
-            i + 1,
+        self.use_material = self.add_localized_label_check(
+            specs_frame,
+            label_loc_key="useMaterialLabel",
+            desc_label_key="useMaterialLabel",
+            default=False,
+            skip_grid=True,
         )
 
-        material_frame = self.add_localized_label_frame(specs_frame, label_loc_key="matFrmLabel")
+        material_frame = self.add_localized_label_frame(specs_frame, labelwidget=self.use_material.check_widget)
         material_frame.grid(row=i, column=0, sticky="nsew", columnspan=3, padx=2, pady=2)
         material_frame.columnconfigure(0, weight=1)
         i += 1
@@ -1080,20 +1034,62 @@ class InteriorBallisticsFrame(LocalizedFrame):
             i + 1,
         )
 
+        self.in_atmos = self.add_localized_label_check(
+            parent=left_frame, label_loc_key="atmosLabel", desc_label_key="atmosLabel", skip_grid=True
+        )
+        environment_frame = self.add_localized_label_frame(left_frame, labelwidget=self.in_atmos.check_widget)
+        environment_frame.grid(row=i, column=0, sticky="nsew", padx=2, pady=2)
+        i += 1
+        environment_frame.columnconfigure(0, weight=1)
+
+        j = 0
+        self.amb_p, j = (
+            self.add_localized_3_input(
+                parent=environment_frame,
+                row=j,
+                label_loc_key="ambPresLabel",
+                unit_text="kPa",
+                default="101.325",
+                validation=validation_nn,
+                dtype=float,
+            ),
+            j + 1,
+        )
+        self.amb_rho, j = (
+            self.add_localized_3_input(
+                parent=environment_frame,
+                row=j,
+                label_loc_key="ambRhoLabel",
+                unit_text="kg/m³",
+                default="1.204",
+                validation=validation_nn,
+                dtype=float,
+            ),
+            j + 1,
+        )
+
+        self.amb_gamma, j = (
+            self.add_localized_3_input(
+                parent=environment_frame,
+                row=j,
+                label_loc_key="ambGamLabel",
+                default="1.400",
+                validation=validation_nn,
+                dtype=float,
+            ),
+            j + 1,
+        )
+
         ## grain frame
         mid_frame = Frame(self)
-
         mid_frame.grid(row=0, column=3, rowspan=2, sticky="nsew")
         mid_frame.columnconfigure(0, weight=1)
 
         i = 0
         mid_frame.rowconfigure(i, weight=1)
         ### propellant frame
-        prop_frame = self.add_localized_label_frame(
-            mid_frame,
-            label_loc_key="propFrmLabel",
-        )
-        prop_frame.grid(row=i, column=0, columnspan=3, sticky="nsew")
+        prop_frame = self.add_localized_label_frame(mid_frame, label_loc_key="propFrmLabel")
+        prop_frame.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         i += 1
         prop_frame.rowconfigure(1, weight=1)
         prop_frame.columnconfigure(0, weight=1)
@@ -1104,7 +1100,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             desc_label_key="propFrmLabel",
             tooltip_loc_key="specsText",
         )
-        self.drop_prop.grid(row=j, column=0, columnspan=2, sticky="nsew")
+        self.drop_prop.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         j += 1
 
         spec_scroll = ttk.Scrollbar(prop_frame, orient="vertical")
@@ -1129,20 +1125,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         spec_h_scroll.grid(row=j, column=0, sticky="nsew")
         j += 1
 
-        self.use_combustible, j = (
-            self.add_localized_label_check(
-                prop_frame,
-                label_loc_key="combustibleLabel",
-                tooltip_loc_key="combustibleText",
-                default=False,
-                row=j,
-                columnspan=2,
-            ),
-            j + 1,
+        self.use_combustible = self.add_localized_label_check(
+            prop_frame, label_loc_key="combustibleLabel", tooltip_loc_key="combustibleText", skip_grid=True
         )
 
-        combustible_frame = Frame(prop_frame)
-        combustible_frame.grid(row=j, column=0, columnspan=2, sticky="nsew")
+        combustible_frame = self.add_localized_label_frame(prop_frame, labelwidget=self.use_combustible.check_widget)
+        combustible_frame.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         j += 1
 
         k = 0
@@ -1194,7 +1182,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         mid_frame.rowconfigure(i, weight=2)
 
         self.grain_frm = self.add_localized_label_frame(mid_frame, label_loc_key="grainFrmLabel")
-        self.grain_frm.grid(row=i, column=0, sticky="nsew")
+        self.grain_frm.grid(row=i, column=0, sticky="nsew", padx=2, pady=2)
         i += 1
         self.grain_frm.columnconfigure(0, weight=1)
         self.grain_frm.rowconfigure(0, weight=1)
@@ -1262,19 +1250,15 @@ class InteriorBallisticsFrame(LocalizedFrame):
             j + 1,
         )
 
-        self.use_aux_grain, j = (
-            self.add_localized_label_check(
-                parent=self.grain_frm,
-                row=j,
-                label_loc_key="useAuxGrainLabel",
-                desc_label_key="useAuxGrainLabel",
-                columnspan=3,
-                default=False,
-            ),
-            j + 1,
+        self.use_aux_grain = self.add_localized_label_check(
+            parent=self.grain_frm,
+            label_loc_key="useAuxGrainLabel",
+            desc_label_key="useAuxGrainLabel",
+            default=False,
+            skip_grid=True,
         )
 
-        self.aux_grain_frm = self.add_localized_label_frame(self.grain_frm, label_loc_key="auxGrainFrmLabel")
+        self.aux_grain_frm = self.add_localized_label_frame(self.grain_frm, labelwidget=self.use_aux_grain.check_widget)
         self.aux_grain_frm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         j += 1
         self.aux_grain_frm.columnconfigure(1, weight=1)
@@ -1348,7 +1332,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         ## guide plot
         plot_frm = self.add_localized_label_frame(self.guide_tab, label_loc_key="guideFrmLabel")
-        plot_frm.grid(row=0, column=0, sticky="nsew")
+        plot_frm.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
         with mpl.rc_context(CONTEXT):
             fig = Figure(dpi=96, layout="constrained")
@@ -1380,9 +1364,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
         )
         self.guide_plot_burnout.grid(row=0, column=2, sticky="nsew")
 
-        self.solve_W_Lg.trace_add("write", self.ctrl_callback)
+        self.use_cons.trace_add("write", self.ctrl_callback)
         self.lock_Lg.trace_add("write", self.ctrl_callback)
-        self.opt_lf.trace_add("write", self.ctrl_callback)
+        self.opt.trace_add("write", self.ctrl_callback)
         self.use_aux_grain.trace_add("write", self.ctrl_callback)
 
         self.guide_index.trace_add("write", callback=self.guide_callback)
@@ -1703,14 +1687,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         super().change_lang()
 
     def generate_kwargs(self):
-        constrain = bool(self.solve_W_Lg.get())
+        constrain = bool(self.use_cons.get())
         lock = bool(self.lock_Lg.get())
-        optimize = bool(self.opt_lf.get())
+        optimize = bool(self.opt.get())
         debug = bool(self.debug.get())
         atmosphere = bool(self.in_atmos.get())
         autofrettage = bool(self.material_is_af.get())
-        # is_tc = bool(self.is_tc.get())
-
         gun_type = self.type_optn.get_obj()
 
         if self.prop is None:
@@ -1781,6 +1763,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             "step_lf": float(self.guide_step_lf.get()) * 1e-2,
             "max_iter": int(self.max_iter.get()),
             "max_guess": int(self.max_guess.get()),
+            "target": self.opt_tgt.get(),
         }
 
         if atmosphere:
@@ -1792,13 +1775,18 @@ class InteriorBallisticsFrame(LocalizedFrame):
                 }
             )
         else:
-            self.kwargs.update(
-                {
-                    "ambient_pressure": 0.0,
-                    "ambient_density": 0.0,
-                    "ambient_adb_index": 1.0,
-                }
-            )
+            self.kwargs.update({"ambient_pressure": 0.0, "ambient_density": 0.0, "ambient_adb_index": 1.0})
+
+        # logging.info(self.kwargs_to_json())
+
+    def kwargs_to_json(self) -> dict:
+        serialized_kwargs = {}
+        for key, value in self.kwargs.items():
+            if isinstance(value, JSONable):
+                value = json.loads(value.to_json())
+            serialized_kwargs[key] = value
+
+        return serialized_kwargs
 
     def on_guide(self):
         self.focus()  # remove focus to force widget entry validation
@@ -1886,12 +1874,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
                             round_sig(self.kwargs["load_fraction"] * 100, n=sigfig)
                         )  # corrected "bulk" load fraction
 
-            # p = self.tabParent.index(self.tabParent.select())  # find the currently active tab
-            # if p == 2 or p == 3:  # if the guidance/logging pane is currently selected.
-            #     self.tabParent.select(0)  # goto the graphing pane
-
         else:  # calculation results in some error
-            # self.tabParent.select(3)  # goto the error pane
             pass
 
         self.update_stats()
@@ -2545,11 +2528,11 @@ class InteriorBallisticsFrame(LocalizedFrame):
             )
 
     def ctrl_callback(self, *_):
-        if not self.solve_W_Lg.get():
+        if not self.use_cons.get():
             self.v_tgt.disable()
             self.p_tgt.disable()
 
-            self.opt_lf.disable()
+            self.opt.disable()
             self.lock_Lg.disable()
             self.min_web.disable()
             self.lg_max.disable()
@@ -2559,14 +2542,14 @@ class InteriorBallisticsFrame(LocalizedFrame):
         else:
             if self.lock_Lg.get():
                 self.v_tgt.disable()
-                self.opt_lf.disable()
+                self.opt.disable()
                 self.tbl_mm.enable()
             else:
                 self.v_tgt.enable()
-                self.opt_lf.enable()
+                self.opt.enable()
                 self.tbl_mm.disable()
 
-            if self.opt_lf.get():
+            if self.opt.get():
                 self.lock_Lg.disable()
             else:
                 self.lock_Lg.enable()
@@ -2787,7 +2770,7 @@ def calculate(job_queue, log_queue, kwargs):
     try:
         if constrain:
             if gun_type == CONVENTIONAL:
-                constrained = Constrained(**kwargs)
+                constrained = ConstrainedGun(**kwargs)
             elif gun_type == RECOILLESS:
                 constrained = ConstrainedRecoilless(**kwargs)
             else:
@@ -2821,8 +2804,6 @@ def calculate(job_queue, log_queue, kwargs):
             gun = Recoilless(**kwargs)
         else:
             raise ValueError("unknown gun type")
-
-        root_logger.info(gun.to_json())
 
         gun_result = gun.integrate(**kwargs)
 

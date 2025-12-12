@@ -112,8 +112,8 @@
 		"errFrmLabel": "Exceptions",
 		"errorTab": "Exceptions",
 		"excTitle": "Error",
-		"exportAux": "Export Bore Trace",
-		"exportGeom": "Export Form Function",
+		"exportAux": "Export Bore Plot",
+		"exportGeom": "Export Form Function Plot",
 		"exportGuide": "Export Guide Graph",
 		"exportLabel": "Export Table as CSV",
 		"exportMain": "Export Main Plot",
@@ -179,7 +179,7 @@
 		"mean": "  Mean ",
 		"minCMRLabel": "Min Charge / Shot Mass",
 		"minLFLabel": "Min Load Fraction",
-		"minTVButton": "Minimize Total Volume",
+		"optButton": "Optimize",
 		"minWebLabel": "Minimum Web",
 		"mvLabel": "Muzzle Velocity",
 		"nameFrm": "Design Overview",
@@ -189,7 +189,7 @@
 		"nozzExpLabel": "Expansion Ratio",
 		"nozzExpText": "Nozzle expansion ratio of the recoilless gun's rear nozzle, or the cross section of the nozzle end over that of the throat. This is used to size the throat to achieve recoilless condition while the projectile is still in bore.\n Usually taken to be 2-4. Higher expansion ratios are only marginally more efficient while incurring additional penalty to weight.",
 		"opFrmLabel": "Operations",
-		"optLFText": "Find the optimum load fraction for given charge mass, minimizing the total volume of the bore and chamber, under the constraint set out above.\n Verify the burnout point is reasonably deep in-bore, as propellant burn rate is sensitive to the ambient temperature and varies from lot to lot. A deeply contained burnout-point yields overall better muzzle velocity consistency, which is more of a concern for indirect fire guns as compared to direct fire guns. On direct fire guns, some sacrifice in this area is required to allow powerful ballistics within a compact package.",
+		"optText": "Optimize by varying the load fraction to find the interior ballistics configuration that approaches the optimization target, selected from the drop down menu.",
 		"pHTgtLabel": "High Chamber",
 		"pLTgtLabel": "Low Chamber",
 		"pPLabel": "Peak Pressure",
@@ -240,6 +240,7 @@
 		"stepCMRLabel": "Charge / Shot Mass Step",
 		"stepLFLabel": "Load Fraction Step",
 		"stepLabel": "Steps",
+      "optTgtLabel": "Optimization Target",
 		"stpLabel": "Start Pressure",
 		"stpText": "Starting Pressure, parameter used to model resistance experienced by the projectile as it starts moving.\n This is an effective value that models the engraving pressure and the pressure exerted by the cartridge rim on the projectile, as a static resistance. That is, propellant burns in an isochoric fashion until the pressure at base of projectile is overcomes starting pressure, at which point starting pressure vanish.\n Historically start pressure was taken as the highest pressure recorded when a projectile is pressed down into the barrel. Although a higher start pressure somewhat increase the peak pressure, a certain level of initial resistance is necessary for consistency of ignition.\n In reality, projectile obturation is a dynamic process, done at some speed and significantly higher dynamic resistance.",
 		"stripRText": "Specify length to width ratio of propellant rod or flake.",
@@ -264,7 +265,9 @@
 		"vacISPDesc": "Isp(Vac)",
 		"vinfText": "Velocity the shot would achieve if the barrel is extended to infinite length, or equivalently, if the gas is allowed to expand to temperature of absolute zero.",
 		"widthLabel": "Width",
-		"widthText": "Specify the width of propellant strip or flake."
+		"widthText": "Specify the width of propellant strip or flake.",
+      "MIN_BORE_VOLUME": "Minimize Bore Volume",
+      "MIN_PROJ_TRAVEL": "Minimize Projectile Travel"
 	},
 	"中文": {
 		"BURNOUT": "火药燃尽",
@@ -447,7 +450,7 @@
 		"mean": " 平均",
 		"minCMRLabel": "最小装药:弹重比",
 		"minLFLabel": "最小相对装填密度",
-		"minTVButton": "求最小膛容解",
+		"optButton": "最优化",
 		"minWebLabel": "最小弧厚",
 		"mvLabel": "炮口初速",
 		"nameFrm": "系统概览",
@@ -457,7 +460,8 @@
 		"nozzExpLabel": "喷管面积比",
 		"nozzExpText": "  无坐力炮喷管的扩张系数，或喷管尾与喉部的面积比。结合无坐力条件可以确定喉口的截面积。\n  无坐力炮的喷管类似于火箭，其推力系数（喷管喷出口的动压相比燃气平均压强的放大比例）随扩张系数的提升而增大，但总体上收益是边缘递减的。更高的推力系数使满足无坐力条件所需的喉口面积减小，对于提高无坐力炮的内弹道效率有积极作用，但是降低了系统的机动性以及紧凑性，从总体设计上必须仔细考量得失。一般无坐力炮取2-4。",
 		"opFrmLabel": "程序运算控制",
-		"optLFText": "  求该装药量下，满足最大设计压强和出膛弹速的最小炮膛容积解。\n  最小膛容解下火药燃尽点常常接近或位于炮口。实际使用中，火药燃速容易受环境温度、批次生产药力差异、弹药装填条件影响，使得弹速的可重复性较差。这样的解一般适用于以直射为主的加农炮，坦克炮，反坦克炮；这些武器弹速差异对于精度影响有限。而对于主要进行间瞄射击的榴弹炮，或主要进行长距离射击的海炮，应适当延长身管。",
+		"optText": "以改变药室装填密度，针对下拉菜单所选的优化目标对弹道构型进行最优化。",
+
 		"pPLabel": "最大压强",
 		"pRatioDesc": "　        （压强比50）",
 		"pTgtLabel": "设计膛压",
@@ -488,7 +492,7 @@
 		"ppLabel": "最大压强",
 		"ppText": "分别记最大平均工作压强，及最大膛底压强。",
 		"propFrmLabel": "火药参数",
-		"reloadPropellant": "加载火药定义",
+		"reloadPropellant": "重载火药定义",
 		"resetLabel": "重置设计",
 		"sampText": "  采样时将给定域等间隔均分的数目。程序中，特征点的计算先行进行，与采样设置无关。采样点的计算在时间域上独立于特征点计算，可以用于特征点计算结果的验证。\n  需要注意的是，由于基于长度的常微分系统在零点上有数值奇点，因此在长度域上的采样点计算与特征点计算并不独立。",
 		"sampleFrmLabel": "采样控制",
@@ -528,6 +532,8 @@
 		"vacISPDesc": "　　真空比冲",
 		"vinfText": "该装药条件下的极限速度（vj），即炮管长度趋于无穷时弹速的极限。",
 		"widthLabel": "宽度",
-		"widthText": "设置带状火药宽度。"
+		"widthText": "设置带状火药宽度。",
+      "MIN_BORE_VOLUME": "最小膛容",
+      "MIN_PROJ_TRAVEL": "最短行程"
 	}
 }

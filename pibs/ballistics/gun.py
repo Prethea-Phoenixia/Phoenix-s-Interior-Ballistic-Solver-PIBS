@@ -35,6 +35,7 @@ from .generics import (
 from .material import Material
 from .num import dekker, gss, integrate, rkf
 from .prop import Propellant
+from . import JSONable
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,7 @@ def pidduck(wpm: float, k: float, tol: float) -> tuple[float, float]:
     return labda_1, labda_2
 
 
-class Gun(DelegatesPropellant):
+class Gun(DelegatesPropellant, JSONable):
     def __init__(
         self,
         caliber,
@@ -225,6 +226,16 @@ class Gun(DelegatesPropellant):
             },
             ensure_ascii=False,
         )
+
+    @classmethod
+    def from_json(cls, json_dict: dict) -> Gun:
+        deserialized_dict = {}
+        for key, value in json_dict.items():
+            if key == "propellant":
+                value = Propellant.from_json(value)
+            deserialized_dict[key] = value
+
+        return cls(**deserialized_dict)
 
     def f_p_bar(self, z: float, l_bar: float, v_bar: float) -> float:
         psi = self.f_psi_z(z)
@@ -610,12 +621,7 @@ class Gun(DelegatesPropellant):
             )
             data.append(table_entry)
 
-        data, p_trace = zip(
-            *(
-                (tableEntry, pTrace)
-                for tableEntry, pTrace in sorted(zip(data, p_trace), key=lambda entries: entries[0].time)
-            )
-        )
+        data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda entries: entries[0].time))
 
         # calculate a pressure and flow velocity tracing.
         gun_result = GunResult(self, data, p_trace)

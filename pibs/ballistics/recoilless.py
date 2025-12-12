@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from math import inf, pi, tan
 from typing import Callable
 
-from pibs.ballistics.material import Material
 
 from . import (
     COMPUTE,
@@ -27,6 +26,8 @@ from . import (
 from .gun import Gun
 from .num import dekker, gss, rkf
 from .prop import Propellant
+from .material import Material
+from . import JSONable
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class RecoillessResult(GenericResult):
     table_data: list[RecoillessTableEntry]
 
 
-class Recoilless(DelegatesPropellant):
+class Recoilless(DelegatesPropellant, JSONable):
     def __init__(
         self,
         caliber: float,
@@ -212,6 +213,16 @@ class Recoilless(DelegatesPropellant):
             },
             ensure_ascii=False,
         )
+
+    @classmethod
+    def from_json(cls, json_dict: dict) -> Recoilless:
+        deserialized_dict = {}
+        for key, value in json_dict.items():
+            if key == "propellant":
+                value = Propellant.from_json(value)
+            deserialized_dict[key] = value
+
+        return cls(**deserialized_dict)
 
     def f_p_bar(self, z: float, l_bar: float, eta: float, tau: float, psi: None | float = None) -> float:
         psi = psi if psi else self.f_psi_z(z)
@@ -670,7 +681,7 @@ class Recoilless(DelegatesPropellant):
                 )
             )
 
-        data, p_trace = zip(*((a, b) for a, b in sorted(zip(data, p_trace), key=lambda entries: entries[0].time)))
+        data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda entries: entries[0].time))
 
         recoilless_result = RecoillessResult(self, data, p_trace)
 

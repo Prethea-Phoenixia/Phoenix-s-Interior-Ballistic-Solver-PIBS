@@ -10,7 +10,7 @@ from .ballistics import (
     CONVENTIONAL,
     POINT_BURNOUT,
     RECOILLESS,
-    Constrained,
+    ConstrainedGun,
     ConstrainedRecoilless,
     Domains,
     Gun,
@@ -37,7 +37,7 @@ OptionalFloat = Optional[float]
 
 
 def f(
-    target: Constrained,
+    target: ConstrainedGun,
     load_fraction: float,
     charge_mass_ratio: float,
     caliber: float,
@@ -48,9 +48,9 @@ def f(
     tol: float,
     min_web: float,
     max_length: float,
-    ambient_rho: float,
-    ambient_p: float,
-    ambient_gamma: float,
+    ambient_density: float,
+    ambient_pressure: float,
+    ambient_adb_index: float,
     control: Points,
     sol: Solutions,
     dom: Domains,
@@ -69,9 +69,9 @@ def f(
             minWeb=min_web,
             maxLength=max_length,
             sol=sol,
-            ambientRho=ambient_rho,
-            ambientP=ambient_p,
-            ambientGamma=ambient_gamma,
+            ambientRho=ambient_density,
+            ambientP=ambient_pressure,
+            ambientGamma=ambient_adb_index,
             control=control,
         )
 
@@ -111,7 +111,13 @@ def f(
             raise ValueError("unknown gun type")
 
         gun_result = gun.integrate(
-            step=0, tol=tol, dom=dom, sol=sol, ambient_rho=ambient_rho, ambient_p=ambient_p, ambient_gamma=ambient_gamma
+            step=0,
+            tol=tol,
+            dom=dom,
+            sol=sol,
+            ambient_rho=ambient_density,
+            ambient_p=ambient_pressure,
+            ambient_gamma=ambient_adb_index,
         )
 
         try:
@@ -132,7 +138,7 @@ def guide_graph(*_, **kwargs):
     typ = kwargs["typ"]
 
     if typ == CONVENTIONAL:
-        target = Constrained(**kwargs)
+        target = ConstrainedGun(**kwargs)
     elif typ == RECOILLESS:
         target = ConstrainedRecoilless(**kwargs)
     else:

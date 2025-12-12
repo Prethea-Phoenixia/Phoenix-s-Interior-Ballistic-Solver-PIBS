@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
+T = TypeVar("T")
 if TYPE_CHECKING:
     from .gun import Gun
     from . import Points

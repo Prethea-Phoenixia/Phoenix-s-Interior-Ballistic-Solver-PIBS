@@ -8,24 +8,29 @@ GEOMETRIES:
 from __future__ import annotations
 
 import csv, json
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod, ABC
 from enum import Enum, EnumType
 from math import pi
+from .. import JSONable
 
 
-class Geometry(ABC):
+class Geometry(ABC, JSONable):
     all_geometries = list()
 
     def __init__(self, desc: str):
         self.desc = desc
         Geometry.all_geometries.append(self)
 
-    @staticmethod
-    def from_desc(desc: str) -> Geometry:
+    @classmethod
+    def from_json(cls, json_dict: dict) -> Geometry:
+        desc = json_dict["desc"]
         for geometry in Geometry.all_geometries:
             if geometry.desc == desc:
                 return geometry
         raise ValueError(f"unknown desc: {desc}")
+
+    def to_json(self) -> str:
+        return json.dumps({"desc": self.desc}, ensure_ascii=False)
 
     @abstractmethod
     def get_form_function_coefficients(self, r1: float, r2: float) -> tuple[float, float, float, float, float, float]:
@@ -214,9 +219,9 @@ class Composition:
             ensure_ascii=False,
         )
 
-    @staticmethod
-    def from_json(json_dict: dict) -> Composition:
-        return Composition(**json_dict)
+    @classmethod
+    def from_json(cls, json_dict: dict) -> Composition:
+        return cls(**json_dict)
 
     @staticmethod
     def read_file(file_name: str):
@@ -279,7 +284,7 @@ class Composition:
         return name_composition_dict
 
 
-class Propellant:
+class Propellant(JSONable):
     def __init__(
         self,
         composition: Composition,
@@ -338,7 +343,7 @@ class Propellant:
         return json.dumps(
             {
                 "composition": json.loads(self.composition.to_json()),
-                "geometry": self.geometry.desc,
+                "main_geom": self.geometry.desc,
                 "main_r1": self.main_r1,
                 "main_r2": self.main_r2,
                 "aux_geom": self.aux_geom.desc,
@@ -353,9 +358,15 @@ class Propellant:
             ensure_ascii=False,
         )
 
-    @staticmethod
-    def from_json(json_dict: dict) -> Propellant:
-        return Propellant(**json_dict)
+    @classmethod
+    def from_json(cls, json_dict: dict) -> Propellant:
+        deserialized_dict = {}
+        for key, value in json_dict.items():
+            if key in ("composition", "main_geom", "aux_geom"):
+                value = Composition.from_json(value)
+            deserialized_dict[key] = value
+
+        return cls(**deserialized_dict)
 
     @property
     def f(self) -> float:

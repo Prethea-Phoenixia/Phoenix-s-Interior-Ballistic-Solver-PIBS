@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import json
 import logging
 from math import inf, pi
 from random import uniform
 from .optimize_gun import probe_func
-
+from . import JSONable
 from . import (
     MAX_GUESSES,
     POINT_PEAK_AVG,
@@ -23,7 +24,7 @@ from .recoilless import Recoilless
 logger = logging.getLogger(__name__)
 
 
-class ConstrainedRecoilless(DelegatesPropellant):
+class ConstrainedRecoilless(DelegatesPropellant, JSONable):
     def __init__(
         self,
         caliber: float,
@@ -39,15 +40,12 @@ class ConstrainedRecoilless(DelegatesPropellant):
         design_velocity: float,
         min_web: float = 1e-6,
         max_length: float = 1e3,
-        ambient_rho: float = 1.204,
-        ambient_p: float = 101.325e3,
-        ambient_gamma: float = 1.4,
+        ambient_density: float = 1.204,
+        ambient_pressure: float = 101.325e3,
+        ambient_adb_index: float = 1.4,
         control: Points = POINT_PEAK_AVG,
-        traveling_charge: bool = False,
         **_,
     ):
-        # constants for constrained designs
-
         super().__init__(propellant=propellant)
 
         if any(
@@ -68,15 +66,16 @@ class ConstrainedRecoilless(DelegatesPropellant):
         if any((design_pressure <= 0, design_velocity <= 0)):
             raise ValueError("Invalid design constraint")
 
-        ambient_p = max(ambient_p, 1)
-        ambient_gamma = max(ambient_gamma, 1)
+        ambient_pressure = max(ambient_pressure, 1)
+        ambient_adb_index = max(ambient_adb_index, 1)
 
+        self.caliber = caliber
         self.s = (0.5 * caliber) ** 2 * pi
         self.m = shot_mass
         self.propellant = propellant
         self.p_0 = start_pressure
         self.phi_1 = 1 / (1 - drag_coefficient)
-        self.p_g = design_pressure
+        self.p_d = design_pressure
         self.v_d = design_velocity
 
         self.chi_0 = nozzle_efficiency
@@ -87,19 +86,52 @@ class ConstrainedRecoilless(DelegatesPropellant):
         self.tol = tol
         self.min_web = min_web
         self.max_length = max_length
-        self.ambient_rho = ambient_rho
-        self.ambient_p = ambient_p
-        self.ambient_gamma = ambient_gamma
+        self.ambient_density = ambient_density
+        self.ambient_pressure = ambient_pressure
+        self.ambient_adb_index = ambient_adb_index
         self.control = control
 
-        self.traveling_charge = traveling_charge
+    def to_json(self) -> str:
+        return json.dumps(
+            {
+                "caliber": self.caliber,
+                "shot_mass": self.m,
+                "propellant": json.loads(self.propellant.to_json()),
+                "start_pressure": self.p_0,
+                "drag_coefficient": 1 - 1 / self.phi_1,
+                "nozzle_expansion": self.a_bar,
+                "nozzle_efficiency": self.chi_0,
+                "chambrage": self.chi_k,
+                "tol": self.tol,
+                "design_pressure": self.p_d,
+                "design_velocity": self.v_d,
+                "min_web": self.min_web,
+                "max_length": self.max_length,
+                "ambient_density": self.ambient_density,
+                "ambient_pressure": self.ambient_pressure,
+                "ambient_adb_index": self.ambient_adb_index,
+                "control": self.control,
+            },
+            ensure_ascii=False,
+        )
+
+    @classmethod
+    def from_json(cls, json_dict: dict) -> ConstrainedRecoilless:
+        deserialized_dict = {}
+        for key, value in json_dict.items():
+            if key == "propellant":
+                value = Propellant.from_json(value)
+
+            deserialized_dict[key] = value
+
+        return cls(**deserialized_dict)
 
     def _f_p_bar_ad(self, v_bar: float, c_a_bar: float, p_a_bar: float) -> float:
         if c_a_bar and v_bar > 0.0:
             v_r = v_bar / c_a_bar
             return (
-                +0.25 * self.ambient_gamma * (self.ambient_gamma + 1) * v_r**2
-                + self.ambient_gamma * v_r * (1 + (0.25 * (self.ambient_gamma + 1)) ** 2 * v_r**2) ** 0.5
+                +0.25 * self.ambient_adb_index * (self.ambient_adb_index + 1) * v_r**2
+                + self.ambient_adb_index * v_r * (1 + (0.25 * (self.ambient_adb_index + 1)) ** 2 * v_r**2) ** 0.5
             ) * p_a_bar
 
         else:
@@ -144,9 +176,9 @@ class ConstrainedRecoilless(DelegatesPropellant):
         """
         v_j = (2 * self.f * w / (self.theta * phi * self.m)) ** 0.5
 
-        if self.ambient_rho != 0:
-            c_a_bar = (self.ambient_gamma * self.ambient_p / self.ambient_rho) ** 0.5 / v_j
-            p_a_bar = self.ambient_p / (self.f * delta)
+        if self.ambient_density != 0:
+            c_a_bar = (self.ambient_adb_index * self.ambient_pressure / self.ambient_density) ** 0.5 / v_j
+            p_a_bar = self.ambient_pressure / (self.f * delta)
         else:
             c_a_bar = 0
             p_a_bar = 0
@@ -186,7 +218,7 @@ class ConstrainedRecoilless(DelegatesPropellant):
                 else:
                     raise ValueError(f"unknown control {self.control}")
 
-        p_bar_d = self.p_g / (self.f * delta)  # convert to unitless
+        p_bar_d = self.p_d / (self.f * delta)  # convert to unitless
         l_bar_d = self.max_length / l_0
 
         """

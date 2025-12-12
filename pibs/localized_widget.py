@@ -481,6 +481,7 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         loc_func: localize_function_type = placeholder_loc_func,
         font: Font | None = None,
         default: bool = True,
+        skip_grid: bool = False,
         row: int = 0,
         col: int = 0,
         columnspan: int = 1,
@@ -495,7 +496,8 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         self.nominal_state = "normal"
         self.loc_func = loc_func
         self.check_widget = ttk.Checkbutton(parent, text=loc_func(label_loc_key), variable=self.var, width=width)
-        self.check_widget.grid(row=row, column=col, sticky="nsew", columnspan=columnspan, padx=2, pady=2)
+        if not skip_grid:
+            self.check_widget.grid(row=row, column=col, sticky="nsew", columnspan=columnspan, padx=2, pady=2)
 
         self.loc_tooltip_var = StringVar(value=loc_func(tooltip_loc_key))
         create_tool_tip(self.check_widget, self.loc_tooltip_var, font=font)
