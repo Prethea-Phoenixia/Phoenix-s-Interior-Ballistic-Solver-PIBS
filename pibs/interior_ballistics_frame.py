@@ -1309,16 +1309,13 @@ class InteriorBallisticsFrame(LocalizedFrame):
     @lock_out
     def reset(self, *_):
         self.reset_entries()
-        self.on_calculate()
 
     def quit(self):
         if self.process:
             self.process.terminate()
-            self.process.kill()
 
         if self.guide_process:
             self.guide_process.terminate()
-            self.guide_process.kill()
 
         self.listener.stop()
 
@@ -1365,7 +1362,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         loc_val_dict = {
             loc.get_descriptive(): loc.get()
-            for loc in self.locs
+            for loc in self.localized_widgets
             if (hasattr(loc, "get_descriptive") and loc.get_descriptive())
         }
 
@@ -1393,34 +1390,29 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         loc_dict = {
             loc.get_descriptive(): loc
-            for loc in self.locs
+            for loc in self.localized_widgets
             if (hasattr(loc, "get_descriptive") and loc.get_descriptive())
         }
         with open(file_name, "r", encoding="utf-8") as file:
             file_dict = json.load(file)
 
         for key, value in file_dict.items():
-            try:
+            try:  # load design settings (bool -> checkboxes, str -> dropdown menus) first
                 if isinstance(value, bool) or isinstance(value, str):
                     loc_dict[key].set(value)
-            except KeyError:
+            except (KeyError, ValueError):
                 pass
-            except ValueError:
-                loc_dict[key].reset()
 
         for key, value in file_dict.items():
-            try:
+            try:  # then load the numeral values (int, float -> numeric entries)
                 if isinstance(value, float) or isinstance(value, int):
                     loc_dict[key].set(value)
-            except KeyError:
+            except (KeyError, ValueError):
                 pass
-            except ValueError:
-                loc_dict[key].reset()
 
         if DESCRIPTION in file_dict.keys():  # update description from file.
             self.description.delete(1.0, "end")
             self.description.insert("end", file_dict[DESCRIPTION].strip("\n"))
-
             self.description.edit_reset()
 
         self.on_calculate()
@@ -1434,7 +1426,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.drop_prop.reset(str_obj_dict=Composition.read_file(file_name))
 
     def reset_entries(self):
-        for loc in self.locs:
+        for loc in self.localized_widgets:
             loc.reset() if hasattr(loc, "get_descriptive") else None
         self.name_var.set(self.get_loc_str("newDesign"))
         self.description.delete(1.0, "end")
@@ -1493,7 +1485,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.calc_button_tip.set(self.get_loc_str("calcButtonText"))
         # self.specs_text_tip.set(self.get_loc_str("specsText"))
 
-        for loc_widget in self.locs:
+        for loc_widget in self.localized_widgets:
             loc_widget.localize()
 
         self.calc_button.config(text=self.get_loc_str("calcLabel"))
@@ -1614,7 +1606,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.guide_process = Process(target=guide, args=(self.guide_job_queue, self.log_queue, self.kwargs))
         self.guide_process.start()
 
-        for loc in self.locs:
+        for loc in self.localized_widgets:
             try:
                 loc.inhibit()
             except AttributeError:
@@ -1630,7 +1622,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, self.kwargs))
         self.process.start()
 
-        for loc in self.locs:
+        for loc in self.localized_widgets:
             try:
                 loc.inhibit()
             except AttributeError:
@@ -1678,7 +1670,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.guide_button.config(state="normal")
         self.swap_button.config(state="normal")
 
-        for loc in self.locs:
+        for loc in self.localized_widgets:
             try:
                 loc.disinhibit()
             except AttributeError:
@@ -1698,7 +1690,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.guide_button.config(state="normal")
         self.swap_button.config(state="normal")
 
-        for loc in self.locs:
+        for loc in self.localized_widgets:
             try:
                 loc.disinhibit()
             except AttributeError:

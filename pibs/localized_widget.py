@@ -472,7 +472,9 @@ class LocDropdown(LocalizableWidget, Descriptive):
             self.str_obj_dict = str_obj_dict
         self.loc_str_obj_dict = {self.loc_func(k): v for k, v in self.str_obj_dict.items()}
         self.widget["values"] = tuple(self.loc_str_obj_dict.keys())
-        self.widget.current(0)
+
+        if self.widget.get() not in self.widget["values"]:
+            self.widget.current(0)
 
 
 class LocLabelFrame(ttk.LabelFrame, Localizable):
@@ -601,7 +603,7 @@ class LocalizedFrame(Frame):
                 else list(self.localization_dict.keys())[0]
             )
         )
-        self.locs = []
+        self.localized_widgets = []
         self.font = font
 
         lang_menu = Menu(menubar)
@@ -619,37 +621,51 @@ class LocalizedFrame(Frame):
     @warn
     @wraps(Loc2LineDisp.__init__)
     def add_localized_2_line_display(self, *args, **kwargs) -> Loc2LineDisp:
-        return Loc2LineDisp(*args, loc_func=self.get_loc_str, all_localized=self.locs, font=self.font, **kwargs)
+        return Loc2LineDisp(
+            *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
+        )
 
     @warn
     @wraps(Loc3LineDisp.__init__)
     def add_localized_3_line_display(self, *args, **kwargs) -> Loc3LineDisp:
-        return Loc3LineDisp(*args, loc_func=self.get_loc_str, all_localized=self.locs, font=self.font, **kwargs)
+        return Loc3LineDisp(
+            *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
+        )
 
     @warn
     @wraps(LocLabelCheck.__init__)
     def add_localized_label_check(self, *args, **kwargs) -> LocLabelCheck:
-        return LocLabelCheck(*args, loc_func=self.get_loc_str, all_localized=self.locs, font=self.font, **kwargs)
+        return LocLabelCheck(
+            *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
+        )
 
     @warn
     @wraps(Loc2Input.__init__)
     def add_localized_2_input(self, *args, **kwargs) -> Loc2Input:
-        return Loc2Input(*args, loc_func=self.get_loc_str, all_localized=self.locs, font=self.font, **kwargs)
+        return Loc2Input(
+            *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
+        )
 
     @warn
     @wraps(Loc3Input.__init__)
     def add_localized_3_input(self, *args, **kwargs) -> Loc3Input:
-        return Loc3Input(*args, loc_func=self.get_loc_str, all_localized=self.locs, font=self.font, **kwargs)
+        return Loc3Input(
+            *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
+        )
 
     @warn
     @wraps(LocDropdown.__init__)
     def add_localized_dropdown(self, *args, **kwargs) -> LocDropdown:
-        return LocDropdown(*args, loc_func=self.get_loc_str, all_localized=self.locs, font=self.font, **kwargs)
+        return LocDropdown(
+            *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
+        )
 
     @warn
     @wraps(LocLabelFrame.__init__)
     def add_localized_label_frame(self, *args, **kwargs) -> LocLabelFrame:
-        return LocLabelFrame(*args, loc_func=self.get_loc_str, all_localized=self.locs, font=self.font, **kwargs)
+        return LocLabelFrame(
+            *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
+        )
 
     def get_loc_str(self, name, force_default: bool = False):
         try:
