@@ -135,7 +135,26 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.theme_menu = theme_menu
         self.debug_menu = debug_menu
 
-        self.theme_name_var = StringVar(value="awdark" if os_dark else "awlight")
+        self.os_dark = os_dark
+        saved_setting = "system_default"
+        settings_path = Path.home() / ".pibs_settings.json"
+        if settings_path.exists():
+            try:
+                with open(settings_path, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+                    if "theme" in settings and (settings["theme"] in THEMES or settings["theme"] == "system_default"):
+                        saved_setting = settings["theme"]
+            except Exception:
+                pass
+
+        self.theme_setting_var = StringVar(value=saved_setting)
+        
+        if saved_setting == "system_default":
+            actual_theme = "awdark" if self.os_dark else "awlight"
+        else:
+            actual_theme = saved_setting
+            
+        self.theme_name_var = StringVar(value=actual_theme)
         self.debug = IntVar(value=int(debug))
 
         design_menu.add_command(label=self.get_loc_str("saveLabel"), command=self.save, accelerator="Ctrl+S")
@@ -171,9 +190,13 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         data_menu.add_command(label=self.get_loc_str("reloadPropellant"), command=self.load_propellant)
 
+        theme_menu.add_radiobutton(
+            label=self.get_loc_str("themeSystem"), variable=self.theme_setting_var, value="system_default", command=self.use_theme
+        )
+        theme_menu.add_separator()
         for themeName in THEMES.keys():
             theme_menu.add_radiobutton(
-                label=themeName, variable=self.theme_name_var, value=themeName, command=self.use_theme
+                label=themeName, variable=self.theme_setting_var, value=themeName, command=self.use_theme
             )
 
         debug_menu.add_checkbutton(label=self.get_loc_str("enableLabel"), variable=self.debug, onvalue=1, offvalue=0)
@@ -198,6 +221,28 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.name_var = StringVar(self, value=self.get_loc_str("newDesign"))
         name_plate = ttk.Entry(name_frm, textvariable=self.name_var, justify="left", font=(FONTNAME, BOLDSIZE))
         name_plate.grid(row=0, column=0, sticky="nsew", padx=2, pady=2, columnspan=2)
+
+        ### desc frame
+        desc_frm = self.add_localized_label_frame(dummy_frame, label_loc_key="descTab")
+        desc_frm.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
+        desc_frm.columnconfigure(0, weight=1)
+        desc_frm.rowconfigure(0, weight=1)
+
+        desc_scroll = ttk.Scrollbar(desc_frm, orient="vertical")
+        desc_scroll.grid(row=0, column=1, sticky="nsew")
+        self.description = Text(
+            desc_frm,
+            wrap="word",
+            height=5,
+            width=80,
+            yscrollcommand=desc_scroll.set,
+            font=(FONTNAME, FONTSIZE),
+            undo=True,
+            maxundo=-1,
+        )
+        self.description.grid(row=0, column=0, sticky="nsew")
+        desc_scroll.config(command=self.description.yview)
+        self.force_update_on_theme_widget.append(self.description)
 
         ## left frame
         info_frame = Frame(self)
@@ -270,40 +315,17 @@ class InteriorBallisticsFrame(LocalizedFrame):
             frame.columnconfigure(0, weight=1)
             return frame
 
-        self.desc_tab, self.plot_tab, self.table_tab, self.guide_tab, self.error_tab = (setup_frame() for _ in range(5))
+        self.plot_tab, self.table_tab, self.guide_tab, self.error_tab = (setup_frame() for _ in range(4))
 
         self.plot_tab.rowconfigure(0, weight=3)
         self.plot_tab.rowconfigure(1, weight=1)
 
-        self.tab_parent.add(self.desc_tab, text=self.get_loc_str("descTab"))
         self.tab_parent.add(self.plot_tab, text=self.get_loc_str("plotTab"))
         self.tab_parent.add(self.table_tab, text=self.get_loc_str("tableTab"))
         self.tab_parent.add(self.guide_tab, text=self.get_loc_str("guideTab"))
         self.tab_parent.add(self.error_tab, text=self.get_loc_str("errorTab"))
 
         self.tab_parent.enable_traversal()
-
-        ### desc frame
-        desc_frm = Frame(self.desc_tab)
-        desc_frm.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
-        desc_frm.columnconfigure(0, weight=1)
-        desc_frm.rowconfigure(0, weight=1)
-
-        desc_scroll = ttk.Scrollbar(desc_frm, orient="vertical")
-        desc_scroll.grid(row=0, column=1, sticky="nsew")
-        self.description = Text(
-            desc_frm,
-            wrap="word",
-            height=40,
-            width=80,
-            yscrollcommand=desc_scroll.set,
-            font=(FONTNAME, FONTSIZE),
-            undo=True,
-            maxundo=-1,
-        )
-        self.description.grid(row=0, column=0, sticky="nsew")
-        desc_scroll.config(command=self.description.yview)
-        self.force_update_on_theme_widget.append(self.description)
 
         ### table frame
         tbl_frm = self.add_localized_label_frame(self.table_tab, label_loc_key="tblFrmLabel")
@@ -948,36 +970,142 @@ class InteriorBallisticsFrame(LocalizedFrame):
         prop_frame.rowconfigure(1, weight=1)
         prop_frame.columnconfigure(0, weight=1)
         j = 0
+        preset_compositions = Composition.read_file(resolve_path("ballistics/resource/propellants.csv"))
+        custom_option = {"customPropOption": "CUSTOM_COMPOSITION"}
+        all_compositions = {**custom_option, **preset_compositions}
         self.drop_prop = self.add_localized_dropdown(
             parent=prop_frame,
-            str_obj_dict=Composition.read_file(resolve_path("ballistics/resource/propellants.csv")),
+            str_obj_dict=all_compositions,
             desc_label_key="propFrmLabel",
             tooltip_loc_key="specsText",
         )
         self.drop_prop.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        # default to first preset (skip custom)
+        self.drop_prop.widget.current(1)
         j += 1
 
-        spec_scroll = ttk.Scrollbar(prop_frame, orient="vertical")
-        spec_h_scroll = ttk.Scrollbar(prop_frame, orient="horizontal")
+        self.spec_scroll = ttk.Scrollbar(prop_frame, orient="vertical")
+        self.spec_h_scroll = ttk.Scrollbar(prop_frame, orient="horizontal")
         self.specs = Text(
             prop_frame,
             wrap="word",
             height=0,
             width=0,
-            yscrollcommand=spec_scroll.set,
-            xscrollcommand=spec_h_scroll.set,
+            yscrollcommand=self.spec_scroll.set,
+            xscrollcommand=self.spec_h_scroll.set,
             font=(FONTNAME, FONTSIZE),
         )
 
         self.force_update_on_theme_widget.append(self.specs)
-        spec_scroll.config(command=self.specs.yview)
-        spec_h_scroll.config(command=self.specs.xview)
+        self.spec_scroll.config(command=self.specs.yview)
+        self.spec_h_scroll.config(command=self.specs.xview)
 
         self.specs.grid(row=j, column=0, sticky="nsew")
-        spec_scroll.grid(row=j, rowspan=2, column=1, sticky="nsew")
+        self.spec_scroll.grid(row=j, rowspan=2, column=1, sticky="nsew")
         j += 1
-        spec_h_scroll.grid(row=j, column=0, sticky="nsew")
+        self.spec_h_scroll.grid(row=j, column=0, sticky="nsew")
         j += 1
+
+        ### custom propellant parameters frame
+        self.custom_prop_frame = self.add_localized_label_frame(
+            prop_frame, label_loc_key="customPropLabel"
+        )
+        self.custom_prop_frame.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        j += 1
+        self.custom_prop_frame.columnconfigure(0, weight=1)
+        self.custom_prop_frame.columnconfigure(1, weight=1)
+
+        k = 0
+        self.custom_name = self.add_localized_2_input(
+            self.custom_prop_frame,
+            label_loc_key="customNameLabel",
+            default="Custom",
+            desc_label_key=None,
+            formatter=lambda e, v: None,  # no formatting for text
+            row=k,
+        )
+        k += 1
+
+        self.custom_force = self.add_localized_3_input(
+            self.custom_prop_frame,
+            label_loc_key="customForceLabel",
+            default="1000.0",
+            unit_text="kJ/kg",
+            dtype=float,
+            validation=validation_nn,
+            row=k,
+        )
+        k += 1
+
+        self.custom_covolume = self.add_localized_3_input(
+            self.custom_prop_frame,
+            label_loc_key="customCovolumeLabel",
+            default="1.0",
+            unit_text="×10⁻³ m³/kg",
+            dtype=float,
+            validation=validation_nn,
+            row=k,
+        )
+        k += 1
+
+        self.custom_density = self.add_localized_3_input(
+            self.custom_prop_frame,
+            label_loc_key="customDensityLabel",
+            default="1600.0",
+            unit_text="kg/m³",
+            dtype=float,
+            validation=validation_nn,
+            row=k,
+        )
+        k += 1
+
+        self.custom_adb_index = self.add_localized_3_input(
+            self.custom_prop_frame,
+            label_loc_key="customAdbIndexLabel",
+            default="1.25",
+            unit_text="",
+            dtype=float,
+            validation=validation_nn,
+            row=k,
+        )
+        k += 1
+
+        self.custom_burn_rate = self.add_localized_3_input(
+            self.custom_prop_frame,
+            label_loc_key="customBurnRateLabel",
+            default="2e-8",
+            unit_text="m/s/Paⁿ",
+            dtype=float,
+            validation=validation_nn,
+            row=k,
+        )
+        k += 1
+
+        self.custom_pressure_exp = self.add_localized_3_input(
+            self.custom_prop_frame,
+            label_loc_key="customPressureExpLabel",
+            default="0.83",
+            unit_text="",
+            dtype=float,
+            validation=validation_nn,
+            row=k,
+        )
+        k += 1
+
+        self.custom_flame_temp = self.add_localized_3_input(
+            self.custom_prop_frame,
+            label_loc_key="customFlameTempLabel",
+            default="0",
+            unit_text="K",
+            dtype=float,
+            validation=validation_nn,
+            row=k,
+        )
+        k += 1
+
+        # initially hide custom params frame (shown when Custom is selected)
+        self.custom_prop_frame.grid_remove()
+        ###
 
         self.use_combustible = self.add_localized_label_check(
             prop_frame,
@@ -1236,6 +1364,8 @@ class InteriorBallisticsFrame(LocalizedFrame):
             *(self.web_mm, self.aux_mass_ratio, self.aux_web_ratio, self.aux_grain_r1, self.aux_grain_r2),
             *(self.use_combustible, self.combustible_force_kJ__kg, self.combustible_mass_kg, self.chg_kg),
             self.force_fudge,
+            *(self.custom_force, self.custom_covolume, self.custom_density, self.custom_adb_index),
+            *(self.custom_burn_rate, self.custom_pressure_exp, self.custom_flame_temp),
         ):
             entry.trace_add("write", self.propellant_callback)
 
@@ -1367,6 +1497,20 @@ class InteriorBallisticsFrame(LocalizedFrame):
         }
 
         kvs = {**loc_val_dict, "Description": self.description.get(1.0, "end").strip("\n")}
+
+        # save custom propellant parameters if custom mode is active
+        if self._is_custom_composition():
+            kvs["_custom_propellant"] = {
+                "name": str(self.custom_name.var.get()),
+                "force_kJ_kg": float(self.custom_force.get()),
+                "covolume_1e-3_m3_kg": float(self.custom_covolume.get()),
+                "density_kg_m3": float(self.custom_density.get()),
+                "adiabatic_index": float(self.custom_adb_index.get()),
+                "burn_rate_coefficient": float(self.custom_burn_rate.get()),
+                "pressure_exponent": float(self.custom_pressure_exp.get()),
+                "flame_temp_K": float(self.custom_flame_temp.get()),
+            }
+
         with open(file_name, "w", encoding="utf-8") as file:
             json.dump(kvs, file, indent="\t", ensure_ascii=False, sort_keys=True)
 
@@ -1417,13 +1561,30 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
         self.on_calculate()
 
+        # restore custom propellant parameters if saved
+        if "_custom_propellant" in file_dict:
+            cp = file_dict["_custom_propellant"]
+            self.custom_name.set(cp.get("name", "Custom"))
+            self.custom_force.set(cp.get("force_kJ_kg", 1000.0))
+            self.custom_covolume.set(cp.get("covolume_1e-3_m3_kg", 1.0))
+            self.custom_density.set(cp.get("density_kg_m3", 1600.0))
+            self.custom_adb_index.set(cp.get("adiabatic_index", 1.25))
+            self.custom_burn_rate.set(cp.get("burn_rate_coefficient", 2e-8))
+            self.custom_pressure_exp.set(cp.get("pressure_exponent", 0.83))
+            self.custom_flame_temp.set(cp.get("flame_temp_K", 0))
+            # select the Custom option in the dropdown
+            self.drop_prop.widget.current(0)
+            self.on_calculate()
+
     @lock_out
     @handle_error_wrapper(Log.WARNING)
     def load_propellant(self):
         file_name = filedialog.askopenfilename(
             title=self.get_loc_str("loadLabel"), filetypes=(("Comma Separated Values File", "*.csv"),)
         )
-        self.drop_prop.reset(str_obj_dict=Composition.read_file(file_name))
+        preset_compositions = Composition.read_file(file_name)
+        custom_option = {"customPropOption": "CUSTOM_COMPOSITION"}
+        self.drop_prop.reset(str_obj_dict={**custom_option, **preset_compositions})
 
     def reset_entries(self):
         for loc in self.localized_widgets:
@@ -1492,7 +1653,6 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.guide_button.config(text=self.get_loc_str("guideLabel"))
         self.swap_button.config(text=self.get_loc_str("swapLabel"))
 
-        self.tab_parent.tab(self.desc_tab, text=self.get_loc_str("descTab"))
         self.tab_parent.tab(self.plot_tab, text=self.get_loc_str("plotTab"))
         self.tab_parent.tab(self.table_tab, text=self.get_loc_str("tableTab"))
         self.tab_parent.tab(self.error_tab, text=self.get_loc_str("errorTab"))
@@ -1603,7 +1763,18 @@ class InteriorBallisticsFrame(LocalizedFrame):
     def on_guide(self):
         self.focus()  # remove focus to force widget entry validation
 
-        self.guide_process = Process(target=guide, args=(self.guide_job_queue, self.log_queue, self.kwargs))
+        kwargs = self.kwargs
+        if not kwargs:
+            return
+
+        # Clear any stale results from previous calculations
+        while not self.guide_job_queue.empty():
+            try:
+                self.guide_job_queue.get_nowait()
+            except Exception:
+                break
+
+        self.guide_process = Process(target=guide, args=(self.guide_job_queue, self.log_queue, kwargs))
         self.guide_process.start()
 
         for loc in self.localized_widgets:
@@ -1619,7 +1790,18 @@ class InteriorBallisticsFrame(LocalizedFrame):
     def on_calculate(self):
         self.focus()  # remove focus to force widget entry validation
 
-        self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, self.kwargs))
+        kwargs = self.kwargs
+        if not kwargs:
+            return
+
+        # Clear any stale results from previous calculations
+        while not self.job_queue.empty():
+            try:
+                self.job_queue.get_nowait()
+            except Exception:
+                break
+
+        self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, kwargs))
         self.process.start()
 
         for loc in self.localized_widgets:
@@ -1660,22 +1842,25 @@ class InteriorBallisticsFrame(LocalizedFrame):
         except Exception as e:
             self.handle_errors(e, level=logging.WARNING)
 
-        self.update_stats()
-        self.update_table()
-        self.update_fig_plot()
-        self.update_aux_plot()
-        self.update_guide_graph()
+        try:
+            self.update_stats()
+            self.update_table()
+            self.update_fig_plot()
+            self.update_aux_plot()
+            self.update_guide_graph()
+        except Exception as e:
+            self.handle_errors(e, level=logging.WARNING)
+        finally:
+            self.calc_button.config(state="normal")
+            self.guide_button.config(state="normal")
+            self.swap_button.config(state="normal")
 
-        self.calc_button.config(state="normal")
-        self.guide_button.config(state="normal")
-        self.swap_button.config(state="normal")
-
-        for loc in self.localized_widgets:
-            try:
-                loc.disinhibit()
-            except AttributeError:
-                pass
-        self.process = None
+            for loc in self.localized_widgets:
+                try:
+                    loc.disinhibit()
+                except AttributeError:
+                    pass
+            self.process = None
 
     def get_guide(self):
 
@@ -1685,17 +1870,21 @@ class InteriorBallisticsFrame(LocalizedFrame):
         if initial_result == self.guide_result:
             return
 
-        self.update_guide_graph()
-        self.calc_button.config(state="normal")
-        self.guide_button.config(state="normal")
-        self.swap_button.config(state="normal")
+        try:
+            self.update_guide_graph()
+        except Exception as e:
+            self.handle_errors(e, level=logging.WARNING)
+        finally:
+            self.calc_button.config(state="normal")
+            self.guide_button.config(state="normal")
+            self.swap_button.config(state="normal")
 
-        for loc in self.localized_widgets:
-            try:
-                loc.disinhibit()
-            except AttributeError:
-                pass
-        self.guide_process = None
+            for loc in self.localized_widgets:
+                try:
+                    loc.disinhibit()
+                except AttributeError:
+                    pass
+            self.guide_process = None
 
     @handle_error_wrapper(Log.WARNING)
     def update_stats(self, *_):
@@ -1704,6 +1893,9 @@ class InteriorBallisticsFrame(LocalizedFrame):
             *(self.sj, self.ld, self.lf),
         ):
             entry.reset()
+
+        if not self.gun_result:
+            return
 
         caliber = self.kwargs["caliber"]
         eta_t, eta_b, eta_p = self.gun_result.get_eff()
@@ -1748,12 +1940,12 @@ class InteriorBallisticsFrame(LocalizedFrame):
         except AttributeError:
             self.sj.remove()
 
-        compo = self.drop_prop.get_obj()
+        compo = self.prop if self.prop else (self.drop_prop.get_obj() if not self._is_custom_composition() else None)
         sigfig = int(self.acc_exp.get()) + 1
         w = float(self.chg_kg.get())
         cv = float(self.cv_L.get())
 
-        rho = compo.rho_p
+        rho = compo.rho_p if compo else 1600
         self.lf.set(f"{round_sig(w / cv / rho * 1e5, n=sigfig)} %")
         self.ld.set(f"{round_sig(w / cv * 1e3, n=sigfig)} kg/m³")
 
@@ -1763,7 +1955,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.ax_p.cla()
             self.ax_v.cla()
 
-            if self.gun:
+            if self.gun and self.gun_result:
                 v_tgt = self.kwargs["design_velocity"]
                 gun_type = self.kwargs["typ"]
                 dom = self.kwargs["dom"]
@@ -1894,7 +2086,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.plt_canvas.draw_idle()
 
     def update_aux_plot(self, *_):
-        if self.gun is None:
+        if self.gun is None or self.gun_result is None:
             with plt.rc_context(CONTEXT):
                 self.aux_ax.cla()
                 self.aux_ax_h.cla()
@@ -1978,41 +2170,72 @@ class InteriorBallisticsFrame(LocalizedFrame):
             self.aux_ax_h.set_ylim(bottom=0)
             self.aux_canvas.draw_idle()
 
-    def update_spec(self, *_):
-        self.specs.config(state="normal")
-        compo = self.drop_prop.get_obj()
-        self.specs.delete("1.0", "end")
+    def _is_custom_composition(self):
+        """Check if the current dropdown selection is the custom option."""
+        return self.drop_prop.get_obj() == "CUSTOM_COMPOSITION"
 
-        if compo.temp_v:
+    def update_spec(self, *_):
+        is_custom = self._is_custom_composition()
+
+        if is_custom:
+            # show custom input fields, hide specs text and scrollbars
+            self.specs.grid_remove()
+            self.spec_scroll.grid_remove()
+            self.spec_h_scroll.grid_remove()
+            self.custom_prop_frame.grid()
+        else:
+            # show specs text and scrollbars, hide custom input fields
+            self.custom_prop_frame.grid_remove()
+            self.specs.grid()
+            self.spec_scroll.grid()
+            self.spec_h_scroll.grid()
+
+            compo = self.drop_prop.get_obj()
+
+            # fill custom fields with preset values (so switching to Custom retains them)
+            self.custom_name.set(compo.name)
+            self.custom_force.set(compo.f / 1e3)
+            self.custom_covolume.set(compo.alpha / 1e-3)
+            self.custom_density.set(compo.rho_p)
+            self.custom_adb_index.set(compo.theta + 1)
+            self.custom_burn_rate.set(compo.u_1)
+            self.custom_pressure_exp.set(compo.n)
+            self.custom_flame_temp.set(compo.temp_v if compo.temp_v else 0)
+
+            # display preset info in specs text
+            self.specs.config(state="normal")
+            self.specs.delete("1.0", "end")
+
+            if compo.temp_v:
+                self.specs.insert(
+                    "end",
+                    "{:}: {:>4.0f} K {:}\n".format(
+                        self.get_loc_str("TvDesc"), compo.temp_v, self.get_loc_str("isochorDesc")
+                    ),
+                )
+            self.specs.insert("end", "{:}: {:>4.0f} kg/m³\n".format(self.get_loc_str("densityDesc"), compo.rho_p))
+            self.specs.insert("end", "{:}: {:>4.0f} kJ/kg\n".format(self.get_loc_str("force"), compo.f / 1e3))
+            isp = compo.get_isp()
+            self.specs.insert(
+                "end", "{:}: {:>4.0f} m/s {:>3.0f} s\n".format(self.get_loc_str("vacISPDesc"), isp, isp / 9.805)
+            )
+            isp = compo.get_isp(50)
             self.specs.insert(
                 "end",
-                "{:}: {:>4.0f} K {:}\n".format(
-                    self.get_loc_str("TvDesc"), compo.temp_v, self.get_loc_str("isochorDesc")
+                "{:}: {:>4.0f} m/s {:>3.0f} s\n{:}\n".format(
+                    self.get_loc_str("atmISPDesc"), isp, isp / 9.805, self.get_loc_str("pRatioDesc")
                 ),
             )
-        self.specs.insert("end", "{:}: {:>4.0f} kg/m³\n".format(self.get_loc_str("densityDesc"), compo.rho_p))
-        self.specs.insert("end", "{:}: {:>4.0f} kJ/kg\n".format(self.get_loc_str("force"), compo.f / 1e3))
-        isp = compo.get_isp()
-        self.specs.insert(
-            "end", "{:}: {:>4.0f} m/s {:>3.0f} s\n".format(self.get_loc_str("vacISPDesc"), isp, isp / 9.805)
-        )
-        isp = compo.get_isp(50)
-        self.specs.insert(
-            "end",
-            "{:}: {:>4.0f} m/s {:>3.0f} s\n{:}\n".format(
-                self.get_loc_str("atmISPDesc"), isp, isp / 9.805, self.get_loc_str("pRatioDesc")
-            ),
-        )
-        self.specs.insert("end", "{:}:\n".format(self.get_loc_str("brDesc")))
-        for p in (1e6, 10e6, 100e6, 1000e6):
-            self.specs.insert(
-                "end",
-                "{:>12}".format(to_si(compo.get_lbr(p), unit="m/s", dec=3))
-                + " @ {:>12}\n".format(to_si(p, unit="Pa", dec=3)),
-            )
+            self.specs.insert("end", "{:}:\n".format(self.get_loc_str("brDesc")))
+            for p in (1e6, 10e6, 100e6, 1000e6):
+                self.specs.insert(
+                    "end",
+                    "{:>12}".format(to_si(compo.get_lbr(p), unit="m/s", dec=3))
+                    + " @ {:>12}\n".format(to_si(p, unit="Pa", dec=3)),
+                )
 
-        self.specs.insert("end", compo.desc)
-        self.specs.config(state="disabled")
+            self.specs.insert("end", compo.desc)
+            self.specs.config(state="disabled")
 
     def update_geom(self, *_):
         for geom, r1, r2 in zip(
@@ -2104,14 +2327,14 @@ class InteriorBallisticsFrame(LocalizedFrame):
             table_data = [
                 (
                     self.get_loc_str(entry.tag),
-                    f"{entry.time * 1e3:.{sigfig}g}",
-                    f"{entry.travel:.{sigfig}g}",
-                    f"{entry.burnup:.0%}",
-                    f"{entry.velocity:.{sigfig}g}",
-                    f"{entry.breech_pressure * 1e-6:.{sigfig}g}",
-                    f"{entry.avg_pressure * 1e-6:.{sigfig}g}",
-                    f"{entry.shot_pressure * 1e-6:.{sigfig}g}",
-                    f"{entry.temperature:.{sigfig}g}",
+                    to_si(entry.time, sigfig, "s"),
+                    to_si(entry.travel, sigfig, "m"),
+                    f" {entry.burnup:.0%} ",
+                    to_si(entry.velocity, sigfig, "m/s"),
+                    to_si(entry.breech_pressure, sigfig, "Pa"),
+                    to_si(entry.avg_pressure, sigfig, "Pa"),
+                    to_si(entry.shot_pressure, sigfig, "Pa"),
+                    f" {entry.temperature:.0f}  K",
                 )
                 for entry in self.gun_result.table_data
             ]
@@ -2120,17 +2343,17 @@ class InteriorBallisticsFrame(LocalizedFrame):
             table_data = [
                 (
                     self.get_loc_str(entry.tag),
-                    f"{entry.time * 1e3:.{sigfig}g}",
-                    f"{entry.travel:.{sigfig}g}",
-                    f"{entry.burnup:.0%}",
-                    f"{entry.outflow_fraction:.0%}",
-                    f"{entry.velocity:.{sigfig}g}",
-                    f"{entry.outflow_velocity:.{sigfig}g}",
-                    f"{entry.breech_pressure * 1e-6:.{sigfig}g}",
-                    f"{entry.stag_pressure * 1e-6:.{sigfig}g}",
-                    f"{entry.avg_pressure * 1e-6:.{sigfig}g}",
-                    f"{entry.shot_pressure * 1e-6:.{sigfig}g}",
-                    f"{entry.temperature:.{sigfig}g}",
+                    to_si(entry.time, sigfig, "s"),
+                    to_si(entry.travel, sigfig, "m"),
+                    f" {entry.burnup:.0%} ",
+                    f" {entry.outflow_fraction:.0%} ",
+                    to_si(entry.velocity, sigfig, "m/s"),
+                    to_si(entry.outflow_velocity, sigfig, "m/s"),
+                    to_si(entry.breech_pressure, sigfig, "Pa"),
+                    to_si(entry.stag_pressure, sigfig, "Pa"),
+                    to_si(entry.avg_pressure, sigfig, "Pa"),
+                    to_si(entry.shot_pressure, sigfig, "Pa"),
+                    f" {entry.temperature:.0f}  K",
                 )
                 for entry in self.gun_result.table_data
             ]
@@ -2139,7 +2362,7 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
     def update_table(self):
         self.tv.delete(*self.tv.get_children())
-        if not self.gun:
+        if not self.gun or not self.gun_result:
             return
 
         loc_table_data = self.format_table()
@@ -2313,8 +2536,22 @@ class InteriorBallisticsFrame(LocalizedFrame):
         self.prop = None
         self.update_geom_plot()
 
+        if self._is_custom_composition():
+            composition = Composition.create_custom(
+                name=str(self.custom_name.var.get()) or "Custom",
+                force=float(self.custom_force.get()) * 1e3,       # kJ/kg -> J/kg
+                covolume=float(self.custom_covolume.get()) * 1e-3, # ×10⁻³ m³/kg -> m³/kg
+                density=float(self.custom_density.get()),
+                adiabatic_index=float(self.custom_adb_index.get()),
+                burn_rate_coefficient=float(self.custom_burn_rate.get()),
+                pressure_exponent=float(self.custom_pressure_exp.get()),
+                adiabatic_flame_temperature=float(self.custom_flame_temp.get()),
+            )
+        else:
+            composition = self.drop_prop.get_obj()
+
         self.prop = Propellant(
-            composition=self.drop_prop.get_obj(),
+            composition=composition,
             main_geom=self.main_geom.get_obj(),
             main_r1=self.grain_r1.get(),
             main_r2=self.grain_r2.get(),
@@ -2425,8 +2662,29 @@ class InteriorBallisticsFrame(LocalizedFrame):
 
     @lock_out
     def use_theme(self):
+        setting = self.theme_setting_var.get()
+        if setting == "system_default":
+            current_theme = "awdark" if self.os_dark else "awlight"
+        else:
+            current_theme = setting
+            
+        self.theme_name_var.set(current_theme)
+
         style = ttk.Style(self)
-        style.theme_use(self.theme_name_var.get())
+        style.theme_use(current_theme)
+
+        # Save theme preference
+        settings_path = Path.home() / ".pibs_settings.json"
+        try:
+            settings = {}
+            if settings_path.exists():
+                with open(settings_path, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+            settings["theme"] = setting
+            with open(settings_path, "w", encoding="utf-8") as f:
+                json.dump(settings, f, indent="\t")
+        except Exception:
+            pass
 
         """ensure that the treeview rows are roughly the same height
         regardless of dpi. on Windows, default is Segoe UI at 9 points

@@ -221,6 +221,41 @@ class Composition:
     def __str__(self):
         return self.name
 
+    @staticmethod
+    def create_custom(
+        name: str,
+        force: float,
+        covolume: float,
+        density: float,
+        adiabatic_index: float,
+        burn_rate_coefficient: float,
+        pressure_exponent: float,
+        adiabatic_flame_temperature: float = 0,
+    ) -> "Composition":
+        """Create a Composition from raw user-supplied parameters.
+
+        Args:
+            name: display name for this custom composition
+            force: propellant force in J/kg
+            covolume: covolume in m³/kg
+            density: density in kg/m³
+            adiabatic_index: γ (gamma), internally stored as θ = γ-1
+            burn_rate_coefficient: u₁ in m/s/Pa^n
+            pressure_exponent: n (dimensionless)
+            adiabatic_flame_temperature: Tᵥ in K (0 if unknown)
+        """
+        return Composition(
+            name=name,
+            desc="Custom propellant",
+            force=force,
+            covolume=covolume,
+            density=density,
+            reduced_adiabatic_index=adiabatic_index - 1,
+            burn_rate_coefficient=burn_rate_coefficient,
+            pressure_exponent=pressure_exponent,
+            adiabatic_flame_temperature=adiabatic_flame_temperature if adiabatic_flame_temperature else None,
+        )
+
     def to_json(self) -> str:
         return json.dumps(
             {
