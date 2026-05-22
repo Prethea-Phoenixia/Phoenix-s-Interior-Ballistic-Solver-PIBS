@@ -71,7 +71,8 @@ a.datas = [entry for entry in a.datas if not entry[0].startswith(mpl_data_path)]
     with open(name + ".spec", "w") as f:
         f.writelines(content)
 
-    os.system("pyinstaller " + name + ".spec" + " --noconfirm")
+    import sys
+    os.system(f'"{sys.executable}" -m PyInstaller ' + name + ".spec" + " --noconfirm")
 
 
 if __name__ == "__main__":
