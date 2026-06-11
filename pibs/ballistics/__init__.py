@@ -1,56 +1,67 @@
 from __future__ import annotations
 
-from typing import Literal, Union, TypeVar
-
-DOMAIN_TIME = "DOMAIN_TIME"
-DOMAIN_LEN = "DOMAIN_LEN"
-
-Domains = Union[Literal["DOMAIN_TIME", "DOMAIN_LEN"], str]
-
-POINT_START = "SHOT_START"
-POINT_PEAK_AVG = "PEAK_AVG_P"
-POINT_PEAK_BREECH = "PEAK_BREECH_P"
-POINT_PEAK_SHOT = "PEAK_SHOT_P"
-POINT_FRACTURE = "FRACTURE"
-POINT_BURNOUT = "BURNOUT"
-POINT_EXIT = "SHOT_EXIT"
-POINT_PEAK_STAG = "PEAK_STAG_P"
-SAMPLE = "SAMPLE"
-COMPUTE = "COMPUTE"
-
-Points = Union[
-    Literal[
-        "SHOT_START",
-        "PEAK_AVG_P",
-        "PEAK_BREECH_P",
-        "PEAK_SHOT_P",
-        "FRACTURE",
-        "BURNOUT",
-        "SHOT_EXIT",
-        "PEAK_STAG_P",
-        "COMPUTE",
-        "SAMPLE",
-    ],
-    str,
-]
-
-SOL_LAGRANGE = "SOL_LAGRANGE"
-SOL_PIDDUCK = "SOL_PIDDUCK"
-SOL_MAMONTOV = "SOL_MAMONTOV"
+from enum import Enum
+from typing import TypeVar
 
 
-MIN_BARR_VOLUME = "MIN_BARR_VOLUME"  # minimum bore volume
-MIN_PROJ_TRAVEL = "MIN_PROJ_TRAVEL"  # minimum barrel length
-OptimizationTargets = Union[Literal["MIN_BARR_VOLUME", "MIN_PROJ_TRAVEL"], str]
+class StrEnum(str, Enum):
+    def __str__(self) -> str:
+        return self.value
 
-Solutions = Union[Literal["SOL_LAGRANGE", "SOL_PIDDUCK", "SOL_MAMONTOV"], str]
 
-CONVENTIONAL = "CONVENTIONAL"
-RECOILLESS = "RECOILLESS"
+class Domain(StrEnum):
+    TIME = "DOMAIN_TIME"
+    LEN = "DOMAIN_LEN"
 
-GunTypes = Union[Literal["CONVENTIONAL", "RECOILLESS"], str]
 
-# maximum iteration to correct for chambrage effects.
+class Point(StrEnum):
+    START = "SHOT_START"
+    PEAK_AVG = "PEAK_AVG_P"
+    PEAK_BREECH = "PEAK_BREECH_P"
+    PEAK_SHOT = "PEAK_SHOT_P"
+    FRACTURE = "FRACTURE"
+    BURNOUT = "BURNOUT"
+    EXIT = "SHOT_EXIT"
+    PEAK_STAG = "PEAK_STAG_P"
+    SAMPLE = "SAMPLE"
+    COMPUTE = "COMPUTE"
+
+
+class SolutionMethod(StrEnum):
+    LAGRANGE = "SOL_LAGRANGE"
+    PIDDUCK = "SOL_PIDDUCK"
+    MAMONTOV = "SOL_MAMONTOV"
+
+
+class OptimizationTarget(StrEnum):
+    MIN_BARR_VOLUME = "MIN_BARR_VOLUME"
+    MIN_PROJ_TRAVEL = "MIN_PROJ_TRAVEL"
+
+
+class GunType(StrEnum):
+    CONVENTIONAL = "CONVENTIONAL"
+    RECOILLESS = "RECOILLESS"
+
+
+# Valid value collections
+VALID_DOMAINS = tuple(d.value for d in Domain)
+VALID_SOLUTION_METHODS = tuple(s.value for s in SolutionMethod)
+VALID_PRESSURE_POINTS = (
+    Point.PEAK_BREECH.value,
+    Point.PEAK_SHOT.value,
+    Point.PEAK_AVG.value,
+    Point.PEAK_STAG.value,
+)
+GUN_PEAK_POINTS = (Point.PEAK_AVG.value, Point.PEAK_SHOT.value, Point.PEAK_BREECH.value)
+RECOILLESS_PEAK_POINTS = (
+    Point.PEAK_AVG.value,
+    Point.PEAK_SHOT.value,
+    Point.PEAK_BREECH.value,
+    Point.PEAK_STAG.value,
+)
+VALID_OPT_TARGETS = tuple(o.value for o in OptimizationTarget)
+VALID_GUN_TYPES = tuple(g.value for g in GunType)
+
 MAX_ITER = 10
 
 
@@ -58,15 +69,9 @@ T = TypeVar("T")
 
 
 class JSONable:
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        raise NotImplementedError
 
     @classmethod
-    def from_json(cls: T, json_dict: dict) -> T: ...
-
-
-from .gun import GenericEntry, GenericResult, Gun, OutlineEntry, PressureProbePoint, PressureTraceEntry
-from .material import Material
-from .constrained_gun import ConstrainedGun
-from .constrained_recoilless import ConstrainedRecoilless
-from .prop import Composition, Geometry, MultPerfGeometry, Propellant, SimpleGeometry
-from .recoilless import Recoilless
+    def from_json(cls: T, json_dict: dict) -> T:
+        raise NotImplementedError

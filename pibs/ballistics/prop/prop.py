@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import csv
 import json
-from abc import ABCMeta, abstractmethod, ABC
+from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumType
 from functools import wraps
 from math import pi
@@ -18,7 +18,7 @@ from .. import JSONable
 
 
 class Geometry(ABC, JSONable):
-    all_geometries = list()
+    all_geometries: list[Geometry] = []
 
     def __init__(self, desc: str):
         self.desc = desc
@@ -26,7 +26,6 @@ class Geometry(ABC, JSONable):
 
     @classmethod
     def from_json(cls, json_dict: dict) -> Geometry:
-        print(json_dict)
         desc = json_dict["desc"]
         for geometry in Geometry.all_geometries:
             if geometry.desc == desc:
@@ -34,15 +33,6 @@ class Geometry(ABC, JSONable):
         raise ValueError(f"unknown desc: {desc}")
 
     def to_json(self) -> str:
-        print("HERE")
-        print(
-            json.dumps(
-                {
-                    "desc": self.desc,
-                },
-                ensure_ascii=False,
-            )
-        )
         return json.dumps(
             {
                 "desc": self.desc,
@@ -75,7 +65,7 @@ class ABCEnum(ABCMeta, EnumType):
 class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
     """table 1-3 from ref[1] page 23"""
 
-    def __init__(self, desc: str, alpha: int, beta: int):
+    def __init__(self, desc: str, alpha: float, beta: float):
         super().__init__(desc)
         self.alpha = alpha
         self.beta = beta
@@ -185,7 +175,7 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
 
 class Composition:
 
-    all_compositions = []
+    all_compositions: list["Composition"] = []
 
     def __init__(
         self,
@@ -197,7 +187,7 @@ class Composition:
         reduced_adiabatic_index: float,
         burn_rate_coefficient: float,
         pressure_exponent: float,
-        adiabatic_flame_temperature: float = 0,
+        adiabatic_flame_temperature: float | None = None,
     ):
         self.name, self.desc = name, desc
         self.f = force
@@ -294,7 +284,7 @@ class Composition:
             return (2 * self.f / self.theta) ** 0.5
 
     @staticmethod
-    def get_name_composition_dict() -> dict[str, str]:
+    def get_name_composition_dict() -> dict[str, Composition]:
         name_composition_dict = {}
         for composition in Composition.all_compositions:
             name_composition_dict[composition.name] = composition
@@ -319,15 +309,44 @@ class Propellant(JSONable):
         force_fudge: float = 1.0,
     ):
         """
-        for propellant i = 1, 2:
-            Z_i = e_i / e_0_i
-            psi_i = ff_i(Z_i)
-            dZ_i / dt = u_1 p ^ n_i / e_0_i
+        MIXED CHARGE FORMULATION (grains 1=main, 2=aux):
 
-        In sum:
-                        n
-            psi = (1/w) Σ ff_i(Z_i) w_i
-                       i=1
+        Individual grain variables:
+            e_0_i : initial web thickness
+            z_i   : burn fraction = burned_web_i / e_0_i  (0 → 1)
+            ψ_i(z_i) : form function = mass fraction of grain i burned
+            σ_i(z_i) = dψ_i/dz_i : relative burning surface of grain i
+
+        Burn rate coupling (same pressure, same Vielle law u = u₁pⁿ):
+            dz_i/dt = u / e_0_i
+            ⇒ dz₂/dz₁ = e_0_1 / e_0_2 = 1 / web_ratio
+            ⇒ z₂ = z₁ / web_ratio
+
+        where web_ratio = e_0_2 / e_0_1 is stored as self.web_ratio.
+
+        Mass weighting:
+            w₁, w₂ : grain masses; mass_ratio = w₂ / w₁ = self.mass_ratio
+            w = w₁ + w₂ = w₁(1 + mass_ratio)
+
+        Overall form function ψ(z), where z ≡ z₁ (main grain burn fraction):
+            m_burned = w₁ψ₁(z₁) + w₂ψ₂(z₂)
+            ψ(z) = m_burned / w
+                  = ψ₁(z)/(1+r) + ψ₂(z/web_ratio)·r/(1+r)
+
+        Overall sigma σ(z) = dψ/dz (chain rule on z₂):
+            σ(z) = dψ/dz₁
+                  = (1/(1+r))·dψ₁/dz₁ + (r/(1+r))·dψ₂/dz₂ · dz₂/dz₁
+                  = σ₁(z)/(1+r) + σ₂(z/web_ratio)·r/(1+r)·(1/web_ratio)
+
+        The 1/web_ratio factor in σ is critical: it accounts for the fact that
+        a unit advance in z₁ corresponds to only 1/web_ratio advance in z₂.
+
+        Burnout constraint:
+            Aux must finish before main: z_b2 ≤ z_b / web_ratio
+            (checked at init; z_b = main grain burnout, z_b2 = aux grain burnout)
+
+        The ODE uses z as the independent variable; f_psi_z(z) and f_sigma_z(z)
+        return the overall ψ and σ at main-grain burn fraction z.
         """
         if any((main_r1 and main_r1 < 0, main_r2 and main_r2 < 0)):
             raise ValueError("Geometry is impossible")
@@ -352,7 +371,7 @@ class Propellant(JSONable):
         self.force_fudge = force_fudge
 
         if not (0 <= self.combustible_fraction <= 1):
-            raise ValueError("Combustible fraction should be in [0,1]")
+            raise ValueError(f"Combustible fraction should be in [0,1], but got {self.combustible_fraction}")
 
         if self.mass_ratio > 0 and z_b2 > self.z_b / self.web_ratio:
             raise ValueError("Auxiliary grains must complete combustion in advance of the primary grains.")
@@ -415,7 +434,7 @@ class Propellant(JSONable):
         return self.composition.n
 
     @property
-    def temp_v(self) -> float:
+    def temp_v(self) -> float | None:
         return self.composition.temp_v
 
     @staticmethod
@@ -445,10 +464,17 @@ class Propellant(JSONable):
             return 1.0
 
     def f_sigma_z(self, z: float) -> float:
+        """
+        Overall sigma σ(z) = dψ/dz for mixed charge.
+
+        σ(z) = σ₁(z)/(1+r) + σ₂(z/web_ratio)·r/(1+r)·(1/web_ratio)
+
+        The trailing /web_ratio is the chain rule factor dz₂/dz₁.
+        """
         z_main, z_aux = z, z / self.web_ratio
         sigma_main, sigma_aux = self.f_sigma(z_main, self.main_params), self.f_sigma(z_aux, self.aux_params)
 
-        return sigma_main / (self.mass_ratio + 1) + sigma_aux * self.mass_ratio / (self.mass_ratio + 1)
+        return sigma_main / (self.mass_ratio + 1) + sigma_aux * self.mass_ratio / (self.mass_ratio + 1) / self.web_ratio
 
     def f_psi_z(self, z: float) -> float:
         z_main, z_aux = z, z / self.web_ratio
@@ -486,17 +512,15 @@ class DelegatesPropellant:
         return self.propellant.n
 
     @property
-    def temp_v(self) -> float:
+    def temp_v(self) -> float | None:
         return self.propellant.temp_v
 
     @property
     def z_b(self) -> float:
         return self.propellant.z_b
 
-    @wraps(Propellant.f_psi_z)
     def f_psi_z(self, *args, **kwargs):
         return self.propellant.f_psi_z(*args, **kwargs)
 
-    @wraps(Propellant.f_sigma_z)
     def f_sigma_z(self, *args, **kwargs):
         return self.propellant.f_sigma_z(*args, **kwargs)

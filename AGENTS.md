@@ -1,0 +1,75 @@
+# PIBS — Agent Instructions
+
+## Run / Test
+
+- **Run app**: `.venv\Scripts\python.exe run_pibs.py` — always use project .venv. App is a tkinter GUI; run directly and
+  watch terminal for errors. User will close window when done.
+- **No test suite** — verification is manual (launch app, run calculation, save/load, theme switch).
+
+## Lint / Format
+
+- **black**: `line-length = 120` — run via `.venv\Scripts\python.exe -m black <files>`
+- **isort**: `profile = "black"` — run via `.venv\Scripts\python.exe -m isort <files>`
+- Pre-commit hook (`pre-commit`) also runs `sort_localization.py` and `generate_executable.py`, but isort/PyInstaller
+  are often not in PATH; black is the only reliable step.
+
+## Design Decisions
+
+**"God objects" in ballistics core are intentional, not technical debt.**
+
+- `Gun`/`Recoilless` own the full simulation pipeline (ODE setup, integration, peak finding, sampling, pressure traces).
+  Splitting into separate classes would add indirection over inherently coupled state without real benefit.
+- `InteriorBallisticsFrame` (~1000 lines) is a tkinter God frame — framework limitation, not design oversight.
+- Refactors should not break these classes apart "for purity." Tight coupling here tracks the physics.
+
+**Input validation lives in the domain layer, not the UI.**
+
+- Ballistics config dataclasses use `__post_init__` to validate constraints.
+- The UI performs only **normalization** (empty→0.0, str→float via focus-out formatters), not constraint checking.
+- Invalid values surface as `ValueError` at `dispatch.sim_config_to_ballistics()` — caught by existing error handling.
+
+## Conventions
+
+**Save / Load**
+
+- Save files use **widget descriptive strings** as JSON keys (from `loc.get_descriptive()`), NOT magic keys.
+
+**Localization**
+
+- After editing keys in `pibs/ui/localization.json`, run: `.venv\Scripts\python.exe sort_localization.py`
+
+**UI Widgets**
+
+- Widgets do **not** self-grid in `__init__`; they are placed via a `place(row, col, ...)` method called by `RowBuilder`.
+- `RowBuilder` is the single source of truth for row placement — don't mix direct `.grid()` calls.
+- For checkboxes used as LabelFrame headers: use `widget.as_labelwidget()` instead of `.place()`.
+
+## Documentation Policy
+
+**CRITICAL: Preserve technical/research documentation.**
+
+- Code docstrings that describe API usage can be updated or removed during refactors.
+- **Technical documentation must never be deleted** — this includes:
+    - Textbook/paper references (e.g., 金 2014, Hunt 1953, 鲍廷钰 1995)
+    - Mathematical formulas and derivations
+    - Physics explanations (ODE domains, pressure conversions, nozzle theory)
+    - ASCII diagrams explaining geometry or flow
+    - Citations to specific equations or page numbers
+- When refactoring, **move** technical docs to their new location — never drop them.
+- Before committing a refactor that touches ballistics code (`gun.py`, `recoilless.py`, `constrained*.py`), compare
+  against the previous version to ensure no technical docs were lost.
+
+## Gotchas
+
+**Logging**: Python's `logging.lastResort` handler writes unformatted messages to stderr when no handlers are found.
+In pool children, setting the `pibs` logger level to CRITICAL is required — merely clearing handlers is insufficient.
+
+**PlotManager**: Each plot update method must wrap plotting code in `plt.rc_context(self.context)` to apply theme/font
+settings. `draw_idle()` must be called inside this context.
+
+**Resources**: Always use `resolve_path()` from `pibs/misc.py` for resource access — handles both dev mode and frozen
+PyInstaller builds.
+
+## Packaging
+
+- PyInstaller via `generate_executable.py`; spec file generated in root.

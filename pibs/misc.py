@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 if platform.system() == "Windows":
     from ctypes import windll
 
-from math import floor, log, log10, isinf, isnan
+from math import floor, isinf, isnan, log, log10
 
 _superscript_map = {
     "0": "⁰",
@@ -201,6 +201,7 @@ def resolve_path(path: str) -> str:
     else:
         # Normal development mode. Use os.getcwd() or __file__ as appropriate in your case...
         resolved_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), path))
+        logger.debug(resolved_path)
 
     return resolved_path
 
@@ -241,14 +242,14 @@ def loadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool:
 
         flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
         num_fonts_added = add_font_resource_ex(byref(pathbuf), flags, 0)
-        logger.info(f"Windows: Loaded font {fontpath} (private={private}, enumerable={enumerable})")
+        logger.debug(f"loaded font {fontpath} (private={private}, enumerable={enumerable})")
         return bool(num_fonts_added)
     else:
         font_dir = get_font_dir()
         if font_dir is None:
             return False
         shutil.copy2(fontpath, font_dir)
-        logger.info(f"Linux: Copied font {fontpath} to {font_dir}")
+        logger.debug(f"copied font {fontpath} to {font_dir}")
         return True
 
 
@@ -271,7 +272,7 @@ def unloadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool
             raise TypeError("fontpath must be a str or unicode")
 
         flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
-        logger.info(f"Windows: Unloaded font {fontpath} (private={private}, enumerable={enumerable})")
+        logger.debug(f"unloaded font {fontpath} (private={private}, enumerable={enumerable})")
         return bool(remove_font_resource_ex(byref(pathbuf), flags, 0))
     else:
         font_dir = get_font_dir()
@@ -280,14 +281,12 @@ def unloadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool
         dest_path = font_dir / Path(fontpath).name
         if dest_path.exists():
             dest_path.unlink()
-        logger.info(f"Linux: Removed font {fontpath} from {font_dir}")
+        logger.debug(f"removed font {fontpath} from {font_dir}")
         return True
 
 
-def to_si(v: float, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: bool = False) -> str:
-    if v is None:
-        return "N/A"
-    elif isinstance(v, int) or isinstance(v, float):
+def to_si(v: float | str, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: bool = False) -> str:
+    if isinstance(v, int) or isinstance(v, float):
         if isinf(v):
             return "INF"
         if isnan(v):
@@ -323,69 +322,6 @@ def to_si(v: float, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: boo
         return v
     else:
         raise ValueError(f"Cannot convert type of {type(v):} to SI notation")
-
-
-def validate_nn(inp):
-    """
-    validate an input if it results in:
-    - result >=0
-    - result is empty
-    in the latter case, the empty field will be handled by tracing
-    change in variable.
-    """
-    if (
-        inp == ""
-        or inp == "."
-        or (inp.count("e") == 1 and inp[-1] == "e")  # scientific input
-        or (inp.count("e") == 1 and inp[-2:] == "e-")  # scientific input with negative exponent
-    ):
-        return True
-    try:
-        if float(inp) >= 0:
-            return True
-        else:
-            return False
-    except ValueError:
-        return False
-
-
-def validate_pi(inp):  # validate an input such that the result is a positive integer
-    if inp == "":
-        return True  # we will catch this by filling the default value
-    try:
-        return float(inp).is_integer() and float(inp) > 0 and "." not in inp
-    except ValueError:
-        return False
-
-
-def validate_ce(inp: float) -> float:
-    return validate_range(inp, low=0.0, high=100.0)
-
-
-def validate_range(inp: float, low: float, high: float) -> float:  # validate a range
-    high, low = max((high, low)), min((high, low))
-    if inp == "":
-        return True
-    try:
-        return high >= float(inp) >= low
-    except ValueError:
-        return False
-
-
-def validate_flt(inp):  # validate an input such that the result is a float.
-    if (
-        inp == ""
-        or inp == "."
-        or inp == "-"
-        or (inp.count("e") == 1 and inp[-1] == "e")  # scientific input
-        or (inp.count("e") == 1 and inp[-2:] == "e-")  # scientific input with negative exponent
-    ):
-        return True
-    try:
-        float(inp)
-        return True
-    except ValueError:
-        return False
 
 
 def format_float_input(event, var):
@@ -453,6 +389,26 @@ def detect_darkmode_in_windows() -> bool:
         except OSError:
             break
     return False
+
+
+def setup_windows_dpi() -> None:
+    """Set process DPI awareness for Windows."""
+    if platform.system() != "Windows":
+        return
+    win_release = platform.release()
+    if win_release in ("8", "10", "11"):
+        windll.shcore.SetProcessDpiAwareness(1)
+    elif win_release in ("7", "Vista"):
+        windll.user32.SetProcessDPIAware()
+
+
+def get_windows_locale() -> str:
+    """Get the default Windows UI language code."""
+    if platform.system() != "Windows":
+        return ""
+    import locale
+
+    return locale.windows_locale[windll.kernel32.GetUserDefaultUILanguage()]
 
 
 if __name__ == "__main__":

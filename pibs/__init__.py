@@ -1,44 +1,44 @@
-__version__ = "0.5.5"
+__version__ = "0.5.6"
 
 
 import logging
-
-# import sys
-from typing import Any
+import sys
+from enum import Enum
 
 DESCRIPTION = "Description"
 FONTNAME = "Sarasa Fixed SC"
 FONTSIZE = 9
 BOLDSIZE = 10
-CONTEXT: dict[str, Any] = {
-    "font.size": FONTSIZE,
-    "axes.titlesize": FONTSIZE,
-    "axes.labelsize": FONTSIZE,
-    "axes.titlelocation": "right",
-    "xtick.labelsize": FONTSIZE,
-    "ytick.labelsize": FONTSIZE,
-    "legend.fontsize": FONTSIZE,
-    "figure.titlesize": BOLDSIZE,
-    "lines.markersize": FONTSIZE / 4,
-    "lines.linewidth": 1,
-    "font.family": FONTNAME,
-    "axes.labelweight": "bold",
-    "xaxis.labellocation": "right",
-    "yaxis.labellocation": "top",
-}
+
+
+class FigureType(str, Enum):
+    MAIN = "main"
+    AUX = "aux"
+    GEOM = "geom"
+    GUIDE = "guide"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class Theme(str, Enum):
+    AWDARK = "awdark"
+    AWLIGHT = "awlight"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 THEMES = {
-    "awlight": {"cmap": "afmhot_r", "is_light": True},
-    "awdark": {"cmap": "afmhot", "is_light": False},
-    "awwinxpblue": {"cmap": "afmhot_r", "is_light": True},
-    "awclearlooks": {"cmap": "afmhot_r", "is_light": True},
+    Theme.AWLIGHT: {"cmap": "afmhot_r", "is_light": True},
+    Theme.AWDARK: {"cmap": "afmhot", "is_light": False},
 }
 
 
 root_logger = logging.getLogger(__name__)
 root_logger.setLevel(logging.INFO)
-log_formatter = logging.Formatter("%(asctime)s %(module)s.%(funcName)s: %(message)s")
-# handler = logging.StreamHandler(sys.stderr)
-# handler.setFormatter(formatter)
-# root_logger.addHandler(handler)
+root_logger.propagate = False
+log_formatter = logging.Formatter("%(asctime)s - [%(module)10s] %(message)s", datefmt="%H:%M:%S")
+handler = logging.StreamHandler(sys.stderr)
+handler.setFormatter(log_formatter)
+root_logger.addHandler(handler)

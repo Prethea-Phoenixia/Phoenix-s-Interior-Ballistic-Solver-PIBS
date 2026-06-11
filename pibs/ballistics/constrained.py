@@ -3,16 +3,24 @@ from __future__ import annotations
 import json
 import logging
 import math
-from typing import Callable, Any
+from dataclasses import asdict
+from typing import TYPE_CHECKING, Any, Callable
 
-from . import JSONable
-from . import POINT_PEAK_AVG, OptimizationTargets, MIN_BARR_VOLUME, Points, MAX_ITER, MIN_PROJ_TRAVEL
+from . import JSONable, OptimizationTarget
+from .config import DesignConstraint, GunGeometry, PropellantLoad, Solver
 from .num import gss
-from .prop import Propellant, DelegatesPropellant
+from .prop import DelegatesPropellant
+
+if TYPE_CHECKING:
+    from .prop import Propellant
 
 
 def probe_func(
-    func: Callable[[float], Any], start: float, stop: float, tol: float, exceptions: tuple[Exception] = (ValueError,)
+    func: Callable[[float], Any],
+    start: float,
+    stop: float,
+    tol: float,
+    exceptions: tuple[type[Exception], ...] = (ValueError,),
 ) -> float:
     delta = stop - start
     probe = new_probe = start
@@ -31,126 +39,104 @@ def probe_func(
 class Constrained(DelegatesPropellant, JSONable):
     def __init__(
         self,
-        caliber: float,
-        shot_mass: float,
-        propellant: Propellant,
-        start_pressure: float,
-        drag_coefficient: float,
-        design_pressure: float,
-        design_velocity: float,
-        tol: float,
-        chambrage: float,
-        min_web: float = 1e-6,
-        max_length: float = 1e3,
-        ambient_density: float = 1.204,
-        ambient_pressure: float = 101.325e3,
-        ambient_adb_index: float = 1.4,
-        control: Points = POINT_PEAK_AVG,
+        geometry: GunGeometry,
+        load: PropellantLoad,
+        design: DesignConstraint,
+        solver: Solver | None = None,
         logger: logging.Logger | None = None,
     ):
         self.logger = logger if logger else logging.getLogger(__name__)
-        super().__init__(propellant=propellant)
+        super().__init__(propellant=load.propellant)
+
+        self.geometry = geometry
+        self.load = load
+        self.design = design
+        self.solver = solver if solver else Solver()
+
         if any(
             (
-                caliber <= 0,
-                shot_mass <= 0,
-                start_pressure <= 0,
-                drag_coefficient < 0,
-                drag_coefficient >= 1,
-                chambrage < 1,
+                geometry.caliber <= 0,
+                geometry.shot_mass <= 0,
+                load.start_pressure <= 0,
+                self.solver.drag_coefficient < 0,
+                self.solver.drag_coefficient >= 1,
+                geometry.chambrage < 1,
             )
         ):
             raise ValueError("Invalid parameters for constrained design")
 
-        if any((design_pressure <= 0, design_velocity <= 0)):
+        if any((design.design_pressure <= 0, design.design_velocity <= 0)):
             raise ValueError("Invalid design constraint")
 
-        ambient_pressure = max(ambient_pressure, 1)
-        ambient_adb_index = max(ambient_adb_index, 1)
+        self.caliber = geometry.caliber
 
-        self.caliber = caliber
+        self.s = (geometry.caliber / 2) ** 2 * math.pi
+        self.m = geometry.shot_mass
+        self.p_0 = load.start_pressure
+        self.phi_1 = 1 / (1 - self.solver.drag_coefficient)
 
-        self.s = (caliber / 2) ** 2 * math.pi
-        self.m = shot_mass
-        self.p_0 = start_pressure
-        self.phi_1 = 1 / (1 - drag_coefficient)
+        self.p_d = design.design_pressure
+        self.v_d = design.design_velocity
 
-        # design limits
-        self.p_d = design_pressure
-        self.v_d = design_velocity
+        self.min_web = design.min_web
+        self.max_length = design.max_length
 
-        self.ambient_density = ambient_density
-        self.ambient_pressure = ambient_pressure
-        self.ambient_adb_index = ambient_adb_index
-        self.control = control
-
-        self.min_web = min_web
-        self.max_length = max_length
-
-        self.chi_k = chambrage
-        self.tol = tol
+        self.chi_k = geometry.chambrage
+        self.tol = self.solver.tolerance
 
     def to_json(self) -> str:
         return json.dumps(
             {
-                "caliber": self.caliber,
-                "shot_mass": self.m,
-                "propellant": json.loads(self.propellant.to_json()),
-                "start_pressure": self.p_0,
-                "drag_coefficient": 1 - 1 / self.phi_1,
-                "design_pressure": self.p_d,
-                "design_velocity": self.v_d,
-                "tol": self.tol,
-                "min_web": self.min_web,
-                "max_length": self.max_length,
-                "ambient_density": self.ambient_density,
-                "ambient_pressure": self.ambient_pressure,
-                "ambient_adb_index": self.ambient_adb_index,
-                "control": self.control,
-                "chambrage": self.chi_k,
+                "geometry": asdict(self.geometry),
+                "load": {
+                    "start_pressure": self.p_0,
+                    "propellant": json.loads(self.propellant.to_json()),
+                },
+                "design": asdict(self.design),
+                "solver": asdict(self.solver),
             },
             ensure_ascii=False,
         )
 
     @classmethod
     def from_json(cls, json_dict: dict) -> Constrained:
-        deserialized_dict = {}
-        for key, value in json_dict.items():
-            if key == "propellant":
-                value = Propellant.from_json(value)
+        from .prop import Propellant
 
-            deserialized_dict[key] = value
+        geometry = GunGeometry(**json_dict["geometry"])
+        load_data = json_dict["load"]
+        load = PropellantLoad(
+            propellant=Propellant.from_json(load_data["propellant"]),
+            start_pressure=load_data["start_pressure"],
+        )
+        design = DesignConstraint(**json_dict["design"])
+        solver = Solver(**json_dict.get("solver", {}))
 
-        return cls(**deserialized_dict)
-
-    def func_p_ad_bar(self, v_bar: float, c_a_bar: float, p_a_bar: float) -> float:
-        if c_a_bar and v_bar > 0.0:
-            v_r = v_bar / c_a_bar
-            return (
-                +0.25 * self.ambient_adb_index * (self.ambient_adb_index + 1) * v_r**2
-                + self.ambient_adb_index * v_r * (1 + (0.25 * (self.ambient_adb_index + 1)) ** 2 * v_r**2) ** 0.5
-            ) * p_a_bar
-
-        else:
-            return 0
+        return cls(geometry=geometry, load=load, design=design, solver=solver)
 
     def solve(
         self,
-        *_,
+        *,
         load_fraction: float,
         charge_mass_ratio: float,
         length_gun: float | None = None,
-        max_iteration: int = MAX_ITER,
+        known_bore: bool = False,
+        max_iterations: int | None = None,
         labda_1: float | None = None,
         labda_2: float | None = None,
         cc: float | None = None,
         it: int = 0,
-        **__,
-    ) -> tuple[float, float]: ...
+    ) -> tuple[float, float]:
+        raise NotImplementedError
 
     @staticmethod
     def validate_solve_inputs(solve):
-        def wrapped_solve(self: Constrained, *args, load_fraction: float, charge_mass_ratio: float, **kwargs):
+        def wrapped_solve(
+            self: Constrained,
+            *,
+            load_fraction: float,
+            charge_mass_ratio: float,
+            **kwargs,
+        ):
             if charge_mass_ratio <= 0:
                 raise ValueError("Charge mass to projectile ratio must be positive")
 
@@ -161,12 +147,16 @@ class Constrained(DelegatesPropellant, JSONable):
             if load_fraction >= 1:
                 raise ValueError("Chamber is overfull (load fraction >= 1).")
 
-            return solve(self, *args, load_fraction=load_fraction, charge_mass_ratio=charge_mass_ratio, **kwargs)
+            return solve(self, load_fraction=load_fraction, charge_mass_ratio=charge_mass_ratio, **kwargs)
 
         return wrapped_solve
 
     @property
     def minimum_load_fraction(self) -> float:
+        """
+        p = fΔ / (1 - αΔ)
+        Δ = 1 / (f/p + α)
+        """
         return (1 / (self.f / self.p_d + self.alpha)) / self.rho_p * (1 + self.tol)
 
     def get_f(self, charge_mass_ratio: float) -> Callable[[float], tuple[float, float, float]]:
@@ -184,40 +174,53 @@ class Constrained(DelegatesPropellant, JSONable):
             self.get_f(charge_mass_ratio), start=self.minimum_load_fraction, stop=1 - self.tol, tol=self.tol
         )
 
+    def validate_load_fraction(
+        self, charge_mass_ratio: float, proposed_lfs: list[float]
+    ) -> dict[float, tuple[float, float, float]]:
+        # construct the load fraction ladder:
+        f = self.get_f(charge_mass_ratio)
+        proposed_lfs = [lf for lf in proposed_lfs if lf > self.minimum_load_fraction]
+        results = {}
+        for lf in proposed_lfs:
+            try:
+                results[lf] = f(lf)
+            except ValueError:
+                break
+
+        return results
+
     def find_min_v(
         self,
+        *,
         charge_mass_ratio: float,
-        opt_target: OptimizationTargets = MIN_BARR_VOLUME,
+        opt_target: OptimizationTarget = OptimizationTarget.MIN_BARR_VOLUME,
         **_,
     ) -> tuple[float, float, float]:
         """
         find the minimum volume solution.
         """
-        self.logger.info("Optimizing under constraints.")
-        """
-        p = fΔ / (1 - αΔ)
-        Δ = 1 / (f/p + α)
-        """
+        self.logger.info("optimizing under constraints")
         low = self.minimum_load_fraction
-        self.logger.info(f"Min Δ/ρ = {low:.3%}.")
+        self.logger.info(f"min Δ/ρ = {low:.3%}")
 
         high = self.maximum_load_fraction(charge_mass_ratio)
-        self.logger.info(f"Max Δ/ρ = {high:.3%}.")
+        self.logger.info(f"max Δ/ρ = {high:.3%}")
 
-        if opt_target == MIN_PROJ_TRAVEL:
+        if opt_target == OptimizationTarget.MIN_PROJ_TRAVEL:
             _f_index = 1
-        elif opt_target == MIN_BARR_VOLUME:
+        elif opt_target == OptimizationTarget.MIN_BARR_VOLUME:
             _f_index = 2
         else:
             raise ValueError(f"Unknown target {opt_target}")
 
-        _f = self.get_f(charge_mass_ratio)
+        _f: Callable[[float], tuple[float, float, float]] = self.get_f(charge_mass_ratio)
 
-        self.logger.info(f"Solution constrained to Δ/ρ : {low:.3%} - {high:.3%}")
+        self.logger.info(f"Δ/ρ range: {low:.3%} - {high:.3%}")
         lf_low, lf_high = gss(
             lambda load_fraction: _f(load_fraction)[_f_index], low, high, x_tol=self.tol, find_min=True
         )
         lf = 0.5 * (lf_high + lf_low)
-        e_1, l_g, _ = _f(lf)
-        self.logger.info(f"Optimal Δ/ρ = {lf:.2f}")
+        e_1 = _f(lf)[0]
+        l_g = _f(lf)[1]
+        self.logger.info(f"optimal Δ/ρ = {lf:.2f}")
         return lf, e_1, l_g

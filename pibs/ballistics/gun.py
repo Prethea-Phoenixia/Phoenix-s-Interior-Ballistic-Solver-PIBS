@@ -3,20 +3,26 @@ from __future__ import annotations
 import json
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from math import log
-from typing import Callable
+from typing import Callable, Literal
 
-from . import DOMAIN_TIME
-from . import Domains, Points, Solutions
-from . import POINT_BURNOUT, POINT_EXIT, POINT_FRACTURE, POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT, POINT_START
-from . import SAMPLE
-from . import SOL_LAGRANGE, SOL_MAMONTOV, SOL_PIDDUCK
+from . import (
+    Domain,
+    Point,
+    SolutionMethod,
+)
 from .base_gun import BaseGun
-from .generics import GenericEntry, GenericResult, OutlineEntry, PressureProbePoint, PressureTraceEntry
+from .config import GunGeometry, PropellantLoad, Solver, Structural
+from .generics import (
+    GenericEntry,
+    GenericResult,
+    OutlineEntry,
+    PressureProbePoint,
+    PressureTraceEntry,
+)
 from .material import Material
-from .num import dekker, gss, integrate, rkf
-from .prop import Propellant
+from .num import dekker, find_last_le, gss, integrate, merge_sorted_records, rkf
 
 
 @dataclass
@@ -74,7 +80,7 @@ def pidduck(wpm: float, k: float, tol: float) -> tuple[float, float]:
         else:
             return i - 0.5 * ((k - 1) / k) * wpm * ((1 - om) ** (k / (k - 1)) / om)
 
-    omega = 0.5 * sum(dekker(f_omega, 0, 1, x_tol=tol**2))
+    omega = 0.5 * sum(dekker(f_omega, 0, 1, x_tol=tol))
 
     if k == 1:
         labda_1 = (math.exp(omega) - 1) / wpm
@@ -89,60 +95,73 @@ def pidduck(wpm: float, k: float, tol: float) -> tuple[float, float]:
 
 
 class Gun(BaseGun):
+    """
+    load density            Δ := ω / V₀
+    asymptotic velocity:    vⱼ := [2 f ω / (θ φ m)]^0.5
+
+    the reduced system:
+    reduced length:         l̄  := l / l₀ where l₀ := V₀ / S
+    reduced pressure:       p̄ := p / (f Δ)
+    reduced time:           t̄ := t vⱼ / l₀
+    reduced velocity:       v̄ := v / vⱼ
+
+    the ODE system (2-72):
+
+    dψ/dt =
+        χ(1 + 2λZ + 3μZ²) √(θ/(2B)) · p̄^n,          when Z < 1
+        (χ_s/Z_k)(1 + 2λ_s·Z/Z_k) √(θ/(2B)) · p̄^n,   when 1 ≤ Z < Z_k
+        0,                                           when Z ≥ Z_k
+
+    dZ/dt =
+        √(θ/(2B)) · p̄^n,    when Z < Z_k
+        0,                   when Z ≥ Z_k
+
+    dl̄/dt̄ = v̄
+
+    dv̄/dt̄ = (θ/2) · p̄
+
+    dp̄/dt = [l₀ / ((l̄ + l̄_φ) · vⱼ)] · [1 + Δ(α - 1/ρ) · p̄] · (dψ/dt)
+             - [(1 + θ) / (l̄ + l̄_φ)] · p̄ · v̄
+
+    auxiliary definitions:
+    l̄φ = 1 - Δ/ρₚ - Δ(α - 1/ρₚ) · ψ
+    B    = [S² · eᵢ² / (f · ω · φ · m · uᵢ²)] · (fΔ)^(2(1-n))
+
+    Note: for typographical purposes, ω has been laid out as w in code, and sometimes l̄ is rendered as λ, spelled as
+        "labda" due to Python keyword lambda.
+
+    """
+
     def __init__(
         self,
-        caliber,
-        shot_mass: float,
-        propellant: Propellant,
-        web: float,
-        charge_mass: float,
-        chamber_volume: float,
-        start_pressure: float,
-        length_gun: float,
-        chambrage: float,
-        tol: float,
-        drag_coefficient: float = 0.0,
-        sol: Solutions = SOL_PIDDUCK,
-        ambient_density: float = 1.204,
-        ambient_pressure: float = 101.325e3,
-        ambient_adb_index: float = 1.4,
+        geometry: GunGeometry,
+        load: PropellantLoad,
+        solver: Solver | None = None,
         logger: logging.Logger | None = None,
-        **_,
     ):
-
         super().__init__(
-            caliber=caliber,
-            shot_mass=shot_mass,
-            propellant=propellant,
-            web=web,
-            charge_mass=charge_mass,
-            chamber_volume=chamber_volume,
-            start_pressure=start_pressure,
-            length_gun=length_gun,
-            chambrage=chambrage,
-            tol=tol,
-            drag_coefficient=drag_coefficient,
-            ambient_density=ambient_density,
-            ambient_pressure=ambient_pressure,
-            ambient_adb_index=ambient_adb_index,
+            geometry=geometry,
+            load=load,
+            solver=solver,
             logger=logger,
         )
 
-        self.sol = sol
+        self.sol = self.solver.solution_method
 
-        if self.sol == SOL_LAGRANGE:
+        if self.sol == SolutionMethod.LAGRANGE:
             self.labda_1, self.labda_2 = 1 / 2, 1 / 3
-        elif self.sol == SOL_PIDDUCK:
-            self.labda_1, self.labda_2 = pidduck(self.w / (self.phi_1 * self.m), self.theta + 1, tol)
-        elif self.sol == SOL_MAMONTOV:
-            self.labda_1, self.labda_2 = pidduck(self.w / (self.phi_1 * self.m), 1, tol)
+        elif self.sol == SolutionMethod.PIDDUCK:
+            self.labda_1, self.labda_2 = pidduck(self.w / (self.phi_1 * self.m), self.theta + 1, self.tol)
+        elif self.sol == SolutionMethod.MAMONTOV:
+            self.labda_1, self.labda_2 = pidduck(self.w / (self.phi_1 * self.m), 1, self.tol)
         else:
             raise ValueError("Unknown Solution")
 
         labda = self.l_g / self.l_0
-        cc = 1 - (1 - 1 / self.chi_k) * log(labda + 1) / labda  # chambrage correction factor
+        cc = 1 - (1 - 1 / self.chi_k) * log(labda + 1) / labda
 
         self.phi = self.phi_1 + self.labda_2 * cc * self.w / self.m
+
         """
         见《枪炮内弹道学》（金，2014）p.70 式
         """
@@ -165,18 +184,18 @@ class Gun(BaseGun):
         psi = self.f_psi_z(z)
         l_psi_bar = 1 - self.delta * ((1 - psi) / self.rho_p + (self.alpha * psi))
         p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
-        return max(p_bar, self.p_a_bar)
+        return p_bar
 
-    def ode_t(self, _: float, zlv: tuple[float, float, float], __: float) -> tuple[float, float, float]:
+    def ode_t(self, _: float, zlv: tuple[float, float, float]) -> tuple[float, float, float]:
         z, l_bar, v_bar = zlv
         p_bar = self.f_p_bar(z, l_bar, v_bar)
         dz = (0.5 * self.theta / self.b) ** 0.5 * p_bar**self.n
         dl_bar = v_bar
-        dv_bar = self.theta * 0.5 * (p_bar - self.func_p_ad_bar(v_bar))
+        dv_bar = self.theta * 0.5 * p_bar
 
         return dz, dl_bar, dv_bar
 
-    def ode_l(self, l_bar: float, tzv: tuple[float, float, float], _: float) -> tuple[float, float, float]:
+    def ode_l(self, l_bar: float, tzv: tuple[float, float, float]) -> tuple[float, float, float]:
         """length domain ode of internal ballistics
         the 1/v_bar pose a starting problem that prevent us from using it from
         initial condition."""
@@ -186,18 +205,18 @@ class Gun(BaseGun):
 
         dz = (0.5 * self.theta / self.b) ** 0.5 * p_bar**self.n / v_bar
 
-        dv_bar = self.theta * 0.5 * (p_bar - self.func_p_ad_bar(v_bar)) / v_bar  # dv_bar/dl_bar
-        dt_bar = 1 / v_bar  # dt_bar / dl_bar
+        dv_bar = self.theta * 0.5 * p_bar / v_bar
+        dt_bar = 1 / v_bar
 
         return dt_bar, dz, dv_bar
 
-    def ode_z(self, z: float, tlv: tuple[float, float, float], _: float) -> tuple[float, float, float]:
+    def ode_z(self, z: float, tlv: tuple[float, float, float]) -> tuple[float, float, float]:
         t_bar, l_bar, v_bar = tlv
         p_bar = self.f_p_bar(z, l_bar, v_bar)
 
-        dt_bar = (2 * self.b / self.theta) ** 0.5 * p_bar**-self.n  # dt_bar/dZ
-        dl_bar = v_bar * dt_bar  # dv_bar/dZ
-        dv_bar = 0.5 * self.theta * (p_bar - self.func_p_ad_bar(v_bar)) * dt_bar
+        dt_bar = (2 * self.b / self.theta) ** 0.5 * p_bar**-self.n
+        dl_bar = v_bar * dt_bar
+        dv_bar = 0.5 * self.theta * p_bar * dt_bar
 
         return dt_bar, dl_bar, dv_bar
 
@@ -211,7 +230,7 @@ class Gun(BaseGun):
 
         if psi:
             r = self.f / self.temp_v
-            l_psi = self.l_0 * (1 - self.delta / self.rho_p - self.delta * (self.alpha * -1 / self.rho_p) * psi)
+            l_psi = self.l_0 * (1 - self.delta / self.rho_p - self.delta * (self.alpha - 1 / self.rho_p) * psi)
             return self.s * p * (l + l_psi) / (self.w * psi * r)
         else:
             return self.temp_v
@@ -234,156 +253,121 @@ class Gun(BaseGun):
 
         return dp_bar
 
-    def integrate(self, step: int = 10, tol: float = 1e-5, dom: Domains = DOMAIN_TIME, **_) -> GunResult:
+    def integrate(
+        self,
+        step: int = 33,
+        dom: Domain = Domain.TIME,
+    ) -> GunResult:
 
         bar_data = []
         t_scale, p_scale = self.l_0 / self.v_j, self.f * self.delta
-        l_g_bar, p_bar_0 = self.l_g / self.l_0, self.p_0 / p_scale
+        l_g_bar = self.l_g / self.l_0
         z_0, z_b = self.z_0, self.z_b
 
-        self.append_bar_data(bar_data, tag=POINT_START, t_bar=0, l_bar=0, z=z_0, v_bar=0)
+        self.append_bar_data(bar_data, tag=Point.START, t_bar=0, l_bar=0, z=z_0, v_bar=0)
 
-        z_i = z_0
-        z_j = z_b
-        n = 1
-        delta_z = z_b - z_0
-        t_bar_i, l_bar_i, v_bar_i = 0, 0, 0
-        is_burn_out_contained = True
+        p_bar_max = 1e9 / p_scale  # 1 GPa
 
-        z_t_l_v_record = [(z_0, (0, 0, 0))]
-        p_max = 1e9
-        p_bar_max = p_max / p_scale
+        def abort_condition(z, tlv, _):
+            t_bar, l_bar, v_bar = tlv
+            p_bar = self.f_p_bar(z, l_bar, v_bar)
+            return l_bar > l_g_bar or p_bar > p_bar_max
 
-        while z_i < z_b:  # terminates if burnout is achieved
-            z_t_l_v_record_i = []
-            if z_j == z_i:
-                raise ValueError("Numerical accuracy exhausted in search of exit/burnout point.")
+        z_record = [(z_0, (0, 0, 0))]
 
-            if z_j > z_b:
-                z_j = z_b
-            z_j, (t_bar_j, l_bar_j, v_bar_j), _ = rkf(
-                self.ode_z,
-                (t_bar_i, l_bar_i, v_bar_i),
-                z_i,
-                z_j,
-                rel_tol=tol,
-                abort_func=lambda _x, _ys, _records: self.abort_z(
-                    _x, _ys, _records, p_bar_max=p_bar_max, l_g_bar=l_g_bar
-                ),
-                record=z_t_l_v_record_i,
-            )
-
-            p_bar_j = self.f_p_bar(z_j, l_bar_j, v_bar_j)
-
-            if l_bar_j >= l_g_bar:
-                if abs(l_bar_i - l_g_bar) / l_g_bar > tol or l_bar_i == 0:
-                    n *= 2
-                    z_j = z_i + delta_z / n
-                else:
-                    is_burn_out_contained = False
-                    break  # l_bar_i is solved to within a tol of l_bar_g
-
-            else:
-                z_t_l_v_record.extend(z_t_l_v_record_i)
-                if v_bar_j <= 0:
-                    _, (t_bar, l_bar, v_bar) = z_t_l_v_record[-1]
-                    raise ValueError(
-                        "Squib load condition detected: Shot stopped in bore.\n"
-                        + "Shot is last calculated at {:.0f} mm at {:.0f} mm/s after {:.0f} ms".format(
-                            l_bar * self.l_0 * 1e3, v_bar * self.v_j * 1e3, t_bar * t_scale * 1e3
-                        )
-                    )
-
-                if any(v < 0 for v in (t_bar_j, l_bar_j, p_bar_j)):
-                    raise ValueError(
-                        "Numerical Integration diverged: negative values encountered in results.\n"
-                        + "{:.0f} ms, {:.0f} mm, {:.0f} m/s, {:.0f} MPa".format(
-                            t_bar_j * t_scale * 1e3,
-                            l_bar_j * self.l_0 * 1e3,
-                            v_bar_j * self.v_j,
-                            p_bar_j * p_scale * 1e-6,
-                        )
-                    )
-
-                if p_bar_j > p_bar_max:
-                    raise ValueError(
-                        "Nobel-Abel EoS is generally accurate enough below 600MPa. However, Unreasonably high pressure "
-                        + "(>{:.0f} MPa) was encountered.".format(p_max / 1e6),
-                    )
-
-                t_bar_i, l_bar_i, v_bar_i = t_bar_j, l_bar_j, v_bar_j
-
-                z_i = z_j
-                """
-                this way the group of values denoted by _i is always updated
-                as a group.
-                """
-                z_j += delta_z / n
-
-        if t_bar_i == 0:
-            raise ValueError("burnout point found to be at the origin.")
-
-        if is_burn_out_contained:
-            self.logger.info("integrated to burnout point.")
-        else:
-            self.logger.warning("shot exited barrel before burnout.")
-
-        l_t_z_v_record = []
-        l_bar, (t_bar_e, z_e, v_bar_e), _ = rkf(
-            self.ode_l, (t_bar_i, z_i, v_bar_i), l_bar_i, l_g_bar, rel_tol=tol, record=l_t_z_v_record
+        z_end, (t_bar_end, l_bar_end, v_bar_end), aborted = rkf(
+            self.ode_z,
+            (0, 0, 0),
+            z_0,
+            z_b,
+            rel_tol=self.tol,
+            abort_func=abort_condition,
+            record=z_record,
         )
 
-        if l_bar != l_g_bar:
-            if v_bar_e <= 0:
-                raise ValueError(
-                    "Squib load condition detected post burnout:"
-                    + " Round stopped in bore at {:.0f} mm".format(l_bar * self.l_0 * 1e3)
-                )
+        # check if integration exited due to excess pressure
+        p_bar_end = self.f_p_bar(z_end, l_bar_end, v_bar_end)
+        if p_bar_end > p_bar_max:
+            raise ValueError(
+                "excessive pressure encountered during integration (>1GPa mean). results cannot be expected to \
+be accurate due to gross violation of the applicable domain of Nobel-Abel equation-of-state. "
+            )
 
-        self.append_bar_data(bar_data, tag=POINT_EXIT, t_bar=t_bar_e, l_bar=l_g_bar, z=z_e, v_bar=v_bar_e)
+        # Determine if exit happened before burnout
+        is_burn_out_contained = not (aborted and l_bar_end >= l_g_bar)
 
-        t_bar_f = None
-        if z_b > 1.0 and z_e >= 1.0:  # fracture point exist and is contained
-
-            t_bar_f, l_bar_f, v_bar_f = rkf(self.ode_z, (0, 0, 0), z_0, 1, rel_tol=tol)[1]
-            self.append_bar_data(bar_data, tag=POINT_FRACTURE, t_bar=t_bar_f, l_bar=l_bar_f, z=1, v_bar=v_bar_f)
-
-        t_bar_b = None
         if is_burn_out_contained:
+            self.append_bar_data(bar_data, tag=Point.BURNOUT, t_bar=t_bar_end, l_bar=l_bar_end, z=z_b, v_bar=v_bar_end)
+            self.logger.info("integrated to burnout point")
+        else:
+            self.logger.warning("shot exited barrel before burnout")
 
-            t_bar_b, l_bar_b, v_bar_b = rkf(self.ode_z, (0, 0, 0), z_0, z_b, rel_tol=tol)[1]
-            self.append_bar_data(bar_data, tag=POINT_BURNOUT, t_bar=t_bar_b, l_bar=l_bar_b, z=z_b, v_bar=v_bar_b)
+        # integrate to actual exit point for both cases
+        l_bar_exit, (t_bar_exit, z_exit, v_bar_exit), _ = rkf(
+            self.ode_l,
+            (t_bar_end, z_end, v_bar_end),
+            l_bar_end,
+            l_g_bar,
+            rel_tol=self.tol,
+        )
+        # Populate exit point
+        self.append_bar_data(bar_data, tag=Point.EXIT, t_bar=t_bar_exit, l_bar=l_g_bar, z=z_exit, v_bar=v_bar_exit)
 
-        def find_peak(g: Callable[[float], float], tag: Points) -> None:
+        # Populate fracture point entry at Z = 1
+        if z_b > 1.0 and z_exit >= 1.0:
+            t_bar_f, l_bar_f, v_bar_f = rkf(self.ode_z, (0, 0, 0), z_0, 1, rel_tol=self.tol)[1]
+            self.append_bar_data(bar_data, tag=Point.FRACTURE, t_bar=t_bar_f, l_bar=l_bar_f, z=1, v_bar=v_bar_f)
 
-            t_bar_tol = tol * min(_t_bar for _t_bar in (t_bar_e, t_bar_b, t_bar_f) if _t_bar is not None)
-            t_bar_p = 0.5 * sum(gss(g, 0, t_bar_e if t_bar_b is None else t_bar_b, x_tol=t_bar_tol, find_min=False))
+        def func_p_z(z: float, tag: Point) -> tuple[float, tuple[float, float, float]]:
+            i = find_last_le(z_record, z)
+            x = z_record[i][0]
+            ys = z_record[i][1]
 
-            z_p, l_bar_p, v_bar_p = self.g(t_bar_p, tag, tol)[1]
+            r = []
+            t_bar, l_bar, v_bar = rkf(self.ode_z, ys, x, z, rel_tol=self.tol, record=r)[1]
+            merge_sorted_records(z_record, r)
+
+            p_bar = self.f_p_bar(z, l_bar, v_bar)
+            if tag == Point.PEAK_AVG:
+                return p_bar, (z, t_bar, l_bar, v_bar)
+            else:
+                ps_bar, pb_bar = self.to_ps_pb(l_bar * self.l_0, p_bar)
+                if tag == Point.PEAK_SHOT:
+                    return ps_bar, (z, t_bar, l_bar, v_bar)
+                elif tag == Point.PEAK_BREECH:
+                    return pb_bar, (z, t_bar, l_bar, v_bar)
+            raise ValueError(f"tag {tag} not handled.")
+
+        def find_peak(tag: Point) -> None:
+            z_p = 0.5 * sum(gss(lambda z: func_p_z(z, tag)[0], z_0, z_end, x_tol=self.tol, find_min=False))
+            _, (z_p, t_bar_p, l_bar_p, v_bar_p) = func_p_z(z_p, tag)
             self.append_bar_data(bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p)
 
-        for i, peak in enumerate([POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH]):
-            find_peak(lambda _t_bar: self.g(_t_bar, peak, z_0)[0], peak)
+        # Find peak pressure in burnup domain
+        for peak in [Point.PEAK_AVG, Point.PEAK_SHOT, Point.PEAK_BREECH]:
+            find_peak(peak)
 
-        if dom == DOMAIN_TIME:
+        # Sampling
+        if dom == Domain.TIME:
             z_j, l_bar_j, v_bar_j, t_bar_j = z_0, 0, 0, 0
-        else:
-            t_bar_j, (z_j, l_bar_j, v_bar_j), _ = rkf(self.ode_t, (z_0, 0, 0), 0, 0.5 * t_bar_i, rel_tol=tol)
+        else:  # length domain ODE requires starting from some point
+            t_bar_j, (z_j, l_bar_j, v_bar_j), _ = rkf(self.ode_t, (z_0, 0, 0), 0, 0.5 * t_bar_exit, rel_tol=self.tol)
 
         for j in range(step):
-            if dom == DOMAIN_TIME:
-                t_bar_k = t_bar_e / (step + 1) * (j + 1)
-                z_j, l_bar_j, v_bar_j = rkf(self.ode_t, (z_j, l_bar_j, v_bar_j), t_bar_j, t_bar_k, rel_tol=tol)[1]
+            if dom == Domain.TIME:
+                t_bar_k = t_bar_exit / (step + 1) * (j + 1)
+                z_j, l_bar_j, v_bar_j = rkf(self.ode_t, (z_j, l_bar_j, v_bar_j), t_bar_j, t_bar_k, rel_tol=self.tol)[1]
                 t_bar_j = t_bar_k
             else:
                 l_bar_k = l_g_bar / (step + 1) * (j + 1)
-                t_bar_j, z_j, v_bar_j = rkf(self.ode_l, (t_bar_j, z_j, v_bar_j), l_bar_j, l_bar_k, rel_tol=tol)[1]
+                t_bar_j, z_j, v_bar_j = rkf(self.ode_l, (t_bar_j, z_j, v_bar_j), l_bar_j, l_bar_k, rel_tol=self.tol)[1]
                 l_bar_j = l_bar_k
 
-            self.append_bar_data(bar_data, tag=SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j)
+            self.append_bar_data(bar_data, tag=Point.SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j)
 
-        self.logger.info(f"sampled for {step} points.")
+        self.logger.info(f"sampled {step} points")
 
+        # Data processing
         data = []
         p_trace = []
         trace_steps = max(step, 1)
@@ -403,30 +387,27 @@ class Gun(BaseGun):
             for i in range(trace_steps):
                 x = i / trace_steps * (l + self.l_c)
                 p_x, _ = self.to_px_u(l, ps, pb, v, x)
-                pp = PressureProbePoint(x, p_x)
-                p_line.append(pp)
+                p_line.append(PressureProbePoint(x, p_x))
 
             p_line.append(PressureProbePoint(l + self.l_c, ps))
             p_trace.append(PressureTraceEntry(dtag, temp, p_line))
 
-            table_entry = GunTableEntry(
-                tag=dtag,
-                time=t,
-                travel=l,
-                burnup=psi,
-                velocity=v,
-                breech_pressure=pb,
-                avg_pressure=p,
-                shot_pressure=ps,
-                temperature=temp,
+            data.append(
+                GunTableEntry(
+                    tag=dtag,
+                    time=t,
+                    travel=l,
+                    burnup=psi,
+                    velocity=v,
+                    breech_pressure=pb,
+                    avg_pressure=p,
+                    shot_pressure=ps,
+                    temperature=temp,
+                )
             )
 
-            data.append(table_entry)
-
-        data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda entries: entries[0].time))
-        gun_result = GunResult(self, data, p_trace)
-
-        return gun_result
+        data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda e: e[0].time))
+        return GunResult(self, data, p_trace)
 
     def append_bar_data(
         self,
@@ -438,20 +419,6 @@ class Gun(BaseGun):
         v_bar: float,
     ) -> None:
         bar_data.append((tag, t_bar, l_bar, z, v_bar, self.f_p_bar(z, l_bar, v_bar)))
-
-    def g(self, t_bar: float, tag: str, tol: float) -> tuple[float, tuple[float, float, float]]:
-        z, l_bar, v_bar = rkf(self.ode_t, (self.z_0, 0, 0), 0, t_bar, rel_tol=tol)[1]
-        p_bar = self.f_p_bar(z, l_bar, v_bar)
-        if tag == POINT_PEAK_AVG:
-            return p_bar, (z, l_bar, v_bar)
-        else:
-            ps_bar, pb_bar = self.to_ps_pb(l_bar * self.l_0, p_bar)
-            if tag == POINT_PEAK_SHOT:
-                return ps_bar, (z, l_bar, v_bar)
-            elif tag == POINT_PEAK_BREECH:
-                return pb_bar, (z, l_bar, v_bar)
-            else:
-                raise ValueError("tag not handled.")
 
     def abort_z(self, z: float, tlv: tuple[float, float, float], _, p_bar_max: float, l_g_bar: float) -> bool:
         t_bar, l_bar, v_bar = tlv
@@ -474,7 +441,7 @@ class Gun(BaseGun):
         labda_1_prime = self.labda_1 * (1 / self.chi_k + labda_g) / (1 + labda_g)
         labda_2_prime = self.labda_2 * (1 / self.chi_k + labda_g) / (1 + labda_g)
 
-        factor_s = 1 + labda_2_prime * (self.w / (self.phi_1 * self.m))  # factor_b = P/P_b = phi / phi_1
+        factor_s = 1 + labda_2_prime * (self.w / (self.phi_1 * self.m))
         factor_b = (self.phi_1 * self.m + labda_2_prime * self.w) / (self.phi_1 * self.m + labda_1_prime * self.w)
 
         return p / factor_s, p / factor_b
@@ -493,7 +460,6 @@ class Gun(BaseGun):
         p_b: pressure of breech
         x: probe point, start from the breech face.
         """
-
         r = self.chi_k * x if x < self.l_c else (x - self.l_c) + self.l_0
         k = (r / (self.l_0 + l)) ** 2
         p_x = p_s * k + p_b * (1 - k)
@@ -508,17 +474,19 @@ class Gun(BaseGun):
     def structure(
         self,
         gun_result: GunResult,
-        step: int,
-        tol: float,
-        structural_material: Material,
-        structural_safety_factor: float = 1.1,
-        autofrettage: bool = True,
-        **_,
+        structural: Structural,
+        step: int = 33,
+        tol: float | None = None,
     ) -> None:
-
+        tol = tol if tol is not None else self.tol
         step = max(step, 1)
 
-        # step 1. calculate the barrel mass
+        structural_material = structural.material
+        if structural_material is None:
+            raise ValueError("No structural material provided")
+
+        structural_safety_factor = structural.safety_factor
+
         r_b = 0.5 * self.caliber
         r_c = r_b * self.chi_k**0.5
         x_probes = (
@@ -541,24 +509,25 @@ class Gun(BaseGun):
                 else:
                     break
 
-        # strength requirement given structural safety factor.
         for i in range(len(p_probes)):
             p_probes[i] *= structural_safety_factor
 
         i = step + 1
-        x_c, p_c = x_probes[:i], p_probes[:i]  # c for chamber
-        x_b, p_b = x_probes[i:], p_probes[i:]  # b for barrel
+        x_c, p_c = x_probes[:i], p_probes[:i]
+        x_b, p_b = x_probes[i:], p_probes[i:]
 
-        if autofrettage:
-            v_c, k_c, m_c = Gun.barrel_autofrettage(
+        if structural.autofrettage:
+            v_c, k_c, m_c = self.barrel_autofrettage(
                 x_c, p_c, [self.s * self.chi_k for _ in x_c], structural_material.yield_strength
             )
-            v_b, k_b, m_b = Gun.barrel_autofrettage(x_b, p_b, [self.s for _ in x_b], structural_material.yield_strength)
+            v_b, k_b, m_b = self.barrel_autofrettage(
+                x_b, p_b, [self.s for _ in x_b], structural_material.yield_strength
+            )
         else:
-            v_c, k_c, m_c = Gun.barrel_monoblock(
+            v_c, k_c, m_c = self.barrel_monoblock(
                 x_c, p_c, [self.s * self.chi_k for _ in x_c], structural_material.yield_strength
             )
-            v_b, k_b, m_b = Gun.barrel_monoblock(x_b, p_b, [self.s for _ in x_b], structural_material.yield_strength)
+            v_b, k_b, m_b = self.barrel_monoblock(x_b, p_b, [self.s for _ in x_b], structural_material.yield_strength)
 
         v = v_c + v_b
         k_probes = k_c + k_b
@@ -574,8 +543,4 @@ class Gun(BaseGun):
         gun_result.outline = hull
         gun_result.tube_mass = v * structural_material.density
 
-        self.logger.info("conducted structural calculation.")
-
-
-if __name__ == "__main__":
-    pass
+        self.logger.info("structural calculation done")

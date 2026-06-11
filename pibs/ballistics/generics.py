@@ -6,14 +6,13 @@ from typing import TYPE_CHECKING, TypeVar
 T = TypeVar("T")
 if TYPE_CHECKING:
     from .gun import Gun
-    from . import Points
 
-from . import POINT_EXIT, POINT_PEAK_AVG
+from . import Point
 
 
 @dataclass
 class GenericEntry:
-    tag: str
+    tag: Point
     time: float
     travel: float
     burnup: float
@@ -21,7 +20,7 @@ class GenericEntry:
     breech_pressure: float
     avg_pressure: float
     shot_pressure: float
-    temperature: float
+    temperature: float | None
 
 
 @dataclass
@@ -30,13 +29,10 @@ class GenericResult:
     table_data: list[GenericEntry]
     pressure_trace: list[PressureTraceEntry]
 
-    tube_mass: float = None
-    outline: list[OutlineEntry] = None
-    thermal_efficiency: float = None
-    ballistic_efficiency: float = None
-    piezo_efficiency: float = None
+    tube_mass: float | None = None
+    outline: list[OutlineEntry] | None = None
 
-    def read_table_data(self, tag: Points) -> GenericEntry:
+    def read_table_data(self, tag: Point) -> GenericEntry:
         for tableEntry in self.table_data:
             if tableEntry.tag == tag:
                 return tableEntry
@@ -48,8 +44,8 @@ class GenericResult:
         be: ballistic efficiency
         pe: piezoelectric efficiency
         """
-        vg = self.read_table_data(POINT_EXIT).velocity
-        p_max = self.read_table_data(POINT_PEAK_AVG).avg_pressure
+        vg = self.read_table_data(Point.EXIT).velocity
+        p_max = self.read_table_data(Point.PEAK_AVG).avg_pressure
         te = (vg / self.gun.v_j) ** 2
         be = te / self.gun.phi
         pe = 0.5 * self.gun.phi * self.gun.m * vg**2 / (p_max * self.gun.s * self.gun.l_g)
@@ -58,8 +54,8 @@ class GenericResult:
 
 @dataclass
 class PressureTraceEntry:
-    tag: str
-    temperature: float
+    tag: Point
+    temperature: float | None
     pressure_trace: list[PressureProbePoint]
 
 

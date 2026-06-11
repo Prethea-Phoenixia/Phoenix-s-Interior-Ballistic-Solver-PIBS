@@ -2,6 +2,7 @@
 ## Phoenix's Interior Ballistics Solver PIBS
 Application for solving the interior ballistics problems of closed-breech and recoilless weapon, with provisions for constrained design and certain optimization calculations.    
 
+
 ## Features
 ### Modelling
 The interior ballistics problem is formulated after the system named after M.E. Serebryakov, widely used in the Soviet Union and People's Republic of China. The calculation is done in the reduced form for conventional and recoilless guns.
@@ -21,7 +22,7 @@ To facilitate interoperability with design processes, data export and design sav
 ### Technical
 Compromising between ease of development, distribution, and runtime speed, the following algorithms were implemented in Python for this application:
 
-* Numerical integration up to user specified precision using high-order, adaptive [Runge Kutta Fehlberg](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method) method.
+* Numerical integration up to user specified precision using adaptive [Runge Kutta Fehlberg](https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta%E2%80%93Fehlberg_method) method.
 * Root-finding is implemented using the Dekker method, a variant of Brent's method that opportunistically employ polynomial and bisection to speedup root finding.
 * Maximal values are found using the Gold Section Search (GSS) method
 
@@ -32,7 +33,7 @@ For Windows, a single-file executable is provided. This package the Python runti
 
 ### For Development:
 
-- Install Python (>=3.9)
+- Install Python 3
 - Setup the virtual environment:`python -m venv .venv`
 - Activate the virtual environment venv 
   - on Windows: `.venv\Scripts\activate.bat`
@@ -43,8 +44,7 @@ For Windows, a single-file executable is provided. This package the Python runti
       
 
 ## Contribution
-Your contribution is welcomed! Please feel free to raise issues or propose pull requests regarding features or problems encountered. To get started, see the [community documentation](CONTRIBUTING.md)
-
+Your contribution is welcomed! Please feel free to raise issues or propose pull requests regarding features or problems encountered.
 
 ## Resources Used
 * tcl/tk themes used include "awdark" & "awlight" from awthemes: https://wiki.tcl-lang.org/page/awthemes

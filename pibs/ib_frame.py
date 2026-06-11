@@ -1,0 +1,1147 @@
+from __future__ import annotations
+
+import logging
+import re
+import sys
+import traceback
+from logging.handlers import QueueListener
+from math import log10
+from multiprocessing import Process, Queue
+from tkinter import IntVar, Menu, StringVar, Text, messagebox, ttk
+from tkinter.font import Font
+from tkinter.ttk import Frame
+from typing import Literal
+
+from . import (
+    BOLDSIZE,
+    DESCRIPTION,
+    FONTNAME,
+    FONTSIZE,
+    FigureType,
+    Theme,
+    log_formatter,
+    root_logger,
+)
+from .ballistics import (
+    Domain,
+    GunType,
+    OptimizationTarget,
+    Point,
+    SolutionMethod,
+)
+from .ballistics.gun import Gun
+from .ballistics.material import Material
+from .ballistics.prop import Composition, Geometry, Propellant, SimpleGeometry
+from .ballistics.recoilless import Recoilless
+from .config import SimulationConfig
+from .dispatch import calculate
+from .file_io import FileIOManager
+from .info_frame import InfoFrame
+from .localized import Descriptive, LocalizableWidget, LocalizedFrame, RowBuilder
+from .misc import (
+    filenameize,
+    format_int_input,
+    resolve_path,
+    round_sig,
+    to_si,
+)
+from .mode_manager import ModeManager
+from .nb_frame import NotebookFrame
+from .theme import ThemedMixin
+from .tip import create_tool_tip
+
+logger = logging.getLogger(__name__)
+
+
+class TextHandler(logging.Handler):
+    # This class allows you to log to a Tkinter Text or ScrolledText widget
+    # Adapted from Moshe Kaplan: https://gist.github.com/moshekaplan/c425f861de7bbf28ef06
+
+    def __init__(self, text):
+        # run the regular Handler __init__
+        super().__init__()
+        self.setFormatter(log_formatter)
+        self.setLevel(logging.INFO)
+        # Store a reference to the Text it will log to
+        self.text = text
+        self.text.config(state="disabled")
+
+    def emit(self, record):
+        msg = self.format(record)
+
+        def append():
+            self.text.configure(state="normal")
+            self.text.insert("end", msg.strip("\n") + "\n", record.levelno)
+            self.text.configure(state="disabled")
+
+            # Autoscroll to the bottom
+            self.text.yview("end")
+
+        # This is necessary because we can't modify the Text from other threads
+        self.text.after_idle(append)
+
+
+class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
+
+    def __init__(self, root, menubar, default_lang, localization_dict, font: Font, os_dark: bool, debug: bool):
+        super().__init__(
+            root,
+            font=font,
+            dpi=root.dpi,
+            menubar=menubar,
+            default_lang=default_lang,
+            localization_dict=localization_dict,
+            os_dark=os_dark,
+        )
+
+        self.root = root
+        self.menubar = menubar
+        self.font = font
+
+        self.process, self.gun_result = None, None
+        self.prop, self.gun, self.guide_results = None, None, None
+
+        self.job_queue, self.log_queue = Queue(), Queue()
+        self.file_io = FileIOManager(self)
+
+        data_menu = Menu(menubar)
+        menubar.add_cascade(label=self.get_loc_str("dataLabel"), menu=data_menu)
+
+        design_menu = Menu(menubar)
+        menubar.add_cascade(label=self.get_loc_str("designLabel"), menu=design_menu)
+
+        theme_menu = Menu(menubar)
+        menubar.add_cascade(label=self.get_loc_str("themeLabel"), menu=theme_menu)
+
+        debug_menu = Menu(menubar)
+        menubar.add_cascade(label=self.get_loc_str("debugLabel"), menu=debug_menu)
+
+        self.design_menu = design_menu
+        self.data_menu = data_menu
+        self.theme_menu = theme_menu
+        self.debug_menu = debug_menu
+
+        self.debug = IntVar(value=int(debug))
+
+        design_menu.add_command(label=self.get_loc_str("saveLabel"), command=self.file_io.save, accelerator="Ctrl+S")
+        self.root.bind("<Control-s>", lambda *_: self.file_io.save())
+        self.root.bind("<Control-S>", lambda *_: self.file_io.save())
+
+        design_menu.add_command(
+            label=self.get_loc_str("loadLabel"), command=self.file_io.load_gun, accelerator="Ctrl+L"
+        )
+        self.root.bind("<Control-l>", lambda *_: self.file_io.load_gun())
+        self.root.bind("<Control-L>", lambda *_: self.file_io.load_gun())
+
+        design_menu.add_command(
+            label=self.get_loc_str("loadPresetLabel"),
+            command=lambda *_: self.file_io.load_gun(initial_dir=resolve_path("examples")),
+        )
+
+        design_menu.add_command(label=self.get_loc_str("resetLabel"), command=self.reset, accelerator="Ctrl+N")
+        self.root.bind("<Control-N>", lambda *_: self.reset())
+        self.root.bind("<Control-n>", lambda *_: self.reset())
+
+        design_menu.add_command(label=self.get_loc_str("calcLabel"), command=self.on_calculate, accelerator="Ctrl+R")
+        self.root.bind("<Control-R>", lambda *_: self.on_calculate())
+        self.root.bind("<Control-r>", lambda *_: self.on_calculate())
+
+        data_menu.add_command(
+            label=self.get_loc_str("exportMain"), command=lambda *_: self.file_io.export_graph(save=FigureType.MAIN)
+        )
+        data_menu.add_command(
+            label=self.get_loc_str("exportAux"), command=lambda *_: self.file_io.export_graph(save=FigureType.AUX)
+        )
+        data_menu.add_command(
+            label=self.get_loc_str("exportGeom"), command=lambda *_: self.file_io.export_graph(save=FigureType.GEOM)
+        )
+        data_menu.add_command(
+            label=self.get_loc_str("exportGuide"), command=lambda *_: self.file_io.export_graph(save=FigureType.GUIDE)
+        )
+        data_menu.add_command(label=self.get_loc_str("exportLabel"), command=self.file_io.export_table)
+
+        data_menu.add_command(label=self.get_loc_str("reloadPropellant"), command=self.file_io.load_propellant)
+
+        for theme in Theme:
+            theme_menu.add_radiobutton(
+                label=theme.value, variable=self.theme_name_var, value=theme.value, command=self.use_theme
+            )
+
+        debug_menu.add_checkbutton(label=self.get_loc_str("enableLabel"), variable=self.debug, onvalue=1, offvalue=0)
+
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(1, weight=1)
+
+        ## nameplate
+        dummy_frame = Frame(self)
+        dummy_frame.grid(row=0, column=0, sticky="nsew", columnspan=2)
+
+        dummy_frame.columnconfigure(0, weight=1)
+        dummy_frame.rowconfigure(0, weight=1)
+
+        name_frm = self.add_localized_label_frame(dummy_frame, label_loc_key="nameFrm")
+        name_frm.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+
+        name_frm.columnconfigure(0, weight=1)
+        name_frm.rowconfigure(0, weight=1)
+        self.name_var = StringVar(self, value=self.get_loc_str("newDesign"))
+        name_plate = ttk.Entry(name_frm, textvariable=self.name_var, justify="left", font=(FONTNAME, BOLDSIZE))
+        name_plate.grid(row=0, column=0, sticky="nsew", padx=2, pady=2, columnspan=2)
+
+        self.info_frame = InfoFrame(
+            self, font=self.font, default_lang=default_lang, localization_dict=localization_dict
+        )
+        self.info_frame.grid(row=1, column=0, sticky="nsew")
+        self.info_frame.columnconfigure(0, weight=1)
+        self.info_frame.rowconfigure(0, weight=1)
+
+        design_frame = Frame(self)
+        design_frame.grid(row=0, column=2, rowspan=2, sticky="nsew")
+        design_frame.columnconfigure(0, weight=1)
+
+        ### specs_frame: caliber, barrel length, shot mass, charge mass
+        specs_frame = self.add_localized_label_frame(design_frame, label_loc_key="specFrmLabel")
+        specs_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+        specs_frame.columnconfigure(0, weight=1)
+
+        sb = RowBuilder(self, specs_frame)
+        self.type_optn = sb.dropdown(
+            str_obj_dict={g.value: g for g in GunType},
+            desc_label_key="typeLabel",
+            grid_kwargs={"columnspan": 3},
+        )
+
+        self.cal_mm = sb.input_3(
+            label_loc_key="calLabel",
+            unit_text="mm",
+            default="50.0",
+            dtype=float,
+        )
+
+        self.tbl_mm = sb.input_3(
+            label_loc_key="tblLabel",
+            unit_text="mm",
+            default="3500.0",
+            dtype=float,
+        )
+
+        self.sht_kg = sb.input_3(
+            label_loc_key="shtLabel",
+            unit_text="kg",
+            default="2.0",
+            dtype=float,
+        )
+
+        self.chg_kg = sb.input_3(
+            label_loc_key="chgLabel",
+            unit_text="kg",
+            default="0.5",
+            tooltip_loc_key="chgText",
+            dtype=float,
+        )
+
+        ### grain_frame: grain geometry settings
+        self.grain_frame = self.add_localized_label_frame(design_frame, label_loc_key="grainFrmLabel")
+        self.grain_frame.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
+        self.grain_frame.columnconfigure(0, weight=1)
+
+        gb = RowBuilder(self, self.grain_frame)
+        self.main_geom = gb.dropdown(
+            str_obj_dict=Geometry.get_desc_geometry_dict(),
+            desc_label_key="Grain Geometry",
+            grid_kwargs={"columnspan": 3},
+        )
+
+        self.web_mm = gb.input_3(
+            desc_label_key="Web",
+            unit_text="mm",
+            default="10.0",
+            dtype=float,
+        )
+
+        self.grain_r1 = gb.input_3(
+            desc_label_key="1/α",
+            unit_text="x",
+            default="1.0",
+            tooltip_loc_key="",
+            dtype=float,
+        )
+
+        self.grain_r2 = gb.input_3(
+            desc_label_key="1/β",
+            unit_text="x",
+            default="10.0",
+            dtype=float,
+        )
+
+        self.use_aux_grain = self.add_localized_label_check(
+            parent=self.grain_frame,
+            label_loc_key="useAuxGrainLabel",
+            desc_label_key="useAuxGrainLabel",
+            default=False,
+            skip_grid=True,
+        )
+
+        self.aux_grain_frm = self.add_localized_label_frame(
+            self.grain_frame, labelwidget=self.use_aux_grain.check_widget
+        )
+        self.aux_grain_frm.grid(row=gb.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        gb.next()
+        aux_row = gb.current_row
+        self.aux_grain_frm.columnconfigure(0, weight=1)
+
+        ab = RowBuilder(self, self.aux_grain_frm)
+        self.aux_mass_ratio = ab.input_3(
+            label_loc_key="auxMassRatio",
+            default="1.0",
+            unit_text="x",
+            dtype=float,
+        )
+
+        self.aux_geom = ab.dropdown(
+            str_obj_dict=Geometry.get_desc_geometry_dict(),
+            desc_label_key="Auxiliary Grain Geometry",
+            grid_kwargs={"columnspan": 3},
+        )
+
+        self.aux_web_ratio = ab.input_3(
+            default="1.0",
+            unit_text="x",
+            label_loc_key="auxWebRatio",
+            dtype=float,
+        )
+
+        self.aux_grain_r1 = ab.input_3(
+            unit_text="x",
+            default="1.0",
+            desc_label_key="Auxiliary 1/α",
+            tooltip_loc_key="",
+            dtype=float,
+        )
+
+        self.aux_grain_r2 = ab.input_3(
+            unit_text="x",
+            default="10.0",
+            desc_label_key="Auxiliary 1/β",
+            dtype=float,
+        )
+
+        self.swap_button = ttk.Button(self.grain_frame, text=self.get_loc_str("swapLabel"), command=self.swap)
+        self.swap_button.grid(row=aux_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+
+        ### barrel/charge settings in specs_frame
+        self.cv_L = sb.input_3(
+            label_loc_key="cvLabel",
+            unit_text="L",
+            default="1.0",
+            dtype=float,
+        )
+
+        self.clr = sb.input_3(
+            label_loc_key="clrLabel",
+            unit_text="x",
+            default="1.5",
+            tooltip_loc_key="clrText",
+            dtype=float,
+        )
+
+        self.dgc = sb.input_3(
+            label_loc_key="dgcLabel",
+            unit_text="%",
+            default="3.0",
+            tooltip_loc_key="dgcText",
+            dtype=float,
+        )
+
+        self.stp_MPa = sb.input_3(
+            label_loc_key="stpLabel",
+            unit_text="MPa",
+            default="30.0",
+            tooltip_loc_key="stpText",
+            dtype=float,
+        )
+
+        self.nozz_exp = sb.input_3(
+            label_loc_key="nozzExpLabel",
+            unit_text="x",
+            default="4.0",
+            tooltip_loc_key="nozzExpText",
+            dtype=float,
+        )
+
+        self.nozz_eff = sb.input_3(
+            label_loc_key="nozzEffLabel",
+            unit_text="%",
+            default="92.0",
+            tooltip_loc_key="nozzEffText",
+            dtype=float,
+        )
+
+        ### material_frame: structural material settings
+        self.use_material = self.add_localized_label_check(
+            parent=design_frame,
+            label_loc_key="useMaterialLabel",
+            desc_label_key="useMaterialLabel",
+            default=False,
+            skip_grid=True,
+        )
+
+        material_frame = self.add_localized_label_frame(design_frame, labelwidget=self.use_material.check_widget)
+        material_frame.grid(row=2, column=0, sticky="nsew", padx=2, pady=2)
+        material_frame.columnconfigure(0, weight=1)
+
+        mb = RowBuilder(self, material_frame)
+        self.material_density = mb.input_3(
+            label_loc_key="matDensityLabel",
+            unit_text="kg/m³",
+            default="7850.0",
+            dtype=float,
+        )
+        self.material_yield = mb.input_3(
+            label_loc_key="matYieldLabel",
+            unit_text="MPa",
+            default="1000.0",
+            dtype=float,
+        )
+
+        self.material_ssf = mb.input_2(
+            label_loc_key="sffLabel",
+            default="1.35",
+            dtype=float,
+        )
+
+        self.material_is_af = self.add_localized_label_check(
+            parent=material_frame,
+            label_loc_key="afLabel",
+            desc_label_key="afLabel",
+            row=mb.current_row,
+            columnspan=2,
+        )
+
+        design_frame.rowconfigure(sb.next(), weight=1)
+
+        calc_frame = Frame(self)
+        calc_frame.grid(row=0, column=3, rowspan=2, sticky="nsew")
+        calc_frame.columnconfigure(0, weight=1)
+        calc_frame.rowconfigure(0, weight=1)
+
+        ### propellant_frame
+        propellant_frame = self.add_localized_label_frame(calc_frame, label_loc_key="propFrmLabel")
+        propellant_frame.grid(row=0, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        propellant_frame.rowconfigure(1, weight=1)
+        propellant_frame.columnconfigure(0, weight=1)
+
+        pb = RowBuilder(self, propellant_frame)
+        self.drop_prop = pb.dropdown(
+            str_obj_dict=Composition.read_file(resolve_path("ballistics/resource/propellants.csv")),
+            desc_label_key="propFrmLabel",
+            tooltip_loc_key="specsText",
+            grid_kwargs={"columnspan": 2},
+        )
+
+        spec_scroll = ttk.Scrollbar(propellant_frame, orient="vertical")
+        spec_h_scroll = ttk.Scrollbar(propellant_frame, orient="horizontal")
+        self.propellant_specs = Text(
+            propellant_frame,
+            wrap="word",
+            height=0,
+            width=0,
+            yscrollcommand=spec_scroll.set,
+            xscrollcommand=spec_h_scroll.set,
+            font=(FONTNAME, FONTSIZE),
+        )
+
+        self.force_update_on_theme_widget.append(self.propellant_specs)
+        spec_scroll.config(command=self.propellant_specs.yview)
+        spec_h_scroll.config(command=self.propellant_specs.xview)
+
+        spec_row = pb.current_row
+        self.propellant_specs.grid(row=spec_row, column=0, sticky="nsew")
+        spec_scroll.grid(row=spec_row, rowspan=2, column=1, sticky="nsew")
+        pb.next()
+        spec_h_scroll.grid(row=pb.current_row, column=0, sticky="nsew")
+        pb.next()
+
+        self.use_combustible = self.add_localized_label_check(
+            parent=propellant_frame,
+            label_loc_key="combustibleLabel",
+            tooltip_loc_key="combustibleText",
+            skip_grid=True,
+            default=False,
+        )
+
+        combustible_frame = self.add_localized_label_frame(
+            propellant_frame, labelwidget=self.use_combustible.check_widget
+        )
+        combustible_frame.grid(row=pb.current_row, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        pb.next()
+
+        cb = RowBuilder(self, combustible_frame)
+        self.combustible_mass_kg = cb.input_3(
+            label_loc_key="combustibleMassLabel",
+            default="0.0",
+            unit_text="kg",
+            desc_label_key="ωʹ",
+            dtype=float,
+        )
+
+        self.combustible_force_kJ__kg = cb.input_3(
+            label_loc_key="combustibleForceLabel",
+            default="750.0",
+            unit_text="kJ/kg",
+            desc_label_key="fʹ",
+            dtype=float,
+        )
+
+        force_fudge_frame = Frame(propellant_frame)
+        force_fudge_frame.grid(row=pb.current_row, column=0, columnspan=2, sticky="nsew")
+        pb.next()
+
+        force_fudge_frame.columnconfigure(0, weight=1)
+        force_fudge_frame.rowconfigure(0, weight=1)
+
+        self.force_fudge = self.add_localized_3_input(
+            parent=force_fudge_frame,
+            label_loc_key="forceFudgeLabel",
+            tooltip_loc_key="forceFudgeText",
+            default="100.0",
+            unit_text="%",
+            dtype=float,
+        )
+
+        ### solution_frame: IB model selection
+        solution_frame = self.add_localized_label_frame(calc_frame, label_loc_key="solFrmLabel")
+        solution_frame.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
+        solution_frame.columnconfigure(0, weight=1)
+
+        self.drop_gradient = self.add_localized_dropdown(
+            parent=solution_frame,
+            str_obj_dict={s.value: s for s in SolutionMethod},
+            desc_label_key="solFrmLabel",
+        )
+        self.drop_gradient.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+
+        ### control_frame: constraints, sampling, accuracy
+        control_frame = self.add_localized_label_frame(calc_frame, label_loc_key="opFrmLabel")
+        control_frame.grid(row=2, column=0, sticky="nsew", padx=2, pady=2)
+        control_frame.columnconfigure(0, weight=1)
+
+        ob = RowBuilder(self, control_frame)
+        self.use_cons = self.add_localized_label_check(
+            parent=control_frame,
+            default=False,
+            label_loc_key="consButton",
+            desc_label_key="consButton",
+            tooltip_loc_key="useConsText",
+            skip_grid=True,
+        )
+
+        cons_frm = self.add_localized_label_frame(control_frame, labelwidget=self.use_cons.check_widget)
+        cons_frm.grid(row=ob.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        ob.next()
+        cons_frm.columnconfigure(0, weight=1)
+
+        ccb = RowBuilder(self, cons_frm)
+        self.lock_Lg = ccb.check(
+            columnspan=3,
+            default=False,
+            label_loc_key="lockButton",
+            desc_label_key="lockButton",
+            tooltip_loc_key="lockText",
+        )
+
+        self.opt = ccb.check(
+            columnspan=3,
+            default=False,
+            desc_label_key="optButton",
+            label_loc_key="optButton",
+            tooltip_loc_key="optText",
+        )
+
+        self.drop_opt_tgt = ccb.dropdown(
+            str_obj_dict={o.value: o for o in OptimizationTarget},
+            desc_label_key="optTgtLabel",
+            grid_kwargs={"columnspan": 3},
+        )
+
+        self.v_tgt = ccb.input_3(
+            label_loc_key="vTgtLabel",
+            unit_text="m/s",
+            default="1000.0",
+            dtype=float,
+        )
+
+        self.p_tgt = ccb.input_3(
+            label_loc_key="pTgtLabel",
+            unit_text="MPa",
+            default="350.0",
+            tooltip_loc_key="pTgtText",
+            dtype=float,
+        )
+
+        self.p_control = ccb.dropdown(desc_label_key="Pressure Constraint", grid_kwargs={"columnspan": 3})
+
+        self.min_web = ccb.input_3(
+            label_loc_key="iniWebLabel",
+            unit_text="μm",
+            default="100.0",
+            color="red",
+            dtype=float,
+        )
+        self.lg_max = ccb.input_3(
+            label_loc_key="maxLgLabel",
+            unit_text="m",
+            default="10.0",
+            color="red",
+            dtype=float,
+        )
+
+        sample_frm = self.add_localized_label_frame(
+            control_frame,
+            label_loc_key="sampleFrmLabel",
+            style="SubLabelFrame.TLabelframe",
+            tooltip_loc_key="sampText",
+        )
+        sample_frm.grid(row=ob.current_row, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        ob.next()
+        sample_frm.columnconfigure(0, weight=1)
+
+        sb = RowBuilder(self, sample_frm)
+        self.drop_domain = sb.dropdown(
+            str_obj_dict={d.value: d for d in Domain},
+            desc_label_key="sampleFrmLabel",
+            grid_kwargs={"columnspan": 2},
+        )
+
+        self.step = sb.input_2(
+            label_loc_key="stepLabel",
+            default="33",
+            formatter=format_int_input,
+        )
+
+        self.acc_exp = ob.input_2(
+            label_loc_key="-log10(ε)",
+            default="3",
+            formatter=format_int_input,
+            color="red",
+            tooltip_loc_key="tolText",
+        )
+
+        self.max_iter = ob.input_2(
+            label_loc_key="maxIterLabel",
+            default="10",
+            formatter=format_int_input,
+            color="red",
+        )
+
+        self.compute_guide = self.add_localized_label_check(
+            parent=control_frame,
+            label_loc_key="guideLabel",
+            desc_label_key="guideLabel",
+            default=False,
+            skip_grid=True,
+        )
+        self.compute_guide.check_widget.grid(row=ob.current_row, column=0, columnspan=3, sticky="w", padx=2, pady=2)
+        ob.next()
+
+        self.calc_button = ttk.Button(control_frame, text=self.get_loc_str("calcLabel"), command=self.on_calculate)
+        self.calc_button.grid(row=ob.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        control_frame.rowconfigure(ob.current_row, weight=1)
+
+        self.calc_button_tip = StringVar(value=self.get_loc_str("calcButtonText"))
+        create_tool_tip(self.calc_button, self.calc_button_tip, font=self.font)
+
+        self.use_cons.trace_add("write", self.on_state_change)
+        self.lock_Lg.trace_add("write", self.on_state_change)
+        self.opt.trace_add("write", self.on_state_change)
+        self.use_aux_grain.trace_add("write", self.on_state_change)
+        self.type_optn.trace_add("write", self.on_state_change)
+        self.use_material.trace_add("write", self.on_state_change)
+        self.use_combustible.trace_add("write", self.on_state_change)
+
+        self.main_geom.trace_add("write", self.update_geom)
+        self.aux_geom.trace_add("write", self.update_geom)
+        self.drop_prop.trace_add("write", self.update_spec)
+
+        for entry in (
+            *(self.main_geom, self.aux_geom, self.use_aux_grain, self.drop_prop, self.grain_r1, self.grain_r2),
+            *(self.web_mm, self.aux_mass_ratio, self.aux_web_ratio, self.aux_grain_r1, self.aux_grain_r2),
+            *(self.use_combustible, self.combustible_force_kJ__kg, self.combustible_mass_kg, self.chg_kg),
+            self.force_fudge,
+        ):
+            entry.trace_add("write", self.propellant_callback)
+
+        self.notebook_frame = NotebookFrame(
+            self,
+            font=self.font,
+            dpi=root.dpi,
+            default_lang=default_lang,
+            localization_dict=localization_dict,
+            lang_var=self.lang_var,
+        )
+        self.notebook_frame.grid(row=1, column=1, sticky="nsew", padx=0, pady=0)
+
+        self.mode_manager = ModeManager(self)
+
+        root.protocol("WM_DELETE_WINDOW", self.quit)
+        self.use_theme()
+        self.t_lid = None
+
+        text_handler = TextHandler(self.notebook_frame.error_text)
+        root_logger.addHandler(text_handler)
+        logger.info("text handler attached")
+
+        self.listener = QueueListener(self.log_queue, text_handler)
+        self.listener.start()
+
+        logger.info("subprocess log listener started")
+        self.timed_loop()
+        self.after_idle(self.reset)
+
+    @staticmethod
+    def handle_error_wrapper(level: int):
+        def decorator(func):
+            def handled_func(self, *args, **kwargs):
+                try:
+                    return func(self, *args, **kwargs)
+                except Exception as e:
+                    self.handle_errors(e, level)
+
+            return handled_func
+
+        return decorator
+
+    @staticmethod
+    def lock_out(func):
+        """Manipulating data while a solution is being computed can lead to inconsistent program
+        state. This decorator locks out execution of a certain program route during said sensitive phases."""
+
+        def handled_func(self, *args, **kwargs):
+            if self.process:
+                return None
+            else:
+                return func(self, *args, **kwargs)
+
+        return handled_func
+
+    def handle_errors(self, exception: Exception, level: int = logging.WARNING):
+        if self.debug.get():
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            logger.log(level, "".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        else:
+            logger.log(level, str(exception))
+
+    def timed_loop(self):
+        if self.process:
+            self.get_value()
+        self.t_lid = self.root.after(100, self.timed_loop)
+
+    @lock_out
+    def reset(self, *_):
+        self.reset_entries()
+        self.on_calculate()
+
+    @lock_out
+    def quit(self):
+        if self.process:
+            self.process.terminate()
+
+        self.listener.stop()
+
+        if self.t_lid:
+            self.root.after_cancel(self.t_lid)
+
+        super().quit()
+        self.root.quit()
+
+    def get_normalized_name(self) -> str:
+        """
+        Return the given string converted to a string that can be used for a clean
+        filename. Remove leading and trailing spaces; convert other spaces to
+        underscores; and remove characters that are unsafe in filenames across
+        platforms (Windows-forbidden characters and control characters).
+        """
+        s = str(self.name_var.get()).strip().replace(" ", "_")
+        s = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "", s)
+        if s in {"", ".", ".."}:
+            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("nameIssue"))
+            raise ValueError(self.get_loc_str("nameIssue"))
+        return s
+
+    # --- File I/O Interface Methods ---
+
+    def has_data(self) -> bool:
+        """Check if there's calculation data available."""
+        return self.gun is not None
+
+    def get_save_data(self) -> dict:
+        """Get all data needed for saving."""
+        loc_val_dict = {
+            loc.get_descriptive(): loc.get()
+            for loc in self.localized_widgets
+            if isinstance(loc, Descriptive)
+            if loc.get_descriptive()
+        }
+        return {**loc_val_dict, "Description": self.notebook_frame.description.get(1.0, "end").strip("\n")}
+
+    def apply_loaded_data(self, data: dict):
+        """Apply loaded data to the frame."""
+        loc_dict = {
+            loc.get_descriptive(): loc
+            for loc in self.localized_widgets
+            if isinstance(loc, Descriptive)
+            if loc.get_descriptive()
+        }
+
+        for key, value in data.items():
+            try:  # load design settings (bool -> checkboxes, str -> dropdown menus) first
+                if isinstance(value, bool) or isinstance(value, str):
+                    w = loc_dict[key]
+                    if isinstance(w, LocalizableWidget):
+                        w.set(value)
+            except (KeyError, ValueError):
+                pass
+
+        for key, value in data.items():
+            try:  # then load the numeral values (int, float -> numeric entries)
+                if isinstance(value, float) or isinstance(value, int):
+                    w = loc_dict[key]
+                    if isinstance(w, LocalizableWidget):
+                        w.set(value)
+            except (KeyError, ValueError):
+                pass
+
+        if DESCRIPTION in data:
+            self.notebook_frame.set_description(data[DESCRIPTION])
+
+    def set_name(self, name: str):
+        """Set the design name."""
+        self.name_var.set(name)
+
+    def set_propellant_options(self, file_path: str):
+        """Set propellant options from CSV file."""
+        self.drop_prop.reset(str_obj_dict=Composition.read_file(file_path))
+
+    def export_table_data(self):
+        """Export table data."""
+        self.notebook_frame.table_frame.export_table(
+            gun_result=self.gun_result,
+            acc_exp=int(self.acc_exp.get()),
+            normalized_filename=filenameize(self.get_normalized_name()),
+        )
+
+    # --- Mode State Getters ---
+
+    def get_gun_type(self) -> GunType:
+        """Get the selected gun type."""
+        return self.type_optn.get_obj()
+
+    def is_constrained(self) -> bool:
+        """Check if constrained mode is enabled."""
+        return bool(self.use_cons.get())
+
+    def is_optimization(self) -> bool:
+        """Check if optimization mode is enabled."""
+        return bool(self.opt.get())
+
+    def is_lock_length(self) -> bool:
+        """Check if lock length mode is enabled."""
+        return bool(self.lock_Lg.get())
+
+    def reset_entries(self):
+        for loc in self.localized_widgets:
+            loc.reset() if isinstance(loc, Descriptive) else None
+
+        self.name_var.set(self.get_loc_str("newDesign"))
+        self.notebook_frame.set_description("")
+
+    @lock_out
+    def change_lang(self):
+        super().change_lang()
+        self.info_frame.change_lang()
+        self.notebook_frame.change_lang()
+
+        self.menubar.entryconfig(1, label=self.get_loc_str("dataLabel"))
+        self.menubar.entryconfig(2, label=self.get_loc_str("designLabel"))
+        self.menubar.entryconfig(3, label=self.get_loc_str("themeLabel"))
+        self.menubar.entryconfig(4, label=self.get_loc_str("debugLabel"))
+
+        self.design_menu.entryconfig(0, label=self.get_loc_str("saveLabel"))
+        self.design_menu.entryconfig(1, label=self.get_loc_str("loadLabel"))
+        self.design_menu.entryconfig(2, label=self.get_loc_str("loadPresetLabel"))
+        self.design_menu.entryconfig(3, label=self.get_loc_str("resetLabel"))
+        self.design_menu.entryconfig(4, label=self.get_loc_str("calcLabel"))
+
+        self.data_menu.entryconfig(0, label=self.get_loc_str("exportMain"))
+        self.data_menu.entryconfig(1, label=self.get_loc_str("exportAux"))
+        self.data_menu.entryconfig(2, label=self.get_loc_str("exportGeom"))
+        self.data_menu.entryconfig(3, label=self.get_loc_str("exportGuide"))
+        self.data_menu.entryconfig(4, label=self.get_loc_str("exportLabel"))
+        self.data_menu.entryconfig(5, label=self.get_loc_str("reloadPropellant"))
+
+        self.debug_menu.entryconfig(0, label=self.get_loc_str("enableLabel"))
+
+        self.calc_button_tip.set(self.get_loc_str("calcButtonText"))
+        self.calc_button.config(text=self.get_loc_str("calcLabel"))
+        self.swap_button.config(text=self.get_loc_str("swapLabel"))
+
+        self.on_calculate()
+
+    @property
+    def config(self) -> SimulationConfig | None:
+        try:
+            if self.prop is None:
+                raise ValueError("Invalid propellant.")
+
+            chamber_volume = float(self.cv_L.get()) * 1e-3
+            charge_mass = float(self.chg_kg.get())
+            caliber = float(self.cal_mm.get()) * 1e-3
+            gun_length = float(self.tbl_mm.get()) * 1e-3
+            load_fraction = charge_mass / chamber_volume / self.prop.rho_p
+
+            return SimulationConfig(
+                optimize=self.is_optimization(),
+                constrained=self.is_constrained(),
+                debug=bool(self.debug.get()),
+                lock_length=self.is_lock_length(),
+                gun_type=self.get_gun_type(),
+                domain=self.drop_domain.get_obj(),
+                solution_method=self.drop_gradient.get_obj(),
+                pressure_control_point=self.p_control.get_obj(),
+                optimization_target=self.drop_opt_tgt.get_obj(),
+                caliber=caliber,
+                shot_mass=float(self.sht_kg.get()),
+                gun_length=gun_length,
+                chamber_volume=chamber_volume,
+                web=float(self.web_mm.get()) * 1e-3,
+                chambrage=float(self.clr.get()),
+                nozzle_expansion=float(self.nozz_exp.get()),
+                nozzle_efficiency=float(self.nozz_eff.get()) * 1e-2,
+                propellant=self.prop,
+                charge_mass=charge_mass,
+                charge_mass_ratio=charge_mass / float(self.sht_kg.get()),
+                load_fraction=load_fraction,
+                start_pressure=float(self.stp_MPa.get()) * 1e6,
+                design_pressure=float(self.p_tgt.get()) * 1e6,
+                design_velocity=float(self.v_tgt.get()),
+                min_web=1e-6 * float(self.min_web.get()),
+                max_length=float(self.lg_max.get()),
+                max_iterations=int(self.max_iter.get()),
+                tolerance=10 ** -int(self.acc_exp.get()),
+                structural_material=(
+                    Material(
+                        density=float(self.material_density.get()),
+                        yield_strength=float(self.material_yield.get()) * 1e6,
+                    )
+                    if self.use_material.get()
+                    else None
+                ),
+                structural_safety_factor=float(self.material_ssf.get()),
+                autofrettage=bool(self.material_is_af.get()),
+                compute_guide=bool(self.compute_guide.get()),
+                guide_min_cmr=float(self.notebook_frame.guide_min_cmr.get()),
+                guide_max_cmr=float(self.notebook_frame.guide_max_cmr.get()),
+                guide_step_cmr=float(self.notebook_frame.guide_step_cmr.get()),
+                guide_step_lf=float(self.notebook_frame.guide_step_lf.get()) * 1e-2,
+                step=int(self.step.get()),
+                drag_coefficient=float(self.dgc.get()) * 1e-2,
+            )
+        except ValueError as e:
+            self.handle_errors(e, level=logging.ERROR)
+            return None
+
+    @lock_out
+    def on_calculate(self):
+        self.focus()
+
+        cfg = self.config
+        if not cfg:
+            return
+        else:
+            self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, cfg))
+            self.process.start()
+            for loc in self.localized_widgets:
+                loc.inhibit()
+
+            self.calc_button.config(state="disabled")
+            self.swap_button.config(state="disabled")
+
+    def get_value(self):
+        if self.job_queue.empty():
+            return
+        else:
+            try:
+                while not self.job_queue.empty():
+                    run_cfg, self.gun, self.gun_result, self.guide_results = self.job_queue.get_nowait()
+
+                sigfig = int(-log10(run_cfg.tolerance)) + 1
+                if run_cfg.constrained:
+                    if isinstance(self.gun, Gun) or isinstance(self.gun, Recoilless):
+                        self.web_mm.set(round_sig(self.gun.geometry.web_thickness * 1e3, n=sigfig))
+                        if not run_cfg.lock_length:
+                            self.tbl_mm.set(round_sig(self.gun.geometry.barrel_length * 1e3, n=sigfig))
+                        self.cv_L.set(round_sig(self.gun.geometry.chamber_volume * 1e3, n=sigfig))
+
+                self.info_frame.update_stats(gun=self.gun, gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
+                self.notebook_frame.table_frame.update_table(gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
+                self.notebook_frame.plot_manager.update_main_plot()
+                self.notebook_frame.plot_manager.update_aux_plot()
+                self.notebook_frame.plot_manager.update_guide_graph()
+
+            except Exception as e:
+                self.handle_errors(e, level=logging.WARNING)
+
+            finally:
+                """Restore buttons and disinhibit widgets after a computation completes."""
+                self.calc_button.config(state="normal")
+                self.swap_button.config(state="normal")
+                for loc in self.localized_widgets:
+                    loc.disinhibit()
+                self.process = None
+
+    def update_spec(self, *_):
+        self.propellant_specs.config(state="normal")
+        compo: Composition = self.drop_prop.get_obj()
+        self.propellant_specs.delete("1.0", "end")
+
+        if compo.temp_v:
+            self.propellant_specs.insert(
+                "end",
+                "{:}: {:>4.0f} K {:}\n".format(
+                    self.get_loc_str("TvDesc"), compo.temp_v, self.get_loc_str("isochorDesc")
+                ),
+            )
+        self.propellant_specs.insert(
+            "end", "{:}: {:>4.0f} kg/m³\n".format(self.get_loc_str("densityDesc"), compo.rho_p)
+        )
+        self.propellant_specs.insert("end", "{:}: {:>4.0f} kJ/kg\n".format(self.get_loc_str("force"), compo.f / 1e3))
+        isp = compo.get_isp()
+        self.propellant_specs.insert(
+            "end", "{:}: {:>4.0f} m/s {:>3.0f} s\n".format(self.get_loc_str("vacISPDesc"), isp, isp / 9.805)
+        )
+        isp = compo.get_isp(50)
+        self.propellant_specs.insert(
+            "end",
+            "{:}: {:>4.0f} m/s {:>3.0f} s\n{:}\n".format(
+                self.get_loc_str("atmISPDesc"), isp, isp / 9.805, self.get_loc_str("pRatioDesc")
+            ),
+        )
+        self.propellant_specs.insert("end", "{:}:\n".format(self.get_loc_str("brDesc")))
+        for p in (1e6, 10e6, 100e6, 1000e6):
+            self.propellant_specs.insert(
+                "end",
+                "{:>12}".format(to_si(compo.get_lbr(p), unit="m/s", dec=3))
+                + " @ {:>12}\n".format(to_si(p, unit="Pa", dec=3)),
+            )
+
+        self.propellant_specs.insert("end", compo.desc)
+        self.propellant_specs.config(state="disabled")
+
+    def update_geom(self, *_):
+        for geom, r1, r2 in zip(
+            (self.main_geom.get_obj(), self.aux_geom.get_obj()),
+            (self.grain_r1, self.aux_grain_r1),
+            (self.grain_r2, self.aux_grain_r2),
+        ):
+            if geom == SimpleGeometry.SPHERE:
+                r1.remove()
+                r2.remove()
+            elif geom == SimpleGeometry.CYLINDER or geom == SimpleGeometry.TUBE:
+                r1.remove()
+                r2.restore()
+            else:
+                r1.restore()
+                r2.restore()
+
+        for geom, web, r1, r2 in zip(
+            (self.main_geom.get_obj(), self.aux_geom.get_obj()),
+            (self.web_mm, None),
+            (self.grain_r1, self.aux_grain_r1),
+            (self.grain_r2, self.aux_grain_r2),
+        ):
+
+            if geom == SimpleGeometry.SPHERE:
+                if web:
+                    web.localize("diamLabel", "diaText")
+
+            elif geom == SimpleGeometry.STRIP:
+                if web:
+                    web.localize("widthLabel", "widthText")
+                r1.localize("htwLabel", "heightRText")
+                r2.localize("ltwLabel", "stripRText")
+
+            elif geom == SimpleGeometry.CYLINDER:
+                if web:
+                    web.localize("diamLabel", "diaText")
+                r2.localize("ltdLabel", "cylLRText")
+
+            elif geom == SimpleGeometry.TUBE:
+                if web:
+                    web.localize("arcLabel", "arcText")
+                r2.localize("ltarcLabel", "ltarcText")
+
+            else:
+                if web:
+                    web.localize("arcLabel", "arcText")
+
+                r1.localize("pdtarcLabel", "pdtarcText")
+                r2.localize("ltarcLabel", "ltarcText")
+
+    @handle_error_wrapper(logging.WARNING)
+    def propellant_callback(self, *_):
+        """
+        updates the propellant object on write to the ratio entry fields
+        and, on changing the propellant or geometrical specification.
+        """
+
+        try:
+            self.prop = Propellant(
+                composition=self.drop_prop.get_obj(),
+                main_geom=self.main_geom.get_obj(),
+                main_r1=self.grain_r1.get(),
+                main_r2=self.grain_r2.get(),
+                aux_geom=self.aux_geom.get_obj(),
+                web_ratio=self.aux_web_ratio.get(),
+                mass_ratio=self.aux_mass_ratio.get() if self.use_aux_grain.get() else 0.0,
+                aux_r1=self.aux_grain_r1.get(),
+                aux_r2=self.aux_grain_r2.get(),
+                combustible_force=float(self.combustible_force_kJ__kg.get() * 1e3),
+                combustible_fraction=float(
+                    self.combustible_mass_kg.get() / self.chg_kg.get() if self.use_combustible.get() else 0.0
+                ),
+                force_fudge=float(self.force_fudge.get()) * 1e-2,
+            )
+            self.notebook_frame.plot_manager.update_geom_plot()
+        except Exception as e:
+            self.prop = None
+            self.notebook_frame.plot_manager.update_geom_plot()
+            raise e
+
+    def on_state_change(self, *_):
+        self.mode_manager.update()
+
+    @lock_out
+    def use_theme(self):
+        super().use_theme()
+        self.notebook_frame.use_theme()
+
+    @handle_error_wrapper(level=logging.WARNING)
+    def swap(self):
+        ## this swaps the primary and auxiliary charge.
+        sigfig = int(self.acc_exp.get()) + 1
+        # cache the values for swapping.
+        main_geom, aux_geom = self.main_geom.get_obj(), self.aux_geom.get_obj()
+        main_r1, main_r2 = self.grain_r1.get(), self.grain_r2.get()
+        aux_r1, aux_r2 = self.aux_grain_r1.get(), self.aux_grain_r2.get()
+        web_ratio, mass_ratio = self.aux_web_ratio.get(), self.aux_mass_ratio.get()
+
+        self.grain_r1.set(aux_r1)
+        self.grain_r2.set(aux_r2)
+        self.aux_grain_r1.set(main_r1)
+        self.aux_grain_r2.set(main_r2)
+
+        self.aux_web_ratio.set(round_sig(1.0 / web_ratio, n=sigfig))
+        self.aux_mass_ratio.set(round_sig(1.0 / mass_ratio, n=sigfig))
+
+        self.main_geom.set_by_obj(aux_geom)
+        self.aux_geom.set_by_obj(main_geom)

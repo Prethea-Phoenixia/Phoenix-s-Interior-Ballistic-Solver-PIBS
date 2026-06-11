@@ -3,5 +3,3 @@
 black .
 isort .
 python sort_localization.py
-python generate_executable.py
-git add .
