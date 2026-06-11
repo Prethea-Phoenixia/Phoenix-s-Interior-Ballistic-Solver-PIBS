@@ -1,24 +1,37 @@
 from __future__ import annotations
 
+import tkinter
 import warnings
 from abc import ABC, abstractmethod
 from functools import wraps
-from tkinter import BooleanVar, Event, Frame, Menu, StringVar, ttk
+from tkinter import BooleanVar, Event, Frame, Menu, StringVar, ttk, Tk, Toplevel
 from tkinter.font import Font
-from typing import Any, Callable, Literal, Union
+from typing import (
+    Any,
+    Callable,
+    Literal,
+    Union,
+)
 
 from .misc import format_float_input
 from .tip import create_tool_tip
 
-localize_function_type = Union[Callable[[str, bool], str], Callable[[str], str]]
-placeholder_loc_func = lambda _: ""
+# Type aliases for localization functions
+localize_function_type = Union[
+    Callable[[str, bool], str],
+    Callable[[str], str],
+]
+"""Type alias for localization functions that can optionally force default language."""
+
+placeholder_loc_func: localize_function_type = lambda _: ""
 
 
 def warn(func):
     def wrapped(*args, font=None, loc_func=None, all_localized=None, **kwargs):
         if loc_func or all_localized or font:
             warnings.warn(
-                "LocalizedFrame sets the font, loc_fun and all_localized parameters to instance of itself, supplied arguments will be ignored."
+                "LocalizedFrame sets the font, loc_fun and all_localized parameters to "
+                "instance of itself, supplied arguments will be ignored."
             )
         return func(*args, **kwargs)
 
@@ -33,13 +46,13 @@ class Localizable(ABC):
 class LocalizableWidget(Localizable):
     def __init__(
         self,
-        *args,
-        var: Any,
+        *args: Any,
+        var: tkinter.Variable,
         loc_func: localize_function_type,
         all_localized: list[LocalizableWidget] | None = None,
-        nominal_state="readonly",
-        **kwargs,
-    ):
+        nominal_state: Literal["normal", "disabled", "readonly"] = "readonly",
+        **kwargs: Any,
+    ) -> None:
         self.loc_func = loc_func
         if isinstance(all_localized, list):
             all_localized.append(self)
@@ -48,51 +61,51 @@ class LocalizableWidget(Localizable):
         self.var = var
 
     @abstractmethod
-    def localize(self, *args: Any, **kwargs: Any) -> None: ...
+    def localize(self, *args: Any, **kwargs: Any) -> None:
+        """Update the widget's text to the current language."""
+        ...
 
-    def trace_add(self, *args):
+    def trace_add(self, *args: Any) -> None:
         self.var.trace_add(*args)
 
-    def get(self):
+    def get(self) -> Any:
         return self.var.get()
 
-    def disable(self):
+    def disable(self) -> None:
         self.target_state = "disabled"
 
-    def enable(self):
+    def enable(self) -> None:
         self.target_state = self.nominal_state
 
     @abstractmethod
-    def inhibit(self): ...
+    def inhibit(self) -> None: ...
 
     @abstractmethod
-    def disinhibit(self): ...
+    def disinhibit(self) -> None: ...
 
 
 class Descriptive(ABC):
-
     @abstractmethod
     def get_descriptive(self) -> str:
         """
-        returns the JSON key to this widget's value.
+        Returns the JSON key to this widget's value.
         """
         ...
 
     @abstractmethod
-    def reset(self, *_) -> None:
+    def reset(self, *args: Any) -> None:
         """
-        resets the value of this widget to the default value.
+        Resets the value of this widget to the default value.
         """
         ...
 
 
 class Loc2LineDisp(LocalizableWidget):
-
     def __init__(
         self,
-        parent,
+        parent: ttk.Widget,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: None | Font = None,
+        font: Font | None = None,
         row: int = 0,
         col: int = 0,
         label_loc_key: str = "",
@@ -100,8 +113,8 @@ class Loc2LineDisp(LocalizableWidget):
         entry_width: int = 20,
         justify: Literal["left", "right", "center"] = "center",
         tooltip_loc_key: str = "",
-        all_localized: list | None = None,
-    ):
+        all_localized: list[LocalizableWidget] | None = None,
+    ) -> None:
         e = StringVar()
         e.set(default)
         super().__init__(loc_func=loc_func, all_localized=all_localized, var=e)
@@ -126,37 +139,37 @@ class Loc2LineDisp(LocalizableWidget):
             self.tooltip_loc_key = new_tooltip_key
         self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
-    def set(self, val) -> None:
+    def set(self, val: str) -> None:
         self.var.set(val)
 
     def reset(self) -> None:
         self.set(self.default)
 
-    def remove(self):
+    def remove(self) -> None:
         self.label_widget.grid_remove()
         self.entry_widget.grid_remove()
 
-    def restore(self):
+    def restore(self) -> None:
         self.label_widget.grid()
         self.entry_widget.grid()
 
-    def disable(self):
+    def disable(self) -> None:
         pass
 
-    def enable(self):
+    def enable(self) -> None:
         pass
 
-    def inhibit(self):
+    def inhibit(self) -> None:
         pass
 
-    def disinhibit(self):
+    def disinhibit(self) -> None:
         pass
 
 
 class Loc3LineDisp(Loc2LineDisp):
     def __init__(
         self,
-        parent,
+        parent: ttk.Widget,
         loc_func: localize_function_type = placeholder_loc_func,
         font: Font | None = None,
         row: int = 0,
@@ -168,8 +181,8 @@ class Loc3LineDisp(Loc2LineDisp):
         justify_up: Literal["left", "right", "center"] = "center",
         justify_dn: Literal["left", "right", "center"] = "center",
         tooltip_loc_key: str = "",
-        all_localized: None | list = None,
-    ):
+        all_localized: list[LocalizableWidget] | None = None,
+    ) -> None:
         super().__init__(
             parent=parent,
             row=row,
@@ -191,19 +204,19 @@ class Loc3LineDisp(Loc2LineDisp):
         self.aux_entry_widget.grid(row=row + 2, column=0, sticky="nsew", padx=2, pady=2)
         self.aux_default = default_dn
 
-    def set(self, val):
+    def set(self, val: tuple[str, str]) -> None:
         val_1, val_2 = val
         super().set(val_1)
         self.aux_entry_var.set(val_2)
 
-    def reset(self):
+    def reset(self) -> None:
         self.set((self.default, self.aux_default))
 
-    def remove(self):
+    def remove(self) -> None:
         super().remove()
         self.aux_entry_widget.grid_remove()
 
-    def restore(self):
+    def restore(self) -> None:
         super().restore()
         self.aux_entry_widget.grid()
 
@@ -211,26 +224,25 @@ class Loc3LineDisp(Loc2LineDisp):
 class Loc2Input(LocalizableWidget, Descriptive):
     def __init__(
         self,
-        parent,
+        parent: ttk.Widget,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: None | Font = None,
+        font: Font | None = None,
         default: str = "",
         row: int = 0,
         col: int = 0,
         label_loc_key: str = "",
-        desc_label_key: None | str = "",  # None can be specified to ignore some inputs.
+        desc_label_key: str | None = "",  # None can be specified to ignore some inputs.
         validation: str = "",
-        label_width: int = 15,
+        label_width: int = 25,
         entry_width: int = 10,
         formatter: Callable[[Event, StringVar], None] = format_float_input,
         color: str = "",
         tooltip_loc_key: str = "",
         anchor: Literal["nw", "n", "ne", "w", "center", "e", "sw", "s", "se"] = "w",
         reverse: bool = False,
-        all_localized: None | list = None,
+        all_localized: list[LocalizableWidget] | None = None,
         dtype: Callable[[str], Any] = lambda v: int(float(v)),
-    ):
-
+    ) -> None:
         e = StringVar(value=default)
 
         super().__init__(loc_func=loc_func, all_localized=all_localized, var=e, nominal_state="normal")
@@ -265,7 +277,7 @@ class Loc2Input(LocalizableWidget, Descriptive):
 
         self.dtype = dtype
 
-    def localize(self, new_loc_key: str = "", new_tooltip_key: str = ""):
+    def localize(self, new_loc_key: str = "", new_tooltip_key: str = "") -> None:
         if new_loc_key:
             self.label_loc_key = new_loc_key
         self.label_widget.config(text=self.loc_func(self.label_loc_key))
@@ -273,21 +285,21 @@ class Loc2Input(LocalizableWidget, Descriptive):
             self.tooltip_loc_key = new_tooltip_key
         self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
-    def remove(self):
+    def remove(self) -> None:
         self.label_widget.grid_remove()
         self.input_widget.grid_remove()
 
-    def restore(self):
+    def restore(self) -> None:
         self.label_widget.grid()
         self.input_widget.grid()
 
     def reset(self, *_) -> None:
         self.var.set(self.default)
 
-    def get(self) -> float:
+    def get(self) -> Any:
         return self.dtype(self.var.get())
 
-    def set(self, val) -> None:
+    def set(self, val: Any) -> None:
         self.var.set(val)
 
     def disable(self) -> None:
@@ -318,26 +330,26 @@ class Loc2Input(LocalizableWidget, Descriptive):
 class Loc3Input(Loc2Input):
     def __init__(
         self,
-        parent,
+        parent: ttk.Widget,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: None | Font = None,
+        font: Font | None = None,
         row: int = 0,
         col: int = 0,
         label_loc_key: str = "",
-        desc_label_key: None | str = "",
+        desc_label_key: str | None = "",
         unit_text: str = "",
         default: str = "",
         validation: str = "",
-        label_width: int = 20,
+        label_width: int = 25,
         entry_width: int = 10,
         formatter: Callable[[Event, StringVar], None] = format_float_input,
         color: str = "",
         tooltip_loc_key: str = "",
         anchor: Literal["w", "e", "s", "n"] = "w",
         reverse: bool = False,
-        all_localized: None | list = None,
+        all_localized: list[LocalizableWidget] | None = None,
         dtype: Callable[[str], Any] = lambda v: int(float(v)),
-    ):
+    ) -> None:
         super().__init__(
             parent=parent,
             font=font,
@@ -364,11 +376,11 @@ class Loc3Input(Loc2Input):
         self.unit_text = unit_text
         self.unit_label = ulb
 
-    def remove(self):
+    def remove(self) -> None:
         super().remove()
         self.unit_label.grid_remove()
 
-    def restore(self):
+    def restore(self) -> None:
         super().restore()
         self.unit_label.grid()
 
@@ -382,26 +394,21 @@ class Loc3Input(Loc2Input):
 class LocDropdown(LocalizableWidget, Descriptive):
     def __init__(
         self,
-        parent,
+        parent: ttk.Widget,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: None | Font = None,
+        font: Font | None = None,
         str_obj_dict: dict[str, object] | None = None,
-        all_localized: list | None = None,
+        all_localized: list[LocalizableWidget] | None = None,
         desc_label_key: str = "",
         tooltip_loc_key: str = "",
-    ):
-        """
-        localized key of string type: underlying object
-        """
-
+    ) -> None:
         super().__init__(loc_func=loc_func, all_localized=all_localized, var=StringVar(), nominal_state="readonly")
         self.nominal_state = "readonly"
         self.loc_func = loc_func
         self.desc_label_key = desc_label_key
 
         self.str_obj_dict: dict[str, object] = str_obj_dict if str_obj_dict else {"": ""}
-        self.loc_str_obj_dict = {self.loc_func(k): v for k, v in self.str_obj_dict.items()}
-
+        self.loc_str_obj_dict = self.update_loc_str_obj_dict()
         self.widget = ttk.Combobox(
             parent,
             textvariable=self.var,
@@ -418,76 +425,83 @@ class LocDropdown(LocalizableWidget, Descriptive):
         self.widget.option_add("*TCombobox*Listbox.Justify", "center")
         self.widget.current(0)
 
-    def localize(self):
+    def localize(self) -> None:
         index = self.widget["values"].index(self.var.get())
-        self.loc_str_obj_dict = {self.loc_func(k): v for k, v in self.str_obj_dict.items()}
+        self.loc_str_obj_dict = self.update_loc_str_obj_dict()
         self.widget.config(values=tuple(self.loc_str_obj_dict.keys()))
         self.widget.current(index)
         self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
-    def get(self) -> str:
-        return str(self.get_obj())
+    def update_loc_str_obj_dict(self) -> dict[str, object]:
+        return {self.loc_func(k): v for k, v in self.str_obj_dict.items()}
 
-    def get_obj(self):
+    def get(self) -> str:
+        return self.get_obj().__str__()
+
+    def get_obj(self) -> object:
         return self.loc_str_obj_dict[self.var.get()]
 
-    def set_by_str(self, string):
+    def set_by_str(self, string: str) -> None:
         """
         Given an unlocalized string / localization key, set the drop-down menu
         to the correct position.
         """
         self.widget.set(self.widget["values"][list(self.str_obj_dict.keys()).index(string)])
 
-    def set_by_obj(self, obj):
+    def set_by_obj(self, obj: object) -> None:
         index = list(self.str_obj_dict.values()).index(obj)
         self.widget.current(index)
 
-    def set(self, string: str):
+    def set(self, string: str) -> None:
         self.set_by_str(string)
 
-    def grid(self, **kwargs):
+    def grid(self, **kwargs: Any) -> None:
         self.widget.grid(**kwargs)
 
-    def disable(self):
+    def disable(self) -> None:
         self.widget.configure(state="disabled")
         super().disable()
 
-    def enable(self):
+    def enable(self) -> None:
         self.widget.configure(state=self.nominal_state)
         super().enable()
 
-    def inhibit(self):
+    def inhibit(self) -> None:
         self.widget.config(state="disabled")
         super().inhibit()
 
-    def disinhibit(self):
+    def disinhibit(self) -> None:
         self.widget.config(state=self.target_state)
         super().disinhibit()
 
     def get_descriptive(self) -> str:
         return self.loc_func(self.desc_label_key, True)
 
-    def reset(self, str_obj_dict=None):
-        if str_obj_dict:
+    def reset(self, str_obj_dict: dict[str, object] | None = None, overwrite: bool = True) -> None:
+        if str_obj_dict is not None:
             self.str_obj_dict = str_obj_dict
-        self.loc_str_obj_dict = {self.loc_func(k): v for k, v in self.str_obj_dict.items()}
+            self.loc_str_obj_dict = self.update_loc_str_obj_dict()
         self.widget["values"] = tuple(self.loc_str_obj_dict.keys())
 
-        if self.widget.get() not in self.widget["values"]:
+        if overwrite:
             self.widget.current(0)
+        else:
+
+            if self.widget.get() not in self.widget["values"]:
+                self.widget.current(0)
 
 
 class LocLabelFrame(ttk.LabelFrame, Localizable):
     def __init__(
         self,
-        *args,
+        *args: Any,
         loc_func: localize_function_type = placeholder_loc_func,
         font: Font | None = None,
         label_loc_key: str = "",
         tooltip_loc_key: str = "",
-        all_localized: list | None = None,
-        **kwargs,
-    ):
+        all_localized: list[LocalizableWidget] | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, text=loc_func(label_loc_key), **kwargs)
         self.loc_key = label_loc_key
         self.loc_func = loc_func
@@ -499,7 +513,7 @@ class LocLabelFrame(ttk.LabelFrame, Localizable):
         if isinstance(all_localized, list):
             all_localized.append(self)
 
-    def localize(self):
+    def localize(self) -> None:
         self.config(text=self.loc_func(self.loc_key))
         self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
@@ -507,7 +521,7 @@ class LocLabelFrame(ttk.LabelFrame, Localizable):
 class LocLabelCheck(LocalizableWidget, Descriptive):
     def __init__(
         self,
-        parent,
+        parent: ttk.Widget,
         loc_func: localize_function_type = placeholder_loc_func,
         font: Font | None = None,
         default: bool = True,
@@ -519,8 +533,8 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         desc_label_key: str | None = "",
         tooltip_loc_key: str = "",
         width: int = 0,
-        all_localized: list | None = None,
-    ):
+        all_localized: list[LocalizableWidget] | None = None,
+    ) -> None:
         super().__init__(
             loc_func=loc_func, all_localized=all_localized, var=BooleanVar(value=default), nominal_state="normal"
         )
@@ -538,37 +552,37 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         self.desc_label_key = desc_label_key
         self.tooltip_loc_key = tooltip_loc_key
 
-    def localize(self, new_loc_key: str = ""):
+    def localize(self, new_loc_key: str = "") -> None:
         if new_loc_key:
             self.label_loc_key = new_loc_key
         self.check_widget.config(text=self.loc_func(self.label_loc_key))
         self.loc_tooltip_var.set(self.loc_func(self.tooltip_loc_key))
 
-    def remove(self):
+    def remove(self) -> None:
         self.check_widget.grid_remove()
 
-    def restore(self):
+    def restore(self) -> None:
         self.check_widget.grid()
 
-    def set(self, value):
+    def set(self, value: bool) -> None:
         self.var.set(value)
 
-    def trace_add(self, *args):
+    def trace_add(self, *args: Any) -> None:
         self.var.trace_add(*args)
 
     def disable(self):
         self.check_widget.config(state="disabled")
         super().disable()
 
-    def enable(self):
+    def enable(self) -> None:
         self.check_widget.config(state=self.nominal_state)
         super().enable()
 
-    def inhibit(self):
+    def inhibit(self) -> None:
         self.check_widget.config(state="disabled")
         super().inhibit()
 
-    def disinhibit(self):
+    def disinhibit(self) -> None:
         self.check_widget.config(state=self.target_state)
         super().disinhibit()
 
@@ -587,89 +601,101 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
 class LocalizedFrame(Frame):
     def __init__(
         self,
-        *args,
+        master: Tk | Toplevel | LocalizedFrame,
+        *args: Any,
         font: Font | None = None,
         localization_dict: dict[str, dict[str, str]],
         menubar: Menu,
         default_lang: str,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
+        lang_var: StringVar | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(master, *args, **kwargs)
         self.localization_dict = localization_dict
-        self.langVar = StringVar(
-            value=(
-                default_lang
-                if default_lang in self.localization_dict.keys()
-                else list(self.localization_dict.keys())[0]
-            )
-        )
-        self.localized_widgets = []
+
+        self.localized_widgets: list[LocalizableWidget] = []
         self.font = font
+        self.lang_var: StringVar
 
-        lang_menu = Menu(menubar)
-        menubar.add_cascade(
-            label="Lang 语言",
-            menu=lang_menu,
-        )
+        if isinstance(master, (Toplevel, Tk)):  # if this LocalizedFrame acts as the top-level frame:
 
-        for lang in localization_dict.keys():
-            lang_menu.add_radiobutton(label=lang, variable=self.langVar, value=lang, command=self.change_lang)
+            self.lang_var = StringVar(
+                value=(
+                    default_lang
+                    if default_lang in self.localization_dict.keys()
+                    else list(self.localization_dict.keys())[0]
+                )
+            )
 
-    def change_lang(self):
-        pass
+            lang_menu = Menu(menubar)
+            menubar.add_cascade(label="Lang 语言", menu=lang_menu)
+
+            for lang in localization_dict.keys():
+                lang_menu.add_radiobutton(label=lang, variable=self.lang_var, value=lang, command=self.change_lang)
+        elif isinstance(master, LocalizedFrame):  # otherwise, piggyback on to the parent's top-level frame
+            self.lang_var = master.lang_var
+        else:  # otherwise, let the children decide how to handle this.
+            if lang_var is None:
+                raise ValueError("lang_var must be provided when master is not a Toplevel, Tk, or LocalizedFrame")
+            self.lang_var = lang_var
+
+    def change_lang(self, lang_var: tkinter.StringVar | None = None) -> None:
+        for loc_widget in self.localized_widgets:
+            loc_widget.localize()
 
     @warn
     @wraps(Loc2LineDisp.__init__)
-    def add_localized_2_line_display(self, *args, **kwargs) -> Loc2LineDisp:
+    def add_localized_2_line_display(self, *args: Any, **kwargs: Any) -> Loc2LineDisp:
         return Loc2LineDisp(
             *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
         )
 
     @warn
     @wraps(Loc3LineDisp.__init__)
-    def add_localized_3_line_display(self, *args, **kwargs) -> Loc3LineDisp:
+    def add_localized_3_line_display(self, *args: Any, **kwargs: Any) -> Loc3LineDisp:
         return Loc3LineDisp(
             *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
         )
 
     @warn
     @wraps(LocLabelCheck.__init__)
-    def add_localized_label_check(self, *args, **kwargs) -> LocLabelCheck:
+    def add_localized_label_check(self, *args: Any, **kwargs: Any) -> LocLabelCheck:
         return LocLabelCheck(
             *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
         )
 
     @warn
     @wraps(Loc2Input.__init__)
-    def add_localized_2_input(self, *args, **kwargs) -> Loc2Input:
+    def add_localized_2_input(self, *args: Any, **kwargs: Any) -> Loc2Input:
         return Loc2Input(
             *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
         )
 
     @warn
     @wraps(Loc3Input.__init__)
-    def add_localized_3_input(self, *args, **kwargs) -> Loc3Input:
+    def add_localized_3_input(self, *args: Any, **kwargs: Any) -> Loc3Input:
         return Loc3Input(
             *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
         )
 
     @warn
     @wraps(LocDropdown.__init__)
-    def add_localized_dropdown(self, *args, **kwargs) -> LocDropdown:
+    def add_localized_dropdown(self, *args: Any, **kwargs: Any) -> LocDropdown:
         return LocDropdown(
             *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
         )
 
     @warn
     @wraps(LocLabelFrame.__init__)
-    def add_localized_label_frame(self, *args, **kwargs) -> LocLabelFrame:
+    def add_localized_label_frame(self, *args: Any, **kwargs: Any) -> LocLabelFrame:
         return LocLabelFrame(
             *args, loc_func=self.get_loc_str, all_localized=self.localized_widgets, font=self.font, **kwargs
         )
 
-    def get_loc_str(self, name, force_default: bool = False):
+    def get_loc_str(self, name: str, force_default: bool = False) -> str:
         try:
-            return self.localization_dict["English" if force_default else self.langVar.get()][name]
+            lang = "English" if force_default else self.lang_var.get()  # type: ignore[union-attr]
+            return self.localization_dict[lang][name]
         except KeyError:
             try:
                 return self.localization_dict["English"][name]

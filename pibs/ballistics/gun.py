@@ -74,7 +74,7 @@ def pidduck(wpm: float, k: float, tol: float) -> tuple[float, float]:
         else:
             return i - 0.5 * ((k - 1) / k) * wpm * ((1 - om) ** (k / (k - 1)) / om)
 
-    omega = 0.5 * sum(dekker(f_omega, 0, 1, x_tol=tol**2))
+    omega = 0.5 * sum(dekker(f_omega, 0, 1, x_tol=tol))
 
     if k == 1:
         labda_1 = (math.exp(omega) - 1) / wpm
