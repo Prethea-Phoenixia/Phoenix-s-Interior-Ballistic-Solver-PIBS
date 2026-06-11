@@ -17,9 +17,13 @@ from . import (
     POINT_START,
     SAMPLE,
     Domains,
+    GenericEntry,
+    GenericResult,
+    OutlineEntry,
     Points,
+    PressureProbePoint,
+    PressureTraceEntry,
 )
-from . import GenericEntry, GenericResult, OutlineEntry, PressureProbePoint, PressureTraceEntry
 from .base_gun import BaseGun
 from .material import Material
 from .num import dekker, gss, rkf

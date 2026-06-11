@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import csv
 import json
-from abc import ABCMeta, abstractmethod, ABC
+from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumType
 from functools import wraps
 from math import pi

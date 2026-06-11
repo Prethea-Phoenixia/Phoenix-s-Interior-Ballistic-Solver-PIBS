@@ -1,1 +1,8 @@
-from .prop import Composition, Geometry, MultPerfGeometry, Propellant, SimpleGeometry, DelegatesPropellant
+from .prop import (
+    Composition,
+    DelegatesPropellant,
+    Geometry,
+    MultPerfGeometry,
+    Propellant,
+    SimpleGeometry,
+)

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 if platform.system() == "Windows":
     from ctypes import windll
 
-from math import floor, log, log10, isinf, isnan
+from math import floor, isinf, isnan, log, log10
 
 _superscript_map = {
     "0": "⁰",
@@ -284,10 +284,8 @@ def unloadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool
         return True
 
 
-def to_si(v: float, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: bool = False) -> str:
-    if v is None:
-        return "N/A"
-    elif isinstance(v, int) or isinstance(v, float):
+def to_si(v: float | str, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: bool = False) -> str:
+    if isinstance(v, int) or isinstance(v, float):
         if isinf(v):
             return "INF"
         if isnan(v):
@@ -349,7 +347,7 @@ def validate_nn(inp):
         return False
 
 
-def validate_pi(inp):  # validate an input such that the result is a positive integer
+def validate_pi(inp: str):  # validate an input such that the result is a positive integer
     if inp == "":
         return True  # we will catch this by filling the default value
     try:
@@ -358,11 +356,11 @@ def validate_pi(inp):  # validate an input such that the result is a positive in
         return False
 
 
-def validate_ce(inp: float) -> float:
+def validate_ce(inp: str) -> float:
     return validate_range(inp, low=0.0, high=100.0)
 
 
-def validate_range(inp: float, low: float, high: float) -> float:  # validate a range
+def validate_range(inp: str, low: float, high: float) -> float:  # validate a range
     high, low = max((high, low)), min((high, low))
     if inp == "":
         return True

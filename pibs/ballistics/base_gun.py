@@ -6,7 +6,7 @@ import math
 
 from . import JSONable
 from .num import dekker
-from .prop import Propellant, DelegatesPropellant
+from .prop import DelegatesPropellant, Propellant
 
 
 class BaseGun(DelegatesPropellant, JSONable):

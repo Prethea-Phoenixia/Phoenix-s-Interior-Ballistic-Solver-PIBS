@@ -3,8 +3,13 @@ from __future__ import annotations
 import json
 import logging
 
-from . import POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT, POINT_PEAK_STAG
-from . import Points
+from . import (
+    POINT_PEAK_AVG,
+    POINT_PEAK_BREECH,
+    POINT_PEAK_SHOT,
+    POINT_PEAK_STAG,
+    Points,
+)
 from .constrained import Constrained
 from .num import dekker, gss, rkf
 from .prop import Propellant

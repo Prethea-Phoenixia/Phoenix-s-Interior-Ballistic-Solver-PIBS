@@ -7,7 +7,7 @@ from itertools import repeat
 import psutil
 from tqdm import tqdm
 
-from .ballistics import CONVENTIONAL, POINT_BURNOUT, RECOILLESS, POINT_EXIT
+from .ballistics import CONVENTIONAL, POINT_BURNOUT, POINT_EXIT, RECOILLESS
 from .ballistics.constrained_gun import ConstrainedGun
 from .ballistics.constrained_recoilless import ConstrainedRecoilless
 from .ballistics.gun import Gun
@@ -128,8 +128,8 @@ def guide_graph(*_, logger: logging.Logger | None = None, **kwargs):
         cmrs.append(charge_mass_ratio)
         charge_mass_ratio += step_cmr
 
-    processes = psutil.cpu_count(logical=False)
-    logger.info(f"Dispatching {processes:} processes for finding maximum load fractions.")
+    processes = psutil.cpu_count(logical=False) or 1
+    logger.info(f"Dispatching {processes} processes for finding maximum load fractions.")
 
     with multiprocessing.Pool(processes=processes) as pool:
         lfmaxs = pool.map(func=target.maximum_load_fraction, iterable=tqdm(cmrs, **tqdm_kwargs))
@@ -145,7 +145,7 @@ def guide_graph(*_, logger: logging.Logger | None = None, **kwargs):
             kv.update({"load_fraction": load_fraction, "charge_mass_ratio": charge_mass_ratio})
             parameters.append(kv)
 
-    logger.info(f"Dispatching {processes:} processes for constructing guidance diagram.")
+    logger.info(f"Dispatching {processes} processes for constructing guidance diagram.")
 
     with multiprocessing.Pool(processes=processes) as pool:
         results = starstarmap(

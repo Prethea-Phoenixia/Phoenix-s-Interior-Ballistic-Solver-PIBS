@@ -45,41 +45,15 @@ class ToolTip(object):
             font=t_font,
         )
         label.pack(ipadx=width, ipady=height * 0.25, anchor="nw", fill="both")
-        tw.update()
 
-        x = self.widget.winfo_rootx()  # + tw.winfo_width()
-        y = self.widget.winfo_rooty()
-
-        # (x, y): top-left
         root_window = self.widget.winfo_toplevel()
-        x_r, y_r, w_r, h_r = (
-            root_window.winfo_rootx(),
-            root_window.winfo_rooty(),
-            root_window.winfo_width(),
-            root_window.winfo_height(),
-        )
-
-        y = min(y, y_r + h_r - tw.winfo_height())
-        y = max(y, y_r)
-
-        if x < x_r + w_r / 2:
-            x += self.widget.winfo_width()
-
-        elif x > x_r + w_r / 2:
-            x -= tw.winfo_width()
+        x, y = root_window.winfo_pointerxy()
 
         # ensure the tip shows up on the correct side:
 
-        tw.wm_geometry("+%d+%d" % (x, y))
+        tw.wm_geometry("+%d+%d" % (x + 1, y + 1))
         tw.attributes("-alpha", 1.0)
-        """
-        tw.bind(
-            "<Configure>",
-            lambda event: label.configure(
-                wraplength=label.winfo_width() * 0.75
-            ),
-        )
-        """
+
         self.initialized = True
 
     def hidetip(self):

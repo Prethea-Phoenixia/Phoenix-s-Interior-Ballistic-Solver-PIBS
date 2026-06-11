@@ -5,8 +5,17 @@ import logging
 from math import log
 from typing import TYPE_CHECKING
 
-from . import MAX_ITER, POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT, SOL_LAGRANGE, SOL_MAMONTOV, SOL_PIDDUCK
-from . import Points, Solutions
+from . import (
+    MAX_ITER,
+    POINT_PEAK_AVG,
+    POINT_PEAK_BREECH,
+    POINT_PEAK_SHOT,
+    SOL_LAGRANGE,
+    SOL_MAMONTOV,
+    SOL_PIDDUCK,
+    Points,
+    Solutions,
+)
 from .gun import pidduck
 from .num import dekker, gss, rkf
 

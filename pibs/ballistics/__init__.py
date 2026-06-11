@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, Union, TypeVar
+from typing import Literal, TypeVar, Union
 
 DOMAIN_TIME = "DOMAIN_TIME"
 DOMAIN_LEN = "DOMAIN_LEN"
@@ -64,9 +64,16 @@ class JSONable:
     def from_json(cls: T, json_dict: dict) -> T: ...
 
 
-from .gun import GenericEntry, GenericResult, Gun, OutlineEntry, PressureProbePoint, PressureTraceEntry
 from .material import Material
+from .prop import Composition, Geometry, MultPerfGeometry, Propellant, SimpleGeometry
+from .gun import (
+    GenericEntry,
+    GenericResult,
+    Gun,
+    OutlineEntry,
+    PressureProbePoint,
+    PressureTraceEntry,
+)
+from .recoilless import Recoilless
 from .constrained_gun import ConstrainedGun
 from .constrained_recoilless import ConstrainedRecoilless
-from .prop import Composition, Geometry, MultPerfGeometry, Propellant, SimpleGeometry
-from .recoilless import Recoilless

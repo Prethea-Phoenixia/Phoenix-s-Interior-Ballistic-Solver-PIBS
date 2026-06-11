@@ -3,7 +3,14 @@ import sys
 import traceback
 from logging.handlers import QueueHandler
 
-from .ballistics import CONVENTIONAL, RECOILLESS, ConstrainedGun, ConstrainedRecoilless, Gun, Recoilless
+from .ballistics import (
+    CONVENTIONAL,
+    RECOILLESS,
+    ConstrainedGun,
+    ConstrainedRecoilless,
+    Gun,
+    Recoilless,
+)
 from .guidegraph import guide_graph
 
 

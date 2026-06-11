@@ -7,13 +7,31 @@ from dataclasses import dataclass
 from math import log
 from typing import Callable
 
-from . import DOMAIN_TIME
-from . import Domains, Points, Solutions
-from . import POINT_BURNOUT, POINT_EXIT, POINT_FRACTURE, POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT, POINT_START
-from . import SAMPLE
-from . import SOL_LAGRANGE, SOL_MAMONTOV, SOL_PIDDUCK
+from . import (
+    DOMAIN_TIME,
+    POINT_BURNOUT,
+    POINT_EXIT,
+    POINT_FRACTURE,
+    POINT_PEAK_AVG,
+    POINT_PEAK_BREECH,
+    POINT_PEAK_SHOT,
+    POINT_START,
+    SAMPLE,
+    SOL_LAGRANGE,
+    SOL_MAMONTOV,
+    SOL_PIDDUCK,
+    Domains,
+    Points,
+    Solutions,
+)
 from .base_gun import BaseGun
-from .generics import GenericEntry, GenericResult, OutlineEntry, PressureProbePoint, PressureTraceEntry
+from .generics import (
+    GenericEntry,
+    GenericResult,
+    OutlineEntry,
+    PressureProbePoint,
+    PressureTraceEntry,
+)
 from .material import Material
 from .num import dekker, gss, integrate, rkf
 from .prop import Propellant
@@ -74,7 +92,7 @@ def pidduck(wpm: float, k: float, tol: float) -> tuple[float, float]:
         else:
             return i - 0.5 * ((k - 1) / k) * wpm * ((1 - om) ** (k / (k - 1)) / om)
 
-    omega = 0.5 * sum(dekker(f_omega, 0, 1, x_tol=tol**2))
+    omega = 0.5 * sum(dekker(f_omega, 0, 1, x_tol=tol))
 
     if k == 1:
         labda_1 = (math.exp(omega) - 1) / wpm

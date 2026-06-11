@@ -3,12 +3,19 @@ from __future__ import annotations
 import json
 import logging
 import math
-from typing import Callable, Any
+from typing import Any, Callable
 
-from . import JSONable
-from . import POINT_PEAK_AVG, OptimizationTargets, MIN_BARR_VOLUME, Points, MAX_ITER, MIN_PROJ_TRAVEL
+from . import (
+    MAX_ITER,
+    MIN_BARR_VOLUME,
+    MIN_PROJ_TRAVEL,
+    POINT_PEAK_AVG,
+    JSONable,
+    OptimizationTargets,
+    Points,
+)
 from .num import gss
-from .prop import Propellant, DelegatesPropellant
+from .prop import DelegatesPropellant, Propellant
 
 
 def probe_func(
@@ -219,5 +226,5 @@ class Constrained(DelegatesPropellant, JSONable):
         )
         lf = 0.5 * (lf_high + lf_low)
         e_1, l_g, _ = _f(lf)
-        self.logger.info(f"Optimal Δ/ρ = {lf:.2f}")
+        self.logger.info(f"Optimal Δ/ρ = {lf :.2f}")
         return lf, e_1, l_g
