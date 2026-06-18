@@ -605,8 +605,8 @@ class LocalizedFrame(Frame):
         *args: Any,
         font: Font | None = None,
         localization_dict: dict[str, dict[str, str]],
-        menubar: Menu,
         default_lang: str,
+        menubar: Menu | None = None,
         lang_var: StringVar | None = None,
         **kwargs: Any,
     ) -> None:
@@ -626,12 +626,12 @@ class LocalizedFrame(Frame):
                     else list(self.localization_dict.keys())[0]
                 )
             )
+            if menubar:
+                lang_menu = Menu(menubar)
+                menubar.add_cascade(label="Lang 语言", menu=lang_menu)
 
-            lang_menu = Menu(menubar)
-            menubar.add_cascade(label="Lang 语言", menu=lang_menu)
-
-            for lang in localization_dict.keys():
-                lang_menu.add_radiobutton(label=lang, variable=self.lang_var, value=lang, command=self.change_lang)
+                for lang in localization_dict.keys():
+                    lang_menu.add_radiobutton(label=lang, variable=self.lang_var, value=lang, command=self.change_lang)
         elif isinstance(master, LocalizedFrame):  # otherwise, piggyback on to the parent's top-level frame
             self.lang_var = master.lang_var
         else:  # otherwise, let the children decide how to handle this.
@@ -639,7 +639,7 @@ class LocalizedFrame(Frame):
                 raise ValueError("lang_var must be provided when master is not a Toplevel, Tk, or LocalizedFrame")
             self.lang_var = lang_var
 
-    def change_lang(self, lang_var: tkinter.StringVar | None = None) -> None:
+    def change_lang(self, *args, **kwargs) -> None:
         for loc_widget in self.localized_widgets:
             loc_widget.localize()
 
