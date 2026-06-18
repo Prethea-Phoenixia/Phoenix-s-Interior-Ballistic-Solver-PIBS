@@ -4,31 +4,67 @@ import logging
 import math
 from tkinter import ttk, Text
 from tkinter.ttk import Frame, Notebook
+from typing import Protocol, runtime_checkable
 
 import matplotlib as mpl
 from labellines import labelLines
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.pyplot import Figure
+from matplotlib.figure import Figure
 
+from ballistics.recoilless import RecoillessTableEntry
 from . import FONTSIZE, FONTNAME, THEMES
 from .ballistics import DOMAIN_TIME, DOMAIN_LEN, CONVENTIONAL, RECOILLESS
 from .ballistics.gun import GunResult, Gun
-from .ballistics.recoilless import RecoillessResult, Recoilless
 from .localized_widget import LocalizedFrame
 from .misc import validate_nn, validate_ce
 from .table_frame import TableFrame
 from .theme import ThemedMixin
 
 
+@runtime_checkable
+class MasterInterface(Protocol):
+    """Protocol defining the expected interface for NotebookFrame's master."""
+
+    gun: Gun | None
+    """The gun object or None if not computed."""
+
+    kwargs: dict[str, object]
+    """Dictionary containing simulation parameters including:
+        - design_velocity: float
+        - design_pressure: float
+        - typ: str (CONVENTIONAL or RECOILLESS)
+        - dom: str (DOMAIN_TIME or DOMAIN_LEN)
+        - control: str
+        - charge_mass: float
+        - chamber_volume: float
+    """
+
+    gun_result: GunResult | None
+    """The gun simulation result or None if not computed."""
+
+    guide_result: list[tuple] | None
+    """The guide graph result or None if not computed."""
+
+
 class NotebookFrame(ThemedMixin, LocalizedFrame):
-    def __init__(self, master, *args, font, default_lang, localization_dict, on_guide_func, **kwargs):
+    def __init__(
+        self,
+        master: MasterInterface | None = None,
+        *args,
+        font,
+        default_lang,
+        localization_dict,
+        on_guide_func,
+        **kwargs,
+    ):
         super().__init__(master, *args, default_lang=default_lang, localization_dict=localization_dict, **kwargs)
 
-        self.master = master
+        if not isinstance(master, MasterInterface):
+            raise ValueError
+        self.master: MasterInterface = master  # type: ignore[assignment]
 
         validation_nn = self.register(validate_nn)
-        # validation_pi = self.register(validate_pi)
         validation_ce = self.register(validate_ce)
         self.font = font
 
@@ -291,19 +327,23 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         self.update_guide_graph()
 
     @property
-    def gun(self):
+    def gun(self) -> Gun | None:
+        """The gun object from master."""
         return self.master.gun
 
     @property
-    def kwargs(self):
+    def kwargs(self) -> dict[str, object]:
+        """Simulation parameters dictionary from master."""
         return self.master.kwargs
 
     @property
-    def gun_result(self):
+    def gun_result(self) -> GunResult | None:
+        """Gun simulation result from master."""
         return self.master.gun_result
 
     @property
-    def guide_result(self):
+    def guide_result(self) -> list[tuple] | None:
+        """Guide graph result from master."""
         return self.master.guide_result
 
     def change_lang(self):
@@ -345,11 +385,12 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
                     v = entry.velocity
                     pb = entry.breech_pressure
 
-                    if gun_type == RECOILLESS:
+                    if isinstance(entry, RecoillessTableEntry):
                         vx = entry.outflow_velocity
                         p0 = entry.stag_pressure
                         eta = entry.outflow_fraction
                         stag = entry.rel_stag_point
+
                     else:
                         vx, p0, eta, stag = 0, 0, 0, 0
 
@@ -608,7 +649,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
 
                 if self.gun:
                     guide_ax.scatter(
-                        self.kwargs["charge_mass"] / self.kwargs["chamber_volume"],
+                        float(self.kwargs["charge_mass"]) / float(self.kwargs["chamber_volume"]),
                         self.kwargs["charge_mass"],
                         c=fgc,
                         marker="x",
@@ -684,7 +725,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         for loc in self.localized_widgets:
             loc.reset() if hasattr(loc, "get_descriptive") else None
 
-    def on_state_change(self, type_option):
+    def on_state_change(self, type_option: str) -> None:
 
         if type_option == CONVENTIONAL:
 
