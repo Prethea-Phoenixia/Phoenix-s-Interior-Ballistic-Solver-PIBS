@@ -7,7 +7,7 @@ import sys
 import traceback
 from enum import Enum
 from logging.handlers import QueueListener
-from math import ceil, log10
+from math import log10
 from multiprocessing import Process, Queue
 from pathlib import Path
 from tkinter import IntVar, Menu, StringVar, Text, filedialog, messagebox, ttk
@@ -16,9 +16,6 @@ from tkinter.ttk import Frame
 from typing import Literal
 
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
-
 from .notebook_frame import NotebookFrame
 from . import THEMES, FONTNAME, BOLDSIZE, FONTSIZE, DESCRIPTION
 from . import log_formatter
@@ -205,7 +202,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         left_frame = Frame(self)
         left_frame.grid(row=0, column=2, rowspan=2, sticky="nsew")
         left_frame.columnconfigure(0, weight=1)
-        left_frame.rowconfigure(0, weight=1)
 
         specs_frame = self.add_localized_label_frame(left_frame, label_loc_key="specFrmLabel")
         specs_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
@@ -272,25 +268,13 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             i + 1,
         )
 
-        specs_frame.rowconfigure(i, weight=1)
-
         self.grain_frame = self.add_localized_label_frame(specs_frame, label_loc_key="grainFrmLabel")
         self.grain_frame.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         i += 1
 
         self.grain_frame.columnconfigure(0, weight=1)
-        self.grain_frame.rowconfigure(0, weight=1)
 
         j = 0
-        geom_plot_frm = self.add_localized_label_frame(
-            self.grain_frame, label_loc_key="σ(Z)", style="SubLabelFrame.TLabelframe", tooltip_loc_key="geomPlotText"
-        )
-        geom_plot_frm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        geom_fig = Figure(dpi=None, layout="constrained")
-        self.geom_canvas = FigureCanvasTkAgg(geom_fig, master=geom_plot_frm)
-        self.geom_canvas.get_tk_widget().place(relheight=1, relwidth=1)
-
-        j += 1
 
         self.main_geom = self.add_localized_dropdown(
             parent=self.grain_frame, str_obj_dict=Geometry.get_desc_geometry_dict(), desc_label_key="Grain Geometry"
@@ -566,6 +550,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         environment_frame = self.add_localized_label_frame(left_frame, labelwidget=self.in_atmos.check_widget)
         environment_frame.grid(row=i, column=0, sticky="nsew", padx=2, pady=2)
         i += 1
+
+        left_frame.rowconfigure(i, weight=1)
 
         environment_frame.columnconfigure(0, weight=1)
         j = 0
@@ -1171,7 +1157,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         # self.specs_text_tip.set(self.get_loc_str("specsText"))
         self.calc_button.config(text=self.get_loc_str("calcLabel"))
         self.swap_button.config(text=self.get_loc_str("swapLabel"))
-        self.update_geom_plot()
+
+        self.notebook_frame.update_geom_plot()
         self.update_table()
 
     @property
@@ -1442,36 +1429,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 r1.localize("pdtarcLabel", "pdtarcText")
                 r2.localize("ltarcLabel", "ltarcText")
 
-    def update_geom_plot(self):
-        with plt.rc_context(self.context):
-            self.geom_canvas.figure.clear()
-            self.geom_canvas.figure.set_facecolor(self.context["figure.facecolor"])
-            geom_ax = self.geom_canvas.figure.add_subplot(111)
-
-            n = 100
-
-            prop = self.prop
-            if prop is not None:
-                zb = prop.z_b
-                xs = [(i / n) * zb for i in range(n + 1)]
-                ys = [prop.f_sigma_z(x) for x in xs]
-
-                xs.append(zb)
-                ys.append(prop.f_sigma_z(zb))
-
-                xs.append(xs[-1])
-                ys.append(0)
-
-                geom_ax.plot(xs, ys)
-                geom_ax.grid(which="major", color="grey", linestyle="dotted")
-                geom_ax.minorticks_on()
-                geom_ax.set_xlim(left=0, right=prop.z_b)
-                geom_ax.xaxis.set_ticks([i * 0.5 for i in range(ceil(min(prop.z_b, 2) / 0.5) + 1)])
-                geom_ax.set_ylim(bottom=0, top=max(ys))
-                geom_ax.yaxis.set_ticks([i * 0.25 for i in range(ceil(max(ys) / 0.25) + 1)])
-
-            self.geom_canvas.draw_idle()
-
     @handle_error_wrapper(Log.WARNING)
     def propellant_callback(self, *_):
         """
@@ -1496,10 +1453,10 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 ),
                 force_fudge=float(self.force_fudge.get()) * 1e-2,
             )
-            self.update_geom_plot()
+            self.notebook_frame.update_geom_plot()
         except Exception as e:
             self.prop = None
-            self.update_geom_plot()
+            self.notebook_frame.update_geom_plot()
 
             raise e
 
@@ -1590,7 +1547,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     def use_theme(self):
         super().use_theme()
         self.notebook_frame.use_theme()
-        self.update_geom_plot()
 
     @handle_error_wrapper(level=Log.WARNING)
     def export_graph(self, save: Literal["main", "aux", "guide", "geom"]):
@@ -1608,7 +1564,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         elif save == "guide":
             fig = self.notebook_frame.guide_canvas.figure
         elif save == "geom":
-            fig = self.geom_canvas.figure
+            fig = self.notebook_frame.geom_canvas.figure
         else:
             raise ValueError("unknown save target.")
 

@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
+from ballistics import Propellant
 from .ballistics.recoilless import RecoillessTableEntry
 from . import FONTSIZE, FONTNAME, THEMES
 from .ballistics import DOMAIN_TIME, DOMAIN_LEN, CONVENTIONAL, RECOILLESS
@@ -41,10 +42,13 @@ class MasterInterface(Protocol):
     """
 
     gun_result: GunResult | None
-    """The gun simulation result or None if not computed."""
+    """The gun simulation result, None on startup or invalid compute output."""
 
     guide_result: list[tuple] | None
-    """The guide graph result or None if not computed."""
+    """The guide graph result, None on startup or invalid compute output."""
+
+    prop: Propellant | None
+    """The propellant, None if invalid propellant entry state"""
 
 
 class NotebookFrame(ThemedMixin, LocalizedFrame):
@@ -88,6 +92,9 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
 
         self.plot_tab.rowconfigure(0, weight=3)
         self.plot_tab.rowconfigure(1, weight=1)
+
+        self.plot_tab.columnconfigure(0, weight=1)
+        self.plot_tab.columnconfigure(1, weight=1)
 
         self.tab_parent.add(self.desc_tab, text=self.get_loc_str("descTab"))
         self.tab_parent.add(self.plot_tab, text=self.get_loc_str("plotTab"))
@@ -155,7 +162,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         plot_label_frame = self.add_localized_label_frame(
             self.plot_tab, label_loc_key="plotFrmLabel", tooltip_loc_key="plotText"
         )
-        plot_label_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+        plot_label_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
 
         for i in range(3):
             plot_label_frame.columnconfigure(i, weight=1)
@@ -228,10 +235,18 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         self.aux_canvas = FigureCanvasTkAgg(aux_fig, master=aux_plot_frame)
         self.aux_canvas.get_tk_widget().place(relwidth=1, relheight=1)
 
+        ## geom plot
+        geom_plot_frm = self.add_localized_label_frame(
+            self.plot_tab, label_loc_key="σ(Z)", style="SubLabelFrame.TLabelframe", tooltip_loc_key="geomPlotText"
+        )
+        geom_plot_frm.grid(row=1, column=1, sticky="nsew", padx=2, pady=2)
+        geom_fig = Figure(dpi=None, layout="constrained")
+        self.geom_canvas = FigureCanvasTkAgg(geom_fig, master=geom_plot_frm)
+        self.geom_canvas.get_tk_widget().place(relheight=1, relwidth=1)
+
         ## guide plot
         self.guide_tab.rowconfigure(0, weight=1)
         self.guide_tab.columnconfigure(0, weight=1)
-        # self.guide_tab.columnconfigure(1, weight=1)
 
         plot_label_frame = self.add_localized_label_frame(self.guide_tab, label_loc_key="guideFrmLabel")
         plot_label_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
@@ -319,6 +334,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         self.update_fig_plot()
         self.update_aux_plot()
         self.update_guide_graph()
+        self.update_geom_plot()
 
     @property
     def gun(self) -> Gun | None:
@@ -339,6 +355,10 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
     def guide_result(self) -> list[tuple] | None:
         """Guide graph result from master."""
         return self.master.guide_result
+
+    @property
+    def prop(self) -> Propellant | None:
+        return self.master.prop
 
     def change_lang(self):
         super().change_lang()
@@ -576,6 +596,36 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
                 aux_ax_h.set_ylim(bottom=0)
 
             self.aux_canvas.draw_idle()
+
+    def update_geom_plot(self):
+        with plt.rc_context(self.context):
+            self.geom_canvas.figure.clear()
+            self.geom_canvas.figure.set_facecolor(self.context["figure.facecolor"])
+            geom_ax = self.geom_canvas.figure.add_subplot(111)
+
+            n = 100
+
+            prop = self.prop
+            if prop is not None:
+                zb = prop.z_b
+                xs = [(i / n) * zb for i in range(n + 1)]
+                ys = [prop.f_sigma_z(x) for x in xs]
+
+                xs.append(zb)
+                ys.append(prop.f_sigma_z(zb))
+
+                xs.append(xs[-1])
+                ys.append(0)
+
+                geom_ax.plot(xs, ys)
+                geom_ax.grid(which="major", color="grey", linestyle="dotted")
+                geom_ax.minorticks_on()
+                geom_ax.set_xlim(left=0, right=prop.z_b)
+                geom_ax.xaxis.set_ticks([i * 0.5 for i in range(math.ceil(min(prop.z_b, 2) / 0.5) + 1)])
+                geom_ax.set_ylim(bottom=0, top=max(ys))
+                geom_ax.yaxis.set_ticks([i * 0.25 for i in range(math.ceil(max(ys) / 0.25) + 1)])
+
+            self.geom_canvas.draw_idle()
 
     def update_guide_graph(self):
         style = ttk.Style(self)
