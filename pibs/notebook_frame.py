@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-from ballistics.recoilless import RecoillessTableEntry
+from .ballistics.recoilless import RecoillessTableEntry
 from . import FONTSIZE, FONTNAME, THEMES
 from .ballistics import DOMAIN_TIME, DOMAIN_LEN, CONVENTIONAL, RECOILLESS
 from .ballistics.gun import GunResult, Gun
@@ -302,12 +302,6 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
 
     def use_theme(self):
         super().use_theme()
-        style = ttk.Style(self)
-
-        bgc = str(style.lookup("TEntry", "background"))
-        fgc = str(style.lookup("TEntry", "foreground"))
-        fbgc = str(style.lookup("TEntry", "fieldbackground")) or bgc
-
         grays = (
             [f"gray{i}" for i in [90, 80, 70]]
             if THEMES[self.theme_name_var.get()]["is_light"]

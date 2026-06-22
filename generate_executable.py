@@ -31,14 +31,36 @@ def generate_executables(mult_file: bool = False):
     with open(name + ".spec", "w") as f:
         f.writelines(content)
 
+    i = content.index("pyz = PYZ(a.pure)\n")
+
+    dll_exclusion = """# exclude excessive DLL collected by pyinstaller
+key_words = ['api-ms-win']
+new_binaries = []
+excluded = []
+for item in a.binaries:
+    name, _, _ = item
+    to_include = True
+    for key_word in key_words:
+        if key_word in name:
+            to_include = False
+    if to_include:
+        new_binaries.append(item)
+    else:
+        excluded.append(item)
+
+a.binaries = new_binaries
+"""
+
+    for line in dll_exclusion.split("\n"):
+        content.insert(i, line + "\n")
+        i += 1
+
+    with open(name + ".spec", "w") as f:
+        f.writelines(content)
+
     os.system("pyinstaller " + name + ".spec" + " --noconfirm")
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser(description="script to generate PIBS executable")
-    # parser.add_argument("--mult_file", action="store_true", default=False)
-    #
-    # args = parser.parse_args()
-
     generate_executables(False)
     generate_executables(True)

@@ -38,7 +38,7 @@ from .ballistics import (
 )
 from .dispatch import calculate, guide
 from .info_frame import InfoFrame
-from .localized_widget import LocalizedFrame
+from .localized_widget import LocalizedFrame, Descriptive
 from .misc import (
     filenameize,
     format_int_input,
@@ -1057,7 +1057,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             if (hasattr(loc, "get_descriptive") and loc.get_descriptive())
         }
 
-        kvs = {**loc_val_dict, "Description": self.description.get(1.0, "end").strip("\n")}
+        kvs = {**loc_val_dict, "Description": self.notebook_frame.description.get(1.0, "end").strip("\n")}
         with open(file_name, "w", encoding="utf-8") as file:
             json.dump(kvs, file, indent="\t", ensure_ascii=False, sort_keys=True)
 
@@ -1079,10 +1079,16 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.reset_entries()
         self.name_var.set(Path(file_name).stem)
 
+        # loc_dict = {
+        #     loc.get_descriptive(): loc
+        #     for loc in self.localized_widgets
+        #     if (hasattr(loc, "get_descriptive") and loc.get_descriptive())
+        # }
+
         loc_dict = {
             loc.get_descriptive(): loc
             for loc in self.localized_widgets
-            if (hasattr(loc, "get_descriptive") and loc.get_descriptive())
+            if isinstance(loc, Descriptive) and loc.get_descriptive()
         }
         with open(file_name, "r", encoding="utf-8") as file:
             file_dict = json.load(file)
