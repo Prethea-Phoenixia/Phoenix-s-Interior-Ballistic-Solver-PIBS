@@ -58,7 +58,8 @@ a.binaries = new_binaries
     with open(name + ".spec", "w") as f:
         f.writelines(content)
 
-    os.system("pyinstaller " + name + ".spec" + " --noconfirm")
+    import sys
+    os.system(f'"{sys.executable}" -m PyInstaller ' + name + ".spec" + " --noconfirm")
 
 
 if __name__ == "__main__":
