@@ -92,10 +92,13 @@ def main(loc: str = "", debug: bool = False):
     if platform.system() == "Windows":
         win_release = platform.release()
         if win_release in ("8", "10", "11"):
+            # noinspection PyUnresolvedReferences
             windll.shcore.SetProcessDpiAwareness(1)
         elif win_release in ("7", "Vista"):
+            # noinspection PyUnresolvedReferences
             windll.user32.SetProcessDPIAware()
 
+        # noinspection PyUnresolvedReferences
         loc: str = loc or locale.windows_locale[windll.kernel32.GetUserDefaultUILanguage()]
 
     loadfont(resolve_path("ui/SarasaFixedSC-Regular.ttf"), True, True)

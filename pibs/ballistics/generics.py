@@ -21,7 +21,7 @@ class GenericEntry:
     breech_pressure: float
     avg_pressure: float
     shot_pressure: float
-    temperature: float
+    temperature: float | None
 
 
 @dataclass

@@ -1,5 +1,4 @@
 import os
-import argparse
 import PyInstaller.__main__
 
 from pibs import __version__
@@ -18,6 +17,7 @@ def generate_executables(mult_file: bool = False):
         "--icon=pibs/ui/logo.ico",
         "--name=" + name,
         "--debug=all",
+        "--noupx",
         f"--add-data=pibs/ballistics/resource{sep}ballistics/resource/",
         f"--add-data=pibs/ui{sep}ui/",
         f"--add-data=pibs/examples{sep}examples/",
@@ -28,18 +28,13 @@ def generate_executables(mult_file: bool = False):
     with open(name + ".spec", "r") as f:
         content = f.readlines()
 
+    with open(name + ".spec", "w") as f:
+        f.writelines(content)
+
     i = content.index("pyz = PYZ(a.pure)\n")
-    """
-    The following code injects code defined in `dll_exclusion` to the specs file, used by pyinstaller. 
-        a = Analysis...
-        >here<
-        pyz = PYZ...
-    excluded keywords corresponds to:
-    - api-ms-win, ucrtbase: MikTex (LaTeX) compiler on Windows machines
-    These can be safely excluded since the functionality of PIBS does not depend on them.
-    """
+
     dll_exclusion = """# exclude excessive DLL collected by pyinstaller
-key_words = ['api-ms-win', 'ucrtbase']
+key_words = ['api-ms-win']
 new_binaries = []
 excluded = []
 for item in a.binaries:
@@ -54,14 +49,6 @@ for item in a.binaries:
         excluded.append(item)
 
 a.binaries = new_binaries
-
-# Filter out all entries in matplotlib/mpl-data/fonts
-mpl_font_path = os.path.join('matplotlib', 'mpl-data', 'fonts')
-a.datas = [entry for entry in a.datas if not entry[0].startswith(mpl_font_path)]
-
-# Filter out all 
-mpl_data_path = os.path.join('matplotlib', 'mpl-data', 'sample_data')
-a.datas = [entry for entry in a.datas if not entry[0].startswith(mpl_data_path)]
 """
 
     for line in dll_exclusion.split("\n"):
@@ -76,10 +63,5 @@ a.datas = [entry for entry in a.datas if not entry[0].startswith(mpl_data_path)]
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser(description="script to generate PIBS executable")
-    # parser.add_argument("--mult_file", action="store_true", default=False)
-    #
-    # args = parser.parse_args()
-
     generate_executables(False)
     generate_executables(True)
