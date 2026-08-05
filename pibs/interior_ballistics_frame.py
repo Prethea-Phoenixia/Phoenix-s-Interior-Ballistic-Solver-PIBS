@@ -49,7 +49,7 @@ from .ballistics import (
 )
 from .dispatch import calculate, guide
 from .info_frame import InfoFrame
-from .localized_widget import Descriptive, LocalizableWidget, LocalizedFrame
+from .localized_widget import Descriptive, LocalizableWidget, LocalizedFrame, RowBuilder
 from .misc import (
     filenameize,
     format_int_input,
@@ -214,128 +214,98 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.info_frame.columnconfigure(0, weight=1)
         self.info_frame.rowconfigure(0, weight=1)
 
-        left_frame = Frame(self)
-        left_frame.grid(row=0, column=2, rowspan=2, sticky="nsew")
-        left_frame.columnconfigure(0, weight=1)
+        design_frame = Frame(self)
+        design_frame.grid(row=0, column=2, rowspan=2, sticky="nsew")
+        design_frame.columnconfigure(0, weight=1)
 
-        specs_frame = self.add_localized_label_frame(left_frame, label_loc_key="specFrmLabel")
+        ### specs_frame: caliber, barrel length, shot mass, charge mass
+        specs_frame = self.add_localized_label_frame(design_frame, label_loc_key="specFrmLabel")
         specs_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
-        i = 0
-        self.type_optn = self.add_localized_dropdown(
+        sb = RowBuilder(self)
+        self.type_optn = sb.dropdown(
             parent=specs_frame,
             str_obj_dict={gun_type: gun_type for gun_type in (CONVENTIONAL, RECOILLESS)},
             desc_label_key="typeLabel",
-        )
-        self.type_optn.grid(row=i, column=0, sticky="nsew", padx=2, pady=2, columnspan=3)
-        i += 1
-
-        self.cal_mm, i = (
-            self.add_localized_3_input(
-                parent=specs_frame,
-                row=i,
-                label_loc_key="calLabel",
-                unit_text="mm",
-                default="50.0",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            i + 1,
+            grid_kwargs={"columnspan": 3},
         )
 
-        self.tbl_mm, i = (
-            self.add_localized_3_input(
-                parent=specs_frame,
-                row=i,
-                label_loc_key="tblLabel",
-                unit_text="mm",
-                default="3500.0",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            i + 1,
+        self.cal_mm = sb.input_3(
+            parent=specs_frame,
+            label_loc_key="calLabel",
+            unit_text="mm",
+            default="50.0",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.sht_kg, i = (
-            self.add_localized_3_input(
-                parent=specs_frame,
-                row=i,
-                label_loc_key="shtLabel",
-                unit_text="kg",
-                default="2.0",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            i + 1,
+        self.tbl_mm = sb.input_3(
+            parent=specs_frame,
+            label_loc_key="tblLabel",
+            unit_text="mm",
+            default="3500.0",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.chg_kg, i = (
-            self.add_localized_3_input(
-                parent=specs_frame,
-                row=i,
-                label_loc_key="chgLabel",
-                unit_text="kg",
-                default="0.5",
-                validation=validation_nn,
-                tooltip_loc_key="chgText",
-                dtype=float,
-            ),
-            i + 1,
+        self.sht_kg = sb.input_3(
+            parent=specs_frame,
+            label_loc_key="shtLabel",
+            unit_text="kg",
+            default="2.0",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.grain_frame = self.add_localized_label_frame(specs_frame, label_loc_key="grainFrmLabel")
-        self.grain_frame.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        i += 1
+        self.chg_kg = sb.input_3(
+            parent=specs_frame,
+            label_loc_key="chgLabel",
+            unit_text="kg",
+            default="0.5",
+            validation=validation_nn,
+            tooltip_loc_key="chgText",
+            dtype=float,
+        )
 
+        ### grain_frame: grain geometry settings
+        self.grain_frame = self.add_localized_label_frame(design_frame, label_loc_key="grainFrmLabel")
+        self.grain_frame.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
         self.grain_frame.columnconfigure(0, weight=1)
 
-        j = 0
-
-        self.main_geom = self.add_localized_dropdown(
-            parent=self.grain_frame, str_obj_dict=Geometry.get_desc_geometry_dict(), desc_label_key="Grain Geometry"
-        )
-        self.main_geom.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-
-        j += 1
-
-        self.web_mm, j = (
-            self.add_localized_3_input(
-                parent=self.grain_frame,
-                row=j,
-                desc_label_key="Web",
-                unit_text="mm",
-                default="1.0",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
+        gb = RowBuilder(self)
+        self.main_geom = gb.dropdown(
+            parent=self.grain_frame,
+            str_obj_dict=Geometry.get_desc_geometry_dict(),
+            desc_label_key="Grain Geometry",
+            grid_kwargs={"columnspan": 3},
         )
 
-        self.grain_r1, j = (
-            self.add_localized_3_input(
-                parent=self.grain_frame,
-                row=j,
-                desc_label_key="1/α",
-                unit_text="x",
-                default="1.0",
-                validation=validation_nn,
-                tooltip_loc_key="",
-                dtype=float,
-            ),
-            j + 1,
+        self.web_mm = gb.input_3(
+            parent=self.grain_frame,
+            desc_label_key="Web",
+            unit_text="mm",
+            default="1.0",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.grain_r2, j = (
-            self.add_localized_3_input(
-                parent=self.grain_frame,
-                row=j,
-                desc_label_key="1/β",
-                unit_text="x",
-                default="10.0",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
+        self.grain_r1 = gb.input_3(
+            parent=self.grain_frame,
+            desc_label_key="1/α",
+            unit_text="x",
+            default="1.0",
+            validation=validation_nn,
+            tooltip_loc_key="",
+            dtype=float,
+        )
+
+        self.grain_r2 = gb.input_3(
+            parent=self.grain_frame,
+            desc_label_key="1/β",
+            unit_text="x",
+            default="10.0",
+            validation=validation_nn,
+            dtype=float,
         )
 
         self.use_aux_grain = self.add_localized_label_check(
@@ -349,286 +319,221 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.aux_grain_frm = self.add_localized_label_frame(
             self.grain_frame, labelwidget=self.use_aux_grain.check_widget
         )
-        self.aux_grain_frm.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        j += 1
+        self.aux_grain_frm.grid(row=gb.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        gb.next()
+        aux_row = gb.current_row
         self.aux_grain_frm.columnconfigure(1, weight=1)
 
-        k = 0
-        self.aux_mass_ratio, k = (
-            self.add_localized_3_input(
-                parent=self.aux_grain_frm,
-                row=k,
-                label_loc_key="auxMassRatio",
-                default="1.0",
-                unit_text="x",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            k + 1,
+        ab = RowBuilder(self)
+        self.aux_mass_ratio = ab.input_3(
+            parent=self.aux_grain_frm,
+            label_loc_key="auxMassRatio",
+            default="1.0",
+            unit_text="x",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.aux_geom = self.add_localized_dropdown(
+        self.aux_geom = ab.dropdown(
             parent=self.aux_grain_frm,
             str_obj_dict=Geometry.get_desc_geometry_dict(),
             desc_label_key="Auxiliary Grain Geometry",
-        )
-        self.aux_geom.grid(row=k, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        k += 1
-
-        self.aux_web_ratio, k = (
-            self.add_localized_3_input(
-                parent=self.aux_grain_frm,
-                row=k,
-                default="1.0",
-                unit_text="x",
-                label_loc_key="auxWebRatio",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            k + 1,
+            grid_kwargs={"columnspan": 3},
         )
 
-        self.aux_grain_r1, k = (
-            self.add_localized_3_input(
-                parent=self.aux_grain_frm,
-                row=k,
-                unit_text="x",
-                default="1.0",
-                desc_label_key="Auxiliary 1/α",
-                validation=validation_nn,
-                tooltip_loc_key="",
-                dtype=float,
-            ),
-            k + 1,
+        self.aux_web_ratio = ab.input_3(
+            parent=self.aux_grain_frm,
+            default="1.0",
+            unit_text="x",
+            label_loc_key="auxWebRatio",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.aux_grain_r2, k = (
-            self.add_localized_3_input(
-                parent=self.aux_grain_frm,
-                row=k,
-                unit_text="x",
-                default="10.0",
-                desc_label_key="Auxiliary 1/β",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            k + 1,
+        self.aux_grain_r1 = ab.input_3(
+            parent=self.aux_grain_frm,
+            unit_text="x",
+            default="1.0",
+            desc_label_key="Auxiliary 1/α",
+            validation=validation_nn,
+            tooltip_loc_key="",
+            dtype=float,
+        )
+
+        self.aux_grain_r2 = ab.input_3(
+            parent=self.aux_grain_frm,
+            unit_text="x",
+            default="10.0",
+            desc_label_key="Auxiliary 1/β",
+            validation=validation_nn,
+            dtype=float,
         )
 
         self.swap_button = ttk.Button(self.grain_frame, text=self.get_loc_str("swapLabel"), command=self.swap)
-        self.swap_button.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.swap_button.grid(row=aux_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
-        self.cv_L, i = (
-            self.add_localized_3_input(
-                parent=specs_frame,
-                row=i,
-                label_loc_key="cvLabel",
-                unit_text="L",
-                default="1.0",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            i + 1,
+        ### barrel/charge settings in specs_frame
+        self.cv_L = sb.input_3(
+            parent=specs_frame,
+            label_loc_key="cvLabel",
+            unit_text="L",
+            default="1.0",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.clr, i = (
-            self.add_localized_3_input(
-                parent=specs_frame,
-                row=i,
-                label_loc_key="clrLabel",
-                unit_text="x",
-                default="1.5",
-                validation=validation_nn,
-                tooltip_loc_key="clrText",
-                dtype=float,
-            ),
-            i + 1,
+        self.clr = sb.input_3(
+            parent=specs_frame,
+            label_loc_key="clrLabel",
+            unit_text="x",
+            default="1.5",
+            validation=validation_nn,
+            tooltip_loc_key="clrText",
+            dtype=float,
         )
 
-        self.dgc, i = (
-            self.add_localized_3_input(
-                parent=specs_frame,
-                row=i,
-                label_loc_key="dgcLabel",
-                unit_text="%",
-                default="3.0",
-                validation=validation_ce,
-                tooltip_loc_key="dgcText",
-                dtype=float,
-            ),
-            i + 1,
+        self.dgc = sb.input_3(
+            parent=specs_frame,
+            label_loc_key="dgcLabel",
+            unit_text="%",
+            default="3.0",
+            validation=validation_ce,
+            tooltip_loc_key="dgcText",
+            dtype=float,
         )
 
-        self.stp_MPa, i = (
-            self.add_localized_3_input(
-                parent=specs_frame,
-                row=i,
-                label_loc_key="stpLabel",
-                unit_text="MPa",
-                default="30.0",
-                validation=validation_nn,
-                tooltip_loc_key="stpText",
-                dtype=float,
-            ),
-            i + 1,
+        self.stp_MPa = sb.input_3(
+            parent=specs_frame,
+            label_loc_key="stpLabel",
+            unit_text="MPa",
+            default="30.0",
+            validation=validation_nn,
+            tooltip_loc_key="stpText",
+            dtype=float,
         )
 
-        self.nozz_exp, i = (
-            self.add_localized_3_input(
-                parent=specs_frame,
-                row=i,
-                label_loc_key="nozzExpLabel",
-                unit_text="x",
-                default="4.0",
-                validation=validation_nn,
-                tooltip_loc_key="nozzExpText",
-                dtype=float,
-            ),
-            i + 1,
+        self.nozz_exp = sb.input_3(
+            parent=specs_frame,
+            label_loc_key="nozzExpLabel",
+            unit_text="x",
+            default="4.0",
+            validation=validation_nn,
+            tooltip_loc_key="nozzExpText",
+            dtype=float,
         )
 
-        self.nozz_eff, i = (
-            self.add_localized_3_input(
-                parent=specs_frame,
-                row=i,
-                label_loc_key="nozzEffLabel",
-                unit_text="%",
-                default="92.0",
-                validation=validation_ce,
-                tooltip_loc_key="nozzEffText",
-                dtype=float,
-            ),
-            i + 1,
+        self.nozz_eff = sb.input_3(
+            parent=specs_frame,
+            label_loc_key="nozzEffLabel",
+            unit_text="%",
+            default="92.0",
+            validation=validation_ce,
+            tooltip_loc_key="nozzEffText",
+            dtype=float,
         )
 
+        ### material_frame: structural material settings
         self.use_material = self.add_localized_label_check(
-            specs_frame,
+            parent=design_frame,
             label_loc_key="useMaterialLabel",
             desc_label_key="useMaterialLabel",
             default=False,
             skip_grid=True,
         )
 
-        material_frame = self.add_localized_label_frame(specs_frame, labelwidget=self.use_material.check_widget)
-        material_frame.grid(row=i, column=0, sticky="nsew", columnspan=3, padx=2, pady=2)
+        material_frame = self.add_localized_label_frame(design_frame, labelwidget=self.use_material.check_widget)
+        material_frame.grid(row=2, column=0, sticky="nsew", padx=2, pady=2)
         material_frame.columnconfigure(0, weight=1)
-        i += 1
 
-        j = 0
-        self.material_density, j = (
-            self.add_localized_3_input(
-                material_frame,
-                row=j,
-                label_loc_key="matDensityLabel",
-                unit_text="kg/m³",
-                default="7850.0",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
+        mb = RowBuilder(self)
+        self.material_density = mb.input_3(
+            parent=material_frame,
+            label_loc_key="matDensityLabel",
+            unit_text="kg/m³",
+            default="7850.0",
+            validation=validation_nn,
+            dtype=float,
         )
-        self.material_yield, j = (
-            self.add_localized_3_input(
-                material_frame,
-                row=j,
-                label_loc_key="matYieldLabel",
-                unit_text="MPa",
-                default="1000.0",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
+        self.material_yield = mb.input_3(
+            parent=material_frame,
+            label_loc_key="matYieldLabel",
+            unit_text="MPa",
+            default="1000.0",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.material_ssf, j = (
-            self.add_localized_2_input(
-                parent=material_frame,
-                row=j,
-                label_loc_key="sffLabel",
-                default="1.35",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
+        self.material_ssf = mb.input_2(
+            parent=material_frame,
+            label_loc_key="sffLabel",
+            default="1.35",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.material_is_af, i = (
-            self.add_localized_label_check(
-                parent=material_frame, label_loc_key="afLabel", desc_label_key="afLabel", row=j, columnspan=2
-            ),
-            i + 1,
+        self.material_is_af = self.add_localized_label_check(
+            parent=material_frame,
+            label_loc_key="afLabel",
+            desc_label_key="afLabel",
+            row=mb.current_row,
+            columnspan=2,
         )
 
+        ### environment_frame: atmosphere settings
         self.in_atmos = self.add_localized_label_check(
-            parent=left_frame, label_loc_key="atmosLabel", desc_label_key="atmosLabel", skip_grid=True
+            parent=design_frame, label_loc_key="atmosLabel", desc_label_key="atmosLabel", skip_grid=True
         )
-        environment_frame = self.add_localized_label_frame(left_frame, labelwidget=self.in_atmos.check_widget)
-        environment_frame.grid(row=i, column=0, sticky="nsew", padx=2, pady=2)
-        i += 1
+        environment_frame = self.add_localized_label_frame(design_frame, labelwidget=self.in_atmos.check_widget)
+        environment_frame.grid(row=3, column=0, sticky="nsew", padx=2, pady=2)
 
-        left_frame.rowconfigure(i, weight=1)
+        design_frame.rowconfigure(4, weight=1)
 
         environment_frame.columnconfigure(0, weight=1)
-        j = 0
-        self.amb_p, j = (
-            self.add_localized_3_input(
-                parent=environment_frame,
-                row=j,
-                label_loc_key="ambPresLabel",
-                unit_text="kPa",
-                default="101.325",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
+        eb = RowBuilder(self)
+        self.amb_p = eb.input_3(
+            parent=environment_frame,
+            label_loc_key="ambPresLabel",
+            unit_text="kPa",
+            default="101.325",
+            validation=validation_nn,
+            dtype=float,
         )
-        self.amb_rho, j = (
-            self.add_localized_3_input(
-                parent=environment_frame,
-                row=j,
-                label_loc_key="ambRhoLabel",
-                unit_text="kg/m³",
-                default="1.204",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
+        self.amb_rho = eb.input_3(
+            parent=environment_frame,
+            label_loc_key="ambRhoLabel",
+            unit_text="kg/m³",
+            default="1.204",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.amb_gamma, j = (
-            self.add_localized_3_input(
-                parent=environment_frame,
-                row=j,
-                label_loc_key="ambGamLabel",
-                default="1.400",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
+        self.amb_gamma = eb.input_3(
+            parent=environment_frame,
+            label_loc_key="ambGamLabel",
+            default="1.400",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        mid_frame = Frame(self)
-        mid_frame.grid(row=0, column=3, rowspan=2, sticky="nsew")
-        mid_frame.columnconfigure(0, weight=1)
+        calc_frame = Frame(self)
+        calc_frame.grid(row=0, column=3, rowspan=2, sticky="nsew")
+        calc_frame.columnconfigure(0, weight=1)
+        calc_frame.rowconfigure(0, weight=1)
 
-        i = 0
-        mid_frame.rowconfigure(i, weight=1)
-
-        ### propellant frame
-        propellant_frame = self.add_localized_label_frame(mid_frame, label_loc_key="propFrmLabel")
-        propellant_frame.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        i += 1
+        ### propellant_frame
+        propellant_frame = self.add_localized_label_frame(calc_frame, label_loc_key="propFrmLabel")
+        propellant_frame.grid(row=0, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         propellant_frame.rowconfigure(1, weight=1)
         propellant_frame.columnconfigure(0, weight=1)
-        j = 0
-        self.drop_prop = self.add_localized_dropdown(
+
+        pb = RowBuilder(self)
+        self.drop_prop = pb.dropdown(
             parent=propellant_frame,
             str_obj_dict=Composition.read_file(resolve_path("ballistics/resource/propellants.csv")),
             desc_label_key="propFrmLabel",
             tooltip_loc_key="specsText",
+            grid_kwargs={"columnspan": 2},
         )
-        self.drop_prop.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        j += 1
 
         spec_scroll = ttk.Scrollbar(propellant_frame, orient="vertical")
         spec_h_scroll = ttk.Scrollbar(propellant_frame, orient="horizontal")
@@ -646,14 +551,15 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         spec_scroll.config(command=self.propellant_specs.yview)
         spec_h_scroll.config(command=self.propellant_specs.xview)
 
-        self.propellant_specs.grid(row=j, column=0, sticky="nsew")
-        spec_scroll.grid(row=j, rowspan=2, column=1, sticky="nsew")
-        j += 1
-        spec_h_scroll.grid(row=j, column=0, sticky="nsew")
-        j += 1
+        spec_row = pb.current_row
+        self.propellant_specs.grid(row=spec_row, column=0, sticky="nsew")
+        spec_scroll.grid(row=spec_row, rowspan=2, column=1, sticky="nsew")
+        pb.next()
+        spec_h_scroll.grid(row=pb.current_row, column=0, sticky="nsew")
+        pb.next()
 
         self.use_combustible = self.add_localized_label_check(
-            propellant_frame,
+            parent=propellant_frame,
             label_loc_key="combustibleLabel",
             tooltip_loc_key="combustibleText",
             skip_grid=True,
@@ -663,46 +569,39 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         combustible_frame = self.add_localized_label_frame(
             propellant_frame, labelwidget=self.use_combustible.check_widget
         )
-        combustible_frame.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        j += 1
+        combustible_frame.grid(row=pb.current_row, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        pb.next()
 
-        k = 0
-        self.combustible_mass_kg, k = (
-            self.add_localized_3_input(
-                combustible_frame,
-                label_loc_key="combustibleMassLabel",
-                default="0.0",
-                unit_text="kg",
-                desc_label_key="ωʹ",
-                dtype=float,
-                validation=validation_nn,
-                row=k,
-            ),
-            k + 1,
+        cb = RowBuilder(self)
+        self.combustible_mass_kg = cb.input_3(
+            parent=combustible_frame,
+            label_loc_key="combustibleMassLabel",
+            default="0.0",
+            unit_text="kg",
+            desc_label_key="ωʹ",
+            dtype=float,
+            validation=validation_nn,
         )
 
-        self.combustible_force_kJ__kg, k = (
-            self.add_localized_3_input(
-                combustible_frame,
-                label_loc_key="combustibleForceLabel",
-                default="750.0",
-                unit_text="kJ/kg",
-                desc_label_key="fʹ",
-                dtype=float,
-                validation=validation_nn,
-                row=k,
-            ),
-            k + 1,
+        self.combustible_force_kJ__kg = cb.input_3(
+            parent=combustible_frame,
+            label_loc_key="combustibleForceLabel",
+            default="750.0",
+            unit_text="kJ/kg",
+            desc_label_key="fʹ",
+            dtype=float,
+            validation=validation_nn,
         )
+
         force_fudge_frame = Frame(propellant_frame)
-        force_fudge_frame.grid(row=j, column=0, columnspan=2, sticky="nsew")
-        j += 1
+        force_fudge_frame.grid(row=pb.current_row, column=0, columnspan=2, sticky="nsew")
+        pb.next()
 
         force_fudge_frame.columnconfigure(0, weight=1)
         force_fudge_frame.rowconfigure(0, weight=1)
 
         self.force_fudge = self.add_localized_3_input(
-            force_fudge_frame,
+            parent=force_fudge_frame,
             label_loc_key="forceFudgeLabel",
             tooltip_loc_key="forceFudgeText",
             default="100.0",
@@ -711,24 +610,26 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             validation=validation_nn,
         )
 
-        sol_frm = self.add_localized_label_frame(mid_frame, label_loc_key="solFrmLabel")
-        sol_frm.grid(row=i, column=0, sticky="nsew", padx=2, pady=2)
-        i += 1
-        sol_frm.columnconfigure(0, weight=1)
+        ### solution_frame: IB model selection
+        solution_frame = self.add_localized_label_frame(calc_frame, label_loc_key="solFrmLabel")
+        solution_frame.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
+        solution_frame.columnconfigure(0, weight=1)
 
         self.drop_gradient = self.add_localized_dropdown(
-            parent=sol_frm,
+            parent=solution_frame,
             str_obj_dict={solution: solution for solution in (SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV)},
             desc_label_key="solFrmLabel",
         )
         self.drop_gradient.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
 
-        op_frm = self.add_localized_label_frame(mid_frame, label_loc_key="opFrmLabel")
-        op_frm.grid(row=4, column=0, sticky="nsew", padx=2, pady=2)
-        op_frm.columnconfigure(0, weight=1)
+        ### control_frame: constraints, sampling, accuracy
+        control_frame = self.add_localized_label_frame(calc_frame, label_loc_key="opFrmLabel")
+        control_frame.grid(row=2, column=0, sticky="nsew", padx=2, pady=2)
+        control_frame.columnconfigure(0, weight=1)
 
+        ob = RowBuilder(self)
         self.use_cons = self.add_localized_label_check(
-            parent=op_frm,
+            parent=control_frame,
             default=False,
             label_loc_key="consButton",
             desc_label_key="consButton",
@@ -736,165 +637,128 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             skip_grid=True,
         )
 
-        cons_frm = self.add_localized_label_frame(op_frm, labelwidget=self.use_cons.check_widget)
-        cons_frm.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        i += 1
+        cons_frm = self.add_localized_label_frame(control_frame, labelwidget=self.use_cons.check_widget)
+        cons_frm.grid(row=ob.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        ob.next()
         cons_frm.columnconfigure(0, weight=1)
 
-        j = 0
-        self.lock_Lg, j = (
-            self.add_localized_label_check(
-                parent=cons_frm,
-                row=j,
-                columnspan=3,
-                default=False,
-                label_loc_key="lockButton",
-                desc_label_key="lockButton",
-                tooltip_loc_key="lockText",
-            ),
-            j + 1,
+        ccb = RowBuilder(self)
+        self.lock_Lg = ccb.check(
+            parent=cons_frm,
+            columnspan=3,
+            default=False,
+            label_loc_key="lockButton",
+            desc_label_key="lockButton",
+            tooltip_loc_key="lockText",
         )
 
-        self.opt, j = (
-            self.add_localized_label_check(
-                parent=cons_frm,
-                row=j,
-                columnspan=3,
-                default=False,
-                desc_label_key="optButton",
-                label_loc_key="optButton",
-                tooltip_loc_key="optText",
-            ),
-            j + 1,
+        self.opt = ccb.check(
+            parent=cons_frm,
+            columnspan=3,
+            default=False,
+            desc_label_key="optButton",
+            label_loc_key="optButton",
+            tooltip_loc_key="optText",
         )
 
-        self.drop_opt_tgt = self.add_localized_dropdown(
+        self.drop_opt_tgt = ccb.dropdown(
             parent=cons_frm,
             str_obj_dict={MIN_BARR_VOLUME: MIN_BARR_VOLUME, MIN_PROJ_TRAVEL: MIN_PROJ_TRAVEL},
             desc_label_key="optTgtLabel",
-        )
-        self.drop_opt_tgt.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        j += 1
-
-        self.v_tgt, j = (
-            self.add_localized_3_input(
-                parent=cons_frm,
-                row=j,
-                label_loc_key="vTgtLabel",
-                unit_text="m/s",
-                default="1000.0",
-                validation=validation_nn,
-                dtype=float,
-            ),
-            j + 1,
+            grid_kwargs={"columnspan": 3},
         )
 
-        self.p_tgt, j = (
-            self.add_localized_3_input(
-                parent=cons_frm,
-                row=j,
-                label_loc_key="pTgtLabel",
-                unit_text="MPa",
-                default="350.0",
-                validation=validation_nn,
-                tooltip_loc_key="pTgtText",
-                dtype=float,
-            ),
-            j + 1,
+        self.v_tgt = ccb.input_3(
+            parent=cons_frm,
+            label_loc_key="vTgtLabel",
+            unit_text="m/s",
+            default="1000.0",
+            validation=validation_nn,
+            dtype=float,
         )
 
-        self.p_control = self.add_localized_dropdown(parent=cons_frm, desc_label_key="Pressure Constraint")
-        self.p_control.grid(row=j, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        j += 1
-
-        self.min_web, j = (
-            self.add_localized_3_input(
-                parent=cons_frm,
-                row=j,
-                label_loc_key="iniWebLabel",
-                unit_text="μm",
-                default="100.0",
-                validation=validation_nn,
-                color="red",
-                dtype=float,
-            ),
-            j + 1,
+        self.p_tgt = ccb.input_3(
+            parent=cons_frm,
+            label_loc_key="pTgtLabel",
+            unit_text="MPa",
+            default="350.0",
+            validation=validation_nn,
+            tooltip_loc_key="pTgtText",
+            dtype=float,
         )
-        self.lg_max, j = (
-            self.add_localized_3_input(
-                parent=cons_frm,
-                row=j,
-                label_loc_key="maxLgLabel",
-                unit_text="m",
-                default="10.0",
-                validation=validation_nn,
-                color="red",
-                dtype=float,
-            ),
-            j + 1,
+
+        self.p_control = ccb.dropdown(
+            parent=cons_frm, desc_label_key="Pressure Constraint", grid_kwargs={"columnspan": 3}
+        )
+
+        self.min_web = ccb.input_3(
+            parent=cons_frm,
+            label_loc_key="iniWebLabel",
+            unit_text="μm",
+            default="100.0",
+            validation=validation_nn,
+            color="red",
+            dtype=float,
+        )
+        self.lg_max = ccb.input_3(
+            parent=cons_frm,
+            label_loc_key="maxLgLabel",
+            unit_text="m",
+            default="10.0",
+            validation=validation_nn,
+            color="red",
+            dtype=float,
         )
 
         sample_frm = self.add_localized_label_frame(
-            op_frm, label_loc_key="sampleFrmLabel", style="SubLabelFrame.TLabelframe", tooltip_loc_key="sampText"
+            control_frame,
+            label_loc_key="sampleFrmLabel",
+            style="SubLabelFrame.TLabelframe",
+            tooltip_loc_key="sampText",
         )
-        sample_frm.grid(row=i, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        sample_frm.grid(row=ob.current_row, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
+        ob.next()
         sample_frm.columnconfigure(0, weight=1)
-        i += 1
 
-        j = 0
-
-        self.drop_domain = self.add_localized_dropdown(
+        sb = RowBuilder(self)
+        self.drop_domain = sb.dropdown(
             parent=sample_frm,
             str_obj_dict={domain: domain for domain in (DOMAIN_TIME, DOMAIN_LEN)},
             desc_label_key="sampleFrmLabel",
-        )
-        self.drop_domain.grid(row=j, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        j += 1
-
-        self.step, j = (
-            self.add_localized_2_input(
-                parent=sample_frm,
-                row=j,
-                label_loc_key="stepLabel",
-                default="33",
-                validation=validation_nn,
-                formatter=format_int_input,
-            ),
-            j + 1,
+            grid_kwargs={"columnspan": 2},
         )
 
-        self.acc_exp, i = (
-            self.add_localized_2_input(
-                parent=op_frm,
-                row=i,
-                label_loc_key="-log10(ε)",
-                default="3",
-                validation=validation_pi,
-                formatter=format_int_input,
-                color="red",
-                tooltip_loc_key="tolText",
-            ),
-            i + 1,
+        self.step = sb.input_2(
+            parent=sample_frm,
+            label_loc_key="stepLabel",
+            default="33",
+            validation=validation_nn,
+            formatter=format_int_input,
         )
 
-        self.max_iter, i = (
-            self.add_localized_2_input(
-                parent=op_frm,
-                row=i,
-                label_loc_key="maxIterLabel",
-                default="10",
-                validation=validation_pi,
-                formatter=format_int_input,
-                color="red",
-            ),
-            i + 1,
+        self.acc_exp = ob.input_2(
+            parent=control_frame,
+            label_loc_key="-log10(ε)",
+            default="3",
+            validation=validation_pi,
+            formatter=format_int_input,
+            color="red",
+            tooltip_loc_key="tolText",
         )
 
-        self.calc_button = ttk.Button(op_frm, text=self.get_loc_str("calcLabel"), command=self.on_calculate)
-        self.calc_button.grid(row=i, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.max_iter = ob.input_2(
+            parent=control_frame,
+            label_loc_key="maxIterLabel",
+            default="10",
+            validation=validation_pi,
+            formatter=format_int_input,
+            color="red",
+        )
 
-        op_frm.rowconfigure(i, weight=1)
-        i += 1
+        self.calc_button = ttk.Button(control_frame, text=self.get_loc_str("calcLabel"), command=self.on_calculate)
+        self.calc_button.grid(row=ob.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+
+        control_frame.rowconfigure(ob.current_row, weight=1)
 
         self.calc_button_tip = StringVar(value=self.get_loc_str("calcButtonText"))
         create_tool_tip(self.calc_button, self.calc_button_tip, font=self.font)
