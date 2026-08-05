@@ -49,12 +49,7 @@ from .ballistics import (
 )
 from .dispatch import calculate, guide
 from .info_frame import InfoFrame
-from .localized_widget import (
-    Descriptive,
-    Localizable,
-    LocalizableWidget,
-    LocalizedFrame,
-)
+from .localized_widget import Descriptive, LocalizableWidget, LocalizedFrame
 from .misc import (
     filenameize,
     format_int_input,
@@ -1579,7 +1574,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.notebook_frame.use_theme()
 
     @handle_error_wrapper(level=Log.WARNING)
-    def export_graph(self, save: Literal["main", "aux", "guide", "geom"]):
+    def export_graph(self, save: Literal["main", "aux", "geom", "guide"]):
         file_name = filedialog.asksaveasfilename(
             title=self.get_loc_str("exportGraphLabel"),
             filetypes=(("Portable Network Graphics", "*.png"),),
@@ -1593,8 +1588,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             fig = self.notebook_frame.aux_canvas.figure
         elif save == "guide":
             fig = self.notebook_frame.guide_canvas.figure
-        elif save == "geom":
-            fig = self.notebook_frame.geom_canvas.figure
+        # elif save == "geom":
+        #     fig = self.notebook_frame.geom_canvas.figure
         else:
             raise ValueError("unknown save target.")
 

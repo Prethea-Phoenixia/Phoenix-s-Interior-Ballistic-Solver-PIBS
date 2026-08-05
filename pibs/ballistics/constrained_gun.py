@@ -115,7 +115,7 @@ class ConstrainedGun(Constrained):
                 raise ValueError("Unknown Solution")
 
         phi = self.phi_1 + labda_2 * w / self.m * cc
-        v_j = (2 * self.f * w / (self.theta * phi * self.m)) ** 0.5
+        v_j: float = (2 * self.f * w / (self.theta * phi * self.m)) ** 0.5
         v_bar_d = self.v_d / v_j
 
         if self.ambient_density:
@@ -292,10 +292,10 @@ conditions is {v_j:.4g} m/s."
             v_bar_m, (t_bar_m, z_m, l_bar_m) = v_t_z_l_record[-1]
             p_max = func_p_control_bar(z_m, l_bar_m, v_bar_m) * self.f * delta
             v_max = v_bar_m * v_j
-            lmax = l_bar_m * l_0
+            l_max = l_bar_m * l_0
             raise ValueError(
                 "Integration appears to be approaching asymptote, "
-                + f"last calculated to v = {v_max:.4g} m/s, x = {lmax:.4g} m, p = {p_max * 1e-6:.4g} MPa. "
+                + f"last calculated to v = {v_max:.4g} m/s, x = {l_max:.4g} m, p = {p_max * 1e-6:.4g} MPa. "
                 + "This indicates an excessive velocity target relative to pressure developed."
             )
 

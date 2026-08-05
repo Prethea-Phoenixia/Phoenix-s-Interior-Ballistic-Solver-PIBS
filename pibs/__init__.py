@@ -7,7 +7,7 @@ import sys
 DESCRIPTION = "Description"
 FONTNAME = "Sarasa Fixed SC"
 FONTSIZE = 9
-BOLDSIZE = 10
+BOLDSIZE = 9
 
 
 THEMES = {
@@ -20,7 +20,7 @@ THEMES = {
 
 root_logger = logging.getLogger(__name__)
 root_logger.setLevel(logging.INFO)
-log_formatter = logging.Formatter("%(asctime)s %(module)s.%(funcName)s: %(message)s")
+log_formatter = logging.Formatter("%(asctime)s.%(msecs)03d - %(module)s.%(funcName)s: %(message)s", datefmt="%H:%M:%S")
 handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(log_formatter)
 root_logger.addHandler(handler)

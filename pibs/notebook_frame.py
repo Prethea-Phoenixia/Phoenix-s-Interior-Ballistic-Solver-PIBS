@@ -114,8 +114,8 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         self.description = Text(
             desc_frm,
             wrap="word",
-            height=40,
-            width=80,
+            height=0,
+            width=0,
             yscrollcommand=desc_scroll.set,
             font=(FONTNAME, FONTSIZE),
             undo=True,
@@ -145,7 +145,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         err_scroll = ttk.Scrollbar(error_frm, orient="vertical")
         err_scroll.grid(row=0, column=1, sticky="nsew")
         self.error_text = Text(
-            error_frm, yscrollcommand=err_scroll.set, wrap="word", height=40, width=80, font=(FONTNAME, FONTSIZE)
+            error_frm, yscrollcommand=err_scroll.set, wrap="word", height=0, width=0, font=(FONTNAME, FONTSIZE)
         )
         self.error_text.grid(row=0, column=0, sticky="nsew")
 
@@ -196,7 +196,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         plot_place_frm = Frame(plot_label_frame)
         plot_place_frm.grid(row=0, column=0, sticky="nsew", columnspan=3)
 
-        fig = Figure(dpi=None, layout="constrained")
+        fig = Figure(dpi=None, figsize=None, layout="constrained")
         self.fig_canvas = FigureCanvasTkAgg(fig, master=plot_place_frm)
         self.fig_canvas.get_tk_widget().place(relheight=1, relwidth=1)
 
@@ -621,8 +621,9 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
                 geom_ax.minorticks_on()
                 geom_ax.set_xlim(left=0, right=prop.z_b)
                 geom_ax.xaxis.set_ticks([i * 0.5 for i in range(math.ceil(min(prop.z_b, 2) / 0.5) + 1)])
+
                 geom_ax.set_ylim(bottom=0, top=max(ys))
-                geom_ax.yaxis.set_ticks([i * 0.25 for i in range(math.ceil(max(ys) / 0.25) + 1)])
+                geom_ax.yaxis.set_ticks([i * 0.5 for i in range(math.ceil(max(ys) / 0.5) + 1)])
 
             self.geom_canvas.draw_idle()
 
