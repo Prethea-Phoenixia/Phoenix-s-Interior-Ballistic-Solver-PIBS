@@ -602,17 +602,26 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
 class RowBuilder:
     """Helper to build vertically stacked widgets with automatic row management.
 
-    Each instance tracks rows for a single parent frame. Create a new builder
-    (or reset) when switching to a different parent frame.
+    Tracks both the parent frame (for widget placement) and the current row.
+    Create a new builder (or call set_parent) when switching to a different frame.
+
+    Usage:
+        b = RowBuilder(localized_frame, parent_frame)
+        self.cal_mm = b.input_3(label_loc_key="calLabel", unit_text="mm", default="50.0")
     """
 
-    def __init__(self, localized_frame: LocalizedFrame, start_row: int = 0) -> None:
+    def __init__(self, localized_frame: LocalizedFrame, parent: ttk.Widget, start_row: int = 0) -> None:
         self.localized_frame = localized_frame
+        self.parent = parent
         self.row = start_row
 
     @property
     def current_row(self) -> int:
         return self.row
+
+    def set_parent(self, parent: ttk.Widget, start_row: int = 0) -> None:
+        self.parent = parent
+        self.row = start_row
 
     def reset(self, start_row: int = 0) -> None:
         self.row = start_row
@@ -622,29 +631,34 @@ class RowBuilder:
         return self.row
 
     def input_3(self, **kwargs) -> Loc3Input:
+        kwargs.setdefault("parent", self.parent)
         kwargs.setdefault("row", self.row)
         widget = self.localized_frame.add_localized_3_input(**kwargs)
         self.row += 1
         return widget
 
     def input_2(self, **kwargs) -> Loc2Input:
+        kwargs.setdefault("parent", self.parent)
         kwargs.setdefault("row", self.row)
         widget = self.localized_frame.add_localized_2_input(**kwargs)
         self.row += 1
         return widget
 
     def dropdown(self, grid_kwargs: dict[str, Any] | None = None, **kwargs) -> LocDropdown:
+        kwargs.setdefault("parent", self.parent)
         widget = self.localized_frame.add_localized_dropdown(**kwargs)
         widget.grid(row=self.row, sticky="nsew", padx=2, pady=2, **(grid_kwargs or {}))
         self.row += 1
         return widget
 
     def label_frame(self, **kwargs) -> LocLabelFrame:
+        kwargs.setdefault("parent", self.parent)
         widget = self.localized_frame.add_localized_label_frame(**kwargs)
         self.row += 1
         return widget
 
     def check(self, **kwargs) -> LocLabelCheck:
+        kwargs.setdefault("parent", self.parent)
         kwargs.setdefault("row", self.row)
         widget = self.localized_frame.add_localized_label_check(**kwargs)
         self.row += 1

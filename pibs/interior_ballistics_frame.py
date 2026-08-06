@@ -222,16 +222,14 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         specs_frame = self.add_localized_label_frame(design_frame, label_loc_key="specFrmLabel")
         specs_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
-        sb = RowBuilder(self)
+        sb = RowBuilder(self, specs_frame)
         self.type_optn = sb.dropdown(
-            parent=specs_frame,
             str_obj_dict={gun_type: gun_type for gun_type in (CONVENTIONAL, RECOILLESS)},
             desc_label_key="typeLabel",
             grid_kwargs={"columnspan": 3},
         )
 
         self.cal_mm = sb.input_3(
-            parent=specs_frame,
             label_loc_key="calLabel",
             unit_text="mm",
             default="50.0",
@@ -240,7 +238,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.tbl_mm = sb.input_3(
-            parent=specs_frame,
             label_loc_key="tblLabel",
             unit_text="mm",
             default="3500.0",
@@ -249,7 +246,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.sht_kg = sb.input_3(
-            parent=specs_frame,
             label_loc_key="shtLabel",
             unit_text="kg",
             default="2.0",
@@ -258,7 +254,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.chg_kg = sb.input_3(
-            parent=specs_frame,
             label_loc_key="chgLabel",
             unit_text="kg",
             default="0.5",
@@ -272,16 +267,14 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.grain_frame.grid(row=1, column=0, sticky="nsew", padx=2, pady=2)
         self.grain_frame.columnconfigure(0, weight=1)
 
-        gb = RowBuilder(self)
+        gb = RowBuilder(self, self.grain_frame)
         self.main_geom = gb.dropdown(
-            parent=self.grain_frame,
             str_obj_dict=Geometry.get_desc_geometry_dict(),
             desc_label_key="Grain Geometry",
             grid_kwargs={"columnspan": 3},
         )
 
         self.web_mm = gb.input_3(
-            parent=self.grain_frame,
             desc_label_key="Web",
             unit_text="mm",
             default="1.0",
@@ -290,7 +283,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.grain_r1 = gb.input_3(
-            parent=self.grain_frame,
             desc_label_key="1/α",
             unit_text="x",
             default="1.0",
@@ -300,7 +292,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.grain_r2 = gb.input_3(
-            parent=self.grain_frame,
             desc_label_key="1/β",
             unit_text="x",
             default="10.0",
@@ -324,9 +315,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         aux_row = gb.current_row
         self.aux_grain_frm.columnconfigure(1, weight=1)
 
-        ab = RowBuilder(self)
+        ab = RowBuilder(self, self.aux_grain_frm)
         self.aux_mass_ratio = ab.input_3(
-            parent=self.aux_grain_frm,
             label_loc_key="auxMassRatio",
             default="1.0",
             unit_text="x",
@@ -335,14 +325,12 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.aux_geom = ab.dropdown(
-            parent=self.aux_grain_frm,
             str_obj_dict=Geometry.get_desc_geometry_dict(),
             desc_label_key="Auxiliary Grain Geometry",
             grid_kwargs={"columnspan": 3},
         )
 
         self.aux_web_ratio = ab.input_3(
-            parent=self.aux_grain_frm,
             default="1.0",
             unit_text="x",
             label_loc_key="auxWebRatio",
@@ -351,7 +339,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.aux_grain_r1 = ab.input_3(
-            parent=self.aux_grain_frm,
             unit_text="x",
             default="1.0",
             desc_label_key="Auxiliary 1/α",
@@ -361,7 +348,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.aux_grain_r2 = ab.input_3(
-            parent=self.aux_grain_frm,
             unit_text="x",
             default="10.0",
             desc_label_key="Auxiliary 1/β",
@@ -374,7 +360,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         ### barrel/charge settings in specs_frame
         self.cv_L = sb.input_3(
-            parent=specs_frame,
             label_loc_key="cvLabel",
             unit_text="L",
             default="1.0",
@@ -383,7 +368,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.clr = sb.input_3(
-            parent=specs_frame,
             label_loc_key="clrLabel",
             unit_text="x",
             default="1.5",
@@ -393,7 +377,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.dgc = sb.input_3(
-            parent=specs_frame,
             label_loc_key="dgcLabel",
             unit_text="%",
             default="3.0",
@@ -403,7 +386,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.stp_MPa = sb.input_3(
-            parent=specs_frame,
             label_loc_key="stpLabel",
             unit_text="MPa",
             default="30.0",
@@ -413,7 +395,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.nozz_exp = sb.input_3(
-            parent=specs_frame,
             label_loc_key="nozzExpLabel",
             unit_text="x",
             default="4.0",
@@ -423,7 +404,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.nozz_eff = sb.input_3(
-            parent=specs_frame,
             label_loc_key="nozzEffLabel",
             unit_text="%",
             default="92.0",
@@ -445,9 +425,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         material_frame.grid(row=2, column=0, sticky="nsew", padx=2, pady=2)
         material_frame.columnconfigure(0, weight=1)
 
-        mb = RowBuilder(self)
+        mb = RowBuilder(self, material_frame)
         self.material_density = mb.input_3(
-            parent=material_frame,
             label_loc_key="matDensityLabel",
             unit_text="kg/m³",
             default="7850.0",
@@ -455,7 +434,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             dtype=float,
         )
         self.material_yield = mb.input_3(
-            parent=material_frame,
             label_loc_key="matYieldLabel",
             unit_text="MPa",
             default="1000.0",
@@ -464,7 +442,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.material_ssf = mb.input_2(
-            parent=material_frame,
             label_loc_key="sffLabel",
             default="1.35",
             validation=validation_nn,
@@ -489,9 +466,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         design_frame.rowconfigure(4, weight=1)
 
         environment_frame.columnconfigure(0, weight=1)
-        eb = RowBuilder(self)
+        eb = RowBuilder(self, environment_frame)
         self.amb_p = eb.input_3(
-            parent=environment_frame,
             label_loc_key="ambPresLabel",
             unit_text="kPa",
             default="101.325",
@@ -499,7 +475,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             dtype=float,
         )
         self.amb_rho = eb.input_3(
-            parent=environment_frame,
             label_loc_key="ambRhoLabel",
             unit_text="kg/m³",
             default="1.204",
@@ -508,7 +483,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.amb_gamma = eb.input_3(
-            parent=environment_frame,
             label_loc_key="ambGamLabel",
             default="1.400",
             validation=validation_nn,
@@ -526,9 +500,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         propellant_frame.rowconfigure(1, weight=1)
         propellant_frame.columnconfigure(0, weight=1)
 
-        pb = RowBuilder(self)
+        pb = RowBuilder(self, propellant_frame)
         self.drop_prop = pb.dropdown(
-            parent=propellant_frame,
             str_obj_dict=Composition.read_file(resolve_path("ballistics/resource/propellants.csv")),
             desc_label_key="propFrmLabel",
             tooltip_loc_key="specsText",
@@ -572,9 +545,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         combustible_frame.grid(row=pb.current_row, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         pb.next()
 
-        cb = RowBuilder(self)
+        cb = RowBuilder(self, combustible_frame)
         self.combustible_mass_kg = cb.input_3(
-            parent=combustible_frame,
             label_loc_key="combustibleMassLabel",
             default="0.0",
             unit_text="kg",
@@ -584,7 +556,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.combustible_force_kJ__kg = cb.input_3(
-            parent=combustible_frame,
             label_loc_key="combustibleForceLabel",
             default="750.0",
             unit_text="kJ/kg",
@@ -627,7 +598,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         control_frame.grid(row=2, column=0, sticky="nsew", padx=2, pady=2)
         control_frame.columnconfigure(0, weight=1)
 
-        ob = RowBuilder(self)
+        ob = RowBuilder(self, control_frame)
         self.use_cons = self.add_localized_label_check(
             parent=control_frame,
             default=False,
@@ -642,9 +613,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         ob.next()
         cons_frm.columnconfigure(0, weight=1)
 
-        ccb = RowBuilder(self)
+        ccb = RowBuilder(self, cons_frm)
         self.lock_Lg = ccb.check(
-            parent=cons_frm,
             columnspan=3,
             default=False,
             label_loc_key="lockButton",
@@ -653,7 +623,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.opt = ccb.check(
-            parent=cons_frm,
             columnspan=3,
             default=False,
             desc_label_key="optButton",
@@ -662,14 +631,12 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.drop_opt_tgt = ccb.dropdown(
-            parent=cons_frm,
             str_obj_dict={MIN_BARR_VOLUME: MIN_BARR_VOLUME, MIN_PROJ_TRAVEL: MIN_PROJ_TRAVEL},
             desc_label_key="optTgtLabel",
             grid_kwargs={"columnspan": 3},
         )
 
         self.v_tgt = ccb.input_3(
-            parent=cons_frm,
             label_loc_key="vTgtLabel",
             unit_text="m/s",
             default="1000.0",
@@ -678,7 +645,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.p_tgt = ccb.input_3(
-            parent=cons_frm,
             label_loc_key="pTgtLabel",
             unit_text="MPa",
             default="350.0",
@@ -687,12 +653,9 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             dtype=float,
         )
 
-        self.p_control = ccb.dropdown(
-            parent=cons_frm, desc_label_key="Pressure Constraint", grid_kwargs={"columnspan": 3}
-        )
+        self.p_control = ccb.dropdown(desc_label_key="Pressure Constraint", grid_kwargs={"columnspan": 3})
 
         self.min_web = ccb.input_3(
-            parent=cons_frm,
             label_loc_key="iniWebLabel",
             unit_text="μm",
             default="100.0",
@@ -701,7 +664,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             dtype=float,
         )
         self.lg_max = ccb.input_3(
-            parent=cons_frm,
             label_loc_key="maxLgLabel",
             unit_text="m",
             default="10.0",
@@ -720,16 +682,14 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         ob.next()
         sample_frm.columnconfigure(0, weight=1)
 
-        sb = RowBuilder(self)
+        sb = RowBuilder(self, sample_frm)
         self.drop_domain = sb.dropdown(
-            parent=sample_frm,
             str_obj_dict={domain: domain for domain in (DOMAIN_TIME, DOMAIN_LEN)},
             desc_label_key="sampleFrmLabel",
             grid_kwargs={"columnspan": 2},
         )
 
         self.step = sb.input_2(
-            parent=sample_frm,
             label_loc_key="stepLabel",
             default="33",
             validation=validation_nn,
@@ -737,7 +697,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.acc_exp = ob.input_2(
-            parent=control_frame,
             label_loc_key="-log10(ε)",
             default="3",
             validation=validation_pi,
@@ -747,7 +706,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.max_iter = ob.input_2(
-            parent=control_frame,
             label_loc_key="maxIterLabel",
             default="10",
             validation=validation_pi,
@@ -1452,8 +1410,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             fig = self.notebook_frame.aux_canvas.figure
         elif save == "guide":
             fig = self.notebook_frame.guide_canvas.figure
-        # elif save == "geom":
-        #     fig = self.notebook_frame.geom_canvas.figure
+        elif save == "geom":
+            fig = self.notebook_frame.geom_canvas.figure
         else:
             raise ValueError("unknown save target.")
 
