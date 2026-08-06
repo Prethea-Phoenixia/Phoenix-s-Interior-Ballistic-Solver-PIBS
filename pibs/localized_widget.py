@@ -603,7 +603,7 @@ class RowBuilder:
     """Helper to build vertically stacked widgets with automatic row management.
 
     Tracks both the parent frame (for widget placement) and the current row.
-    Create a new builder (or call set_parent) when switching to a different frame.
+    Create a new builder for each parent frame.
 
     Usage:
         b = RowBuilder(localized_frame, parent_frame)
@@ -618,10 +618,6 @@ class RowBuilder:
     @property
     def current_row(self) -> int:
         return self.row
-
-    def set_parent(self, parent: ttk.Widget, start_row: int = 0) -> None:
-        self.parent = parent
-        self.row = start_row
 
     def reset(self, start_row: int = 0) -> None:
         self.row = start_row
