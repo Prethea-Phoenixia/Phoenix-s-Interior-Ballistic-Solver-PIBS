@@ -26,6 +26,7 @@ from .constrained import Constrained
 
 
 class ConstrainedGun(Constrained):
+
     def __init__(
         self,
         caliber: float,
@@ -44,7 +45,7 @@ class ConstrainedGun(Constrained):
         ambient_pressure: float = 101.325e3,
         ambient_adb_index: float = 1.4,
         control: Points = POINT_PEAK_AVG,
-        max_iteration: int = MAX_ITER,
+        max_iterations: int = MAX_ITER,
         logger: logging.Logger | None = None,
         **_,
     ):
@@ -68,7 +69,7 @@ class ConstrainedGun(Constrained):
         )
 
         self.sol = sol
-        self.max_iteration = max_iteration
+        self.max_iterations = max_iterations
 
     def to_json(self) -> str:
         return json.dumps(
@@ -103,6 +104,9 @@ class ConstrainedGun(Constrained):
 
         if cc is None:
             cc = 1 - (1 - 1 / self.chi_k) * log(l_bar_g_0 + 1) / l_bar_g_0
+        """
+        张小兵，金志明（2014），《枪炮内弹道学》，北京理工大学出版社，pp 70 (1-128)
+        """
 
         if any((labda_1 is None, labda_2 is None)):
             if self.sol == SOL_LAGRANGE:
@@ -116,19 +120,19 @@ class ConstrainedGun(Constrained):
 
         phi = self.phi_1 + labda_2 * w / self.m * cc
         v_j: float = (2 * self.f * w / (self.theta * phi * self.m)) ** 0.5
-        v_bar_d = self.v_d / v_j
 
+        if v_j < self.v_d and not known_bore:
+            raise ValueError(
+                f"Design velocity cannot be achieved with the current load conditions. The 2nd ballistic limit for this loading \
+        conditions is {v_j:.4g} m/s."
+            )
+
+        v_bar_d = self.v_d / v_j
         if self.ambient_density:
             c_a_bar = (self.ambient_adb_index * self.ambient_pressure / self.ambient_density) ** 0.5 / v_j
             p_a_bar = self.ambient_pressure / (self.f * delta)
         else:
             c_a_bar, p_a_bar = 0, 0
-
-        if v_j < self.v_d and not known_bore:
-            raise ValueError(
-                f"Propellant load too low to achieve design velocity. The 2nd ballistic limit for this loading \
-conditions is {v_j:.4g} m/s."
-            )
 
         psi_0 = (1 / delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
         z_0, _ = dekker(self.propellant.f_psi_z, 0, 1, y=psi_0, y_rel_tol=self.tol)
@@ -310,7 +314,7 @@ conditions is {v_j:.4g} m/s."
             )
         cc_n = 1 - (1 - 1 / self.chi_k) * log(l_bar_g + 1) / l_bar_g
         l_g = l_bar_g * l_0
-        if abs((l_bar_g - l_bar_g_0) / min(l_bar_g, l_bar_g_0)) > self.tol and it < self.max_iteration:
+        if abs((l_bar_g - l_bar_g_0) / min(l_bar_g, l_bar_g_0)) > self.tol and it < self.max_iterations:
             return self.solve(
                 load_fraction=load_fraction,
                 charge_mass_ratio=charge_mass_ratio,

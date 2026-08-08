@@ -147,7 +147,7 @@ class Constrained(DelegatesPropellant, JSONable):
         load_fraction: float,
         charge_mass_ratio: float,
         length_gun: float | None = None,
-        max_iteration: int = MAX_ITER,
+        max_iterations: int = MAX_ITER,
         labda_1: float | None = None,
         labda_2: float | None = None,
         cc: float | None = None,

@@ -4,9 +4,9 @@ import logging
 import sys
 import traceback
 from math import inf
-from typing import Callable, TypeVar
+from typing import Callable, TypeVar, Sequence
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Sequence[float])
 logger = logging.getLogger(__name__)
 
 
@@ -31,7 +31,7 @@ def rkf(
     rel_tol: float,
     abs_tol: float = 1e-16,
     min_tol: float = 1e-16,
-    abort_func: Callable[[float, T, list[tuple[float, T]]], bool] = None,
+    abort_func: Callable[[float, T, list[tuple[float, T]]], bool] | None = None,
     record: list[tuple[float, T]] = None,
     debug: bool = False,
     alphas: tuple[float, ...] = (),

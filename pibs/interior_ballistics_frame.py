@@ -92,7 +92,8 @@ class TextHandler(logging.Handler):
             self.text.configure(state="normal")
 
             # use record name as tags
-            tags = record.name.split(".")
+            # tags = record.name.split(".")
+            tags = []
             self.text.insert("end", msg.strip("\n") + "\n", [record.levelno, *tags])
             self.text.configure(state="disabled")
 
@@ -956,7 +957,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         for loc in self.localized_widgets:
             loc.reset() if isinstance(loc, Descriptive) else None
 
-        self.notebook_frame.reset_entries()
         self.name_var.set(self.get_loc_str("newDesign"))
         self.notebook_frame.set_description("")
         self.gun, self.gun_result, self.guide_result = None, None, None
@@ -974,7 +974,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     def change_lang(self):
         super().change_lang()
         self.info_frame.change_lang()
-
         self.notebook_frame.change_lang()
 
         self.menubar.entryconfig(1, label=self.get_loc_str("dataLabel"))
@@ -1075,7 +1074,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 "max_cmr": float(self.notebook_frame.guide_max_cmr.get()),
                 "step_cmr": float(self.notebook_frame.guide_step_cmr.get()),
                 "step_lf": float(self.notebook_frame.guide_step_lf.get()) * 1e-2,
-                "max_iteration": int(self.max_iter.get()),
+                "max_iterations": int(self.max_iter.get()),
                 "opt_target": self.drop_opt_tgt.get_obj(),
             }
 

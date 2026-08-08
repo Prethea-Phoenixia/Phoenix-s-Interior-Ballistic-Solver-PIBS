@@ -106,7 +106,7 @@ def guide_graph(*_, logger: logging.Logger | None = None, **kwargs):
         ascii=False,
         miniters=1,
         ncols=40,
-        bar_format="[{elapsed_s:5.1f}s]{bar}[{remaining_s:5.1f}s]{percentage:5.1f}%",
+        bar_format="{percentage:5.1f}%",
         smoothing=0.3,
     )
 
@@ -132,10 +132,10 @@ def guide_graph(*_, logger: logging.Logger | None = None, **kwargs):
     logger.info(f"Dispatching {processes} processes for finding maximum load fractions.")
 
     with multiprocessing.Pool(processes=processes) as pool:
-        lfmaxs = pool.map(func=target.maximum_load_fraction, iterable=tqdm(cmrs, **tqdm_kwargs))
+        lf_maxs = pool.map(func=target.maximum_load_fraction, iterable=tqdm(cmrs, **tqdm_kwargs))
 
     parameters = []
-    for charge_mass_ratio, max_lf in zip(cmrs, lfmaxs):
+    for charge_mass_ratio, max_lf in zip(cmrs, lf_maxs):
         load_fraction = target.minimum_load_fraction
 
         while load_fraction < max_lf + 0.5 * step_lf:

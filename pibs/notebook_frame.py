@@ -282,12 +282,13 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
             self.add_localized_3_input(
                 guide_input_frame,
                 label_loc_key=locKey,
-                # desc_label_key=None,
+                desc_label_key=None,
                 default=default,
                 unit_text=unit,
                 validation=validation,
                 row=j,
                 dtype=float,
+                label_width=25,
             )
             for j, (locKey, default, unit, validation) in enumerate(
                 (
@@ -764,10 +765,6 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         self.description.delete(1.0, "end")
         self.description.insert("end", description)
         self.description.edit_reset()
-
-    def reset_entries(self):
-        for loc in self.localized_widgets:
-            loc.reset() if isinstance(loc, Descriptive) else None
 
     def on_state_change(self, type_option: str) -> None:
 

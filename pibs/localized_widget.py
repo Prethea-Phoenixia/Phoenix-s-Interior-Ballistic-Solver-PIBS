@@ -85,6 +85,10 @@ class LocalizableWidget(Localizable):
 
 
 class Descriptive(ABC):
+
+    @abstractmethod
+    def get(self): ...
+
     @abstractmethod
     def get_descriptive(self) -> str:
         """
@@ -386,7 +390,7 @@ class Loc3Input(Loc2Input):
         self.unit_label.grid()
 
     def get_descriptive(self) -> str:
-        if self.desc_label_key is None:  # None, explicit exclude
+        if self.desc_label_key is None:
             return ""
         else:
             return super().get_descriptive() + (f" ({self.unit_text})" if self.unit_text else "")
@@ -588,11 +592,11 @@ class LocLabelCheck(LocalizableWidget, Descriptive):
         super().disinhibit()
 
     def get_descriptive(self) -> str:
-        if self.desc_label_key is None:  # None, explicit exclude
+        if self.desc_label_key is None:  # None, returns "" which is falsey -> explicitly excluded from saving
             return ""
-        elif self.desc_label_key:  # str, include with label.
+        elif self.desc_label_key:  # str, truthy -> saved
             return self.loc_func(self.desc_label_key, True)
-        else:  # "", defers to label
+        else:  # "", returns the label_loc_key or a localization thereof -> saved
             return self.loc_func(self.label_loc_key, True)
 
     def reset(self, *args) -> None:
@@ -676,7 +680,11 @@ class LocalizedFrame(Frame):
         super().__init__(master, *args, **kwargs)
         self.localization_dict = localization_dict
 
-        self.localized_widgets: list[LocalizableWidget] = []
+        if isinstance(master, LocalizedFrame):
+            self.localized_widgets = master.localized_widgets
+        else:
+            self.localized_widgets: list[LocalizableWidget] = []
+
         self.font = font
 
         if isinstance(master, (Toplevel, Tk)):  # if this LocalizedFrame acts as the top-level frame:

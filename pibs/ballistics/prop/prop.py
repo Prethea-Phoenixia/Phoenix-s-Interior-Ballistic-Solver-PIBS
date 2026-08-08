@@ -26,7 +26,6 @@ class Geometry(ABC, JSONable):
 
     @classmethod
     def from_json(cls, json_dict: dict) -> Geometry:
-        print(json_dict)
         desc = json_dict["desc"]
         for geometry in Geometry.all_geometries:
             if geometry.desc == desc:
@@ -34,15 +33,6 @@ class Geometry(ABC, JSONable):
         raise ValueError(f"unknown desc: {desc}")
 
     def to_json(self) -> str:
-        print("HERE")
-        print(
-            json.dumps(
-                {
-                    "desc": self.desc,
-                },
-                ensure_ascii=False,
-            )
-        )
         return json.dumps(
             {
                 "desc": self.desc,
@@ -352,7 +342,7 @@ class Propellant(JSONable):
         self.force_fudge = force_fudge
 
         if not (0 <= self.combustible_fraction <= 1):
-            raise ValueError("Combustible fraction should be in [0,1]")
+            raise ValueError(f"Combustible fraction should be in [0,1], but got {self.combustible_fraction}")
 
         if self.mass_ratio > 0 and z_b2 > self.z_b / self.web_ratio:
             raise ValueError("Auxiliary grains must complete combustion in advance of the primary grains.")
