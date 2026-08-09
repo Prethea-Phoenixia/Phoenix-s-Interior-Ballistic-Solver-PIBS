@@ -15,8 +15,15 @@
 
 - **Entry**: `run_pibs.py` → `pibs.interior_ballistics.main()` → `PIBS(Tk)` → `InteriorBallisticsFrame`
 - **UI layer**: `pibs/interior_ballistics_frame.py`, `notebook_frame.py`, `info_frame.py`, `table_frame.py` (tkinter + matplotlib)
-- **Ballistics core**: `pibs/ballistics/` — `gun.py`, `recoilless.py`, `constrained*.py`, `num/` (RK45/UMF integrators), `prop/` (propellant models)
+- **Config**: `pibs/config.py` — `SimulationConfig` dataclass (all fields required, no defaults except `logger`). UI gathers values into this; dispatch passes it to ballistics core.
+- **Ballistics core**: `pibs/ballistics/` — `gun.py`, `recoilless.py`, `constrained*.py`, `config.py` (typed dataclasses: `GunGeometry`, `PropellantLoad`, `Solver`, etc.), `num/` (RK45/UMF integrators), `prop/` (propellant models)
+- **Dispatch**: `pibs/dispatch.py` — `calculate()` and `guide()` run in separate processes; `sim_config_to_ballistics()` converts `SimulationConfig` to ballistics objects.
 - **Resources**: loaded via `resolve_path()` from `pibs/misc.py` — handles both dev mode and frozen PyInstaller builds.
+
+## Save / Load
+
+- Save files use **widget descriptive strings** as JSON keys (from `loc.get_descriptive()`), NOT magic keys.
+- Load matches JSON keys to widgets via `loc_dict`; no round-trip through `SimulationConfig`.
 
 ## Localization
 
@@ -29,6 +36,20 @@
 - Widgets do **not** self-grid in `__init__`; they are placed via a `place(row, col, ...)` method called by `RowBuilder`.
 - `RowBuilder` is the single source of truth for row placement — don't mix direct `.grid()` calls with RowBuilder-managed widgets.
 - For checkboxes used as LabelFrame headers: use `widget.as_labelwidget()` instead of `.place()`.
+
+## Documentation Policy
+
+**CRITICAL: Preserve technical/research documentation.**
+
+- Code docstrings that describe API usage can be updated or removed during refactors.
+- **Technical documentation must never be deleted** — this includes:
+  - Textbook/paper references (e.g., 金 2014, Hunt 1953, 鲍廷钰 1995)
+  - Mathematical formulas and derivations
+  - Physics explanations (ODE domains, pressure conversions, nozzle theory)
+  - ASCII diagrams explaining geometry or flow
+  - Citations to specific equations or page numbers
+- When refactoring, **move** technical docs to their new location — never drop them.
+- Before committing a refactor that touches ballistics code (`gun.py`, `recoilless.py`, `constrained*.py`), compare against the previous version to ensure no technical docs were lost.
 
 ## Packaging
 
