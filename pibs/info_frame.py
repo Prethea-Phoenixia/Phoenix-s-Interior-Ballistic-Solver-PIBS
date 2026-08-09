@@ -11,7 +11,7 @@ from .ballistics import (
 )
 from .ballistics.gun import GunResult
 from .ballistics.recoilless import RecoillessResult
-from .localized_widget import LocalizedFrame
+from .localized_widget import LocalizedFrame, RowBuilder
 from .misc import format_mass, round_sig, to_si
 
 
@@ -26,53 +26,23 @@ class InfoFrame(LocalizedFrame):
         par_frm.grid(row=0, column=0, sticky="nsew")
         par_frm.columnconfigure(0, weight=1)
 
-        i = 0
-        self.ammo, i = (self.add_localized_2_line_display(parent=par_frm, row=i, label_loc_key="ammoLabel"), i + 2)
-        self.pp, i = (
-            self.add_localized_3_line_display(parent=par_frm, row=i, label_loc_key="ppLabel", tooltip_loc_key="ppText"),
-            i + 3,
-        )
-        self.bop, i = self.add_localized_2_line_display(parent=par_frm, row=i, label_loc_key="bopLabel"), i + 2
-        self.lx, i = (
-            self.add_localized_3_line_display(
-                parent=par_frm, row=i, label_loc_key="lxLabel", tooltip_loc_key="calLxText"
-            ),
-            i + 3,
-        )
-        self.mv, i = self.add_localized_2_line_display(parent=par_frm, row=i, label_loc_key="mvLabel"), i + 2
-        self.va, i = (
-            self.add_localized_2_line_display(
-                parent=par_frm, row=i, label_loc_key="vaLabel", tooltip_loc_key="vinfText"
-            ),
-            i + 2,
-        )
-        self.te, i = (
-            self.add_localized_2_line_display(
-                parent=par_frm, row=i, label_loc_key="teffLabel", tooltip_loc_key="teffText"
-            ),
-            i + 2,
-        )
-        self.be, i = (
-            self.add_localized_2_line_display(
-                parent=par_frm, row=i, label_loc_key="beffLabel", tooltip_loc_key="beffText"
-            ),
-            i + 2,
-        )
-        self.pe, i = (
-            self.add_localized_2_line_display(
-                parent=par_frm, row=i, label_loc_key="peffLabel", tooltip_loc_key="peffText"
-            ),
-            i + 2,
-        )
-        self.pa, i = self.add_localized_2_line_display(parent=par_frm, row=i, label_loc_key="paLabel"), i + 2
-        self.gm, i = self.add_localized_2_line_display(parent=par_frm, row=i, label_loc_key="gmLabel"), i + 2
-        self.sj, i = self.add_localized_2_line_display(parent=par_frm, row=i, label_loc_key="sjLabel"), i + 2
+        b = RowBuilder(self, par_frm)
+        self.ammo = b.display_2(label_loc_key="ammoLabel")
+        self.pp = b.display_3(label_loc_key="ppLabel", tooltip_loc_key="ppText")
+        self.bop = b.display_2(label_loc_key="bopLabel")
+        self.lx = b.display_3(label_loc_key="lxLabel", tooltip_loc_key="calLxText")
+        self.mv = b.display_2(label_loc_key="mvLabel")
+        self.va = b.display_2(label_loc_key="vaLabel", tooltip_loc_key="vinfText")
+        self.te = b.display_2(label_loc_key="teffLabel", tooltip_loc_key="teffText")
+        self.be = b.display_2(label_loc_key="beffLabel", tooltip_loc_key="beffText")
+        self.pe = b.display_2(label_loc_key="peffLabel", tooltip_loc_key="peffText")
+        self.pa = b.display_2(label_loc_key="paLabel")
+        self.gm = b.display_2(label_loc_key="gmLabel")
+        self.sj = b.display_2(label_loc_key="sjLabel")
+        self.ld = b.display_2(label_loc_key="ldLabel")
+        self.lf = b.display_2(label_loc_key="ldfLabel")
 
-        self.ld, i = (self.add_localized_2_line_display(parent=par_frm, row=i, label_loc_key="ldLabel"), i + 2)
-
-        self.lf, i = (self.add_localized_2_line_display(parent=par_frm, row=i, label_loc_key="ldfLabel"), i + 2)
-
-        par_frm.rowconfigure(i + 1, weight=1)
+        par_frm.rowconfigure(b.current_row + 1, weight=1)
 
     def update_stats(self, gun: Gun | Recoilless, gun_result: GunResult | RecoillessResult, acc_exp: int):
         for entry in (

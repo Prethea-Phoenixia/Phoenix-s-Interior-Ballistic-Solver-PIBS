@@ -42,11 +42,11 @@ from .ballistics import (
     SOL_PIDDUCK,
     Composition,
     Geometry,
-    JSONable,
     Material,
     Propellant,
     SimpleGeometry,
 )
+from .config import SimulationConfig
 from .dispatch import calculate, guide
 from .info_frame import InfoFrame
 from .localized_widget import Descriptive, LocalizableWidget, LocalizedFrame, RowBuilder
@@ -70,6 +70,12 @@ logger = logging.getLogger(__name__)
 class Log(Enum):
     ERROR = logging.ERROR
     WARNING = logging.WARNING
+
+
+MODE_FREE = "free"
+MODE_CONSTRAINED = "constrained"
+MODE_LOCK_LG = "lock_lg"
+MODE_OPT = "opt"
 
 
 class TextHandler(logging.Handler):
@@ -1006,40 +1012,51 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.update_table()
 
     @property
-    def kwargs(self) -> dict:
-        kwargs = {}
+    def config(self) -> SimulationConfig | None:
         try:
-            constrain = bool(self.use_cons.get())
             lock = bool(self.lock_Lg.get())
-            optimize = bool(self.opt.get())
-            debug = bool(self.debug.get())
             atmosphere = bool(self.in_atmos.get())
-            autofrettage = bool(self.material_is_af.get())
             material = bool(self.use_material.get())
-            gun_type = self.type_optn.get_obj()
 
             if self.prop is None:
                 raise ValueError("Invalid propellant.")
 
             chamber_volume = float(self.cv_L.get()) * 1e-3
-
-            chambrage = float(self.clr.get())
             charge_mass = float(self.chg_kg.get())
             caliber = float(self.cal_mm.get()) * 1e-3
-
             gun_length = float(self.tbl_mm.get()) * 1e-3
             load_fraction = charge_mass / chamber_volume / self.prop.rho_p
 
-            kwargs = {
-                "opt": optimize,
-                "con": constrain,
-                "deb": debug,
-                "lock": lock,
-                "typ": gun_type,
-                "dom": self.drop_domain.get_obj(),
-                "sol": self.drop_gradient.get_obj(),
-                "control": self.p_control.get_obj(),
-                "structural_material": (
+            return SimulationConfig(
+                optimize=bool(self.opt.get()),
+                constrained=bool(self.use_cons.get()),
+                debug=bool(self.debug.get()),
+                lock_length=lock,
+                gun_type=self.type_optn.get_obj(),
+                domain=self.drop_domain.get_obj(),
+                solution_method=self.drop_gradient.get_obj(),
+                pressure_control_point=self.p_control.get_obj(),
+                optimization_target=self.drop_opt_tgt.get_obj(),
+                caliber=caliber,
+                shot_mass=float(self.sht_kg.get()),
+                gun_length=gun_length,
+                chamber_volume=chamber_volume,
+                web=float(self.web_mm.get()) * 1e-3,
+                chambrage=float(self.clr.get()),
+                nozzle_expansion=float(self.nozz_exp.get()),
+                nozzle_efficiency=float(self.nozz_eff.get()) * 1e-2,
+                propellant=self.prop,
+                charge_mass=charge_mass,
+                charge_mass_ratio=charge_mass / float(self.sht_kg.get()),
+                load_fraction=load_fraction,
+                start_pressure=float(self.stp_MPa.get()) * 1e6,
+                design_pressure=float(self.p_tgt.get()) * 1e6,
+                design_velocity=float(self.v_tgt.get()),
+                min_web=1e-6 * float(self.min_web.get()),
+                max_length=float(self.lg_max.get()),
+                max_iterations=int(self.max_iter.get()),
+                tolerance=10 ** -int(self.acc_exp.get()),
+                structural_material=(
                     Material(
                         density=float(self.material_density.get()),
                         yield_strength=float(self.material_yield.get()) * 1e6,
@@ -1047,60 +1064,21 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                     if material
                     else None
                 ),
-                "structural_safety_factor": float(self.material_ssf.get()),
-                "caliber": caliber,
-                "shot_mass": float(self.sht_kg.get()),
-                "propellant": self.prop,
-                "web": float(self.web_mm.get()) * 1e-3,
-                "charge_mass": charge_mass,
-                "charge_mass_ratio": float(self.chg_kg.get()) / float(self.sht_kg.get()),
-                "chamber_volume": chamber_volume,
-                "start_pressure": float(self.stp_MPa.get()) * 1e6,
-                "length_gun": gun_length,
-                "chambrage": chambrage,  # chamber expansion
-                "nozzle_expansion": float(self.nozz_exp.get()),  # nozzle expansion
-                "nozzle_efficiency": float(self.nozz_eff.get()) * 1e-2,  # nozzle efficiency
-                "drag_coefficient": float(self.dgc.get()) * 1e-2,  # drag coefficient
-                "design_pressure": float(self.p_tgt.get()) * 1e6,  # design pressure
-                "design_velocity": float(self.v_tgt.get()),  # design velocity
-                "tol": 10 ** -int(self.acc_exp.get()),
-                "min_web": 1e-6 * float(self.min_web.get()),
-                "max_length": float(self.lg_max.get()),
-                "load_fraction": load_fraction,
-                "step": int(self.step.get()),
-                "autofrettage": autofrettage,
-                "known_bore": lock,
-                "min_cmr": float(self.notebook_frame.guide_min_cmr.get()),
-                "max_cmr": float(self.notebook_frame.guide_max_cmr.get()),
-                "step_cmr": float(self.notebook_frame.guide_step_cmr.get()),
-                "step_lf": float(self.notebook_frame.guide_step_lf.get()) * 1e-2,
-                "max_iterations": int(self.max_iter.get()),
-                "opt_target": self.drop_opt_tgt.get_obj(),
-            }
-
-            if atmosphere:
-                kwargs.update(
-                    {
-                        "ambient_pressure": float(self.amb_p.get()) * 1e3,
-                        "ambient_density": float(self.amb_rho.get()),
-                        "ambient_adb_index": float(self.amb_gamma.get()),
-                    }
-                )
-            else:
-                kwargs.update({"ambient_pressure": 0.0, "ambient_density": 0.0, "ambient_adb_index": 1.0})
+                structural_safety_factor=float(self.material_ssf.get()),
+                autofrettage=bool(self.material_is_af.get()),
+                ambient_pressure=float(self.amb_p.get()) * 1e3 if atmosphere else 0.0,
+                ambient_density=float(self.amb_rho.get()) if atmosphere else 0.0,
+                ambient_adiabatic_index=float(self.amb_gamma.get()) if atmosphere else 1.0,
+                guide_min_cmr=float(self.notebook_frame.guide_min_cmr.get()),
+                guide_max_cmr=float(self.notebook_frame.guide_max_cmr.get()),
+                guide_step_cmr=float(self.notebook_frame.guide_step_cmr.get()),
+                guide_step_lf=float(self.notebook_frame.guide_step_lf.get()) * 1e-2,
+                step=int(self.step.get()),
+                drag_coefficient=float(self.dgc.get()) * 1e-2,
+            )
         except ValueError as e:
             self.handle_errors(e, level=logging.ERROR)
-
-        return kwargs
-
-    def kwargs_to_json(self) -> dict:
-        serialized_kwargs = {}
-        for key, value in self.kwargs.items():
-            if isinstance(value, JSONable):
-                value = json.loads(value.to_json())
-            serialized_kwargs[key] = value
-
-        return serialized_kwargs
+            return None
 
     def _inhibit_widgets(self):
         for loc in self.localized_widgets:
@@ -1113,46 +1091,119 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.notebook_frame.guide_button.config(state="disabled")
         self.swap_button.config(state="disabled")
 
+    def _apply_type_option(self):
+        if self.type_optn.get_obj() == CONVENTIONAL:
+            self.drop_gradient.enable()
+            self.nozz_exp.remove()
+            self.nozz_eff.remove()
+            self.p_control.reset({p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH)}, overwrite=False)
+        elif self.type_optn.get_obj() == RECOILLESS:
+            self.drop_gradient.set_by_obj(SOL_LAGRANGE)
+            self.drop_gradient.disable()
+            self.nozz_exp.restore()
+            self.nozz_eff.restore()
+            self.p_control.reset(
+                {p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)},
+                overwrite=False,
+            )
+
+    def _compute_mode(self) -> str:
+        if not self.use_cons.get():
+            return MODE_FREE
+        if self.opt.get():
+            return MODE_OPT
+        if self.lock_Lg.get():
+            return MODE_LOCK_LG
+        return MODE_CONSTRAINED
+
+    def _apply_mode(self, mode: str):
+        states = {
+            self.v_tgt: False,
+            self.p_tgt: False,
+            self.opt: False,
+            self.lock_Lg: False,
+            self.min_web: False,
+            self.lg_max: False,
+            self.p_control: False,
+            self.drop_opt_tgt: False,
+            self.tbl_mm: True,
+            self.web_mm: True,
+        }
+        if mode == MODE_CONSTRAINED:
+            states.update(
+                {
+                    self.v_tgt: True,
+                    self.p_tgt: True,
+                    self.opt: True,
+                    self.lock_Lg: True,
+                    self.min_web: True,
+                    self.lg_max: True,
+                    self.p_control: True,
+                    self.tbl_mm: False,
+                    self.web_mm: False,
+                }
+            )
+        elif mode == MODE_LOCK_LG:
+            states.update(
+                {
+                    self.p_tgt: True,
+                    self.lock_Lg: True,
+                    self.min_web: True,
+                    self.lg_max: True,
+                    self.p_control: True,
+                    self.tbl_mm: True,
+                    self.web_mm: False,
+                }
+            )
+        elif mode == MODE_OPT:
+            states.update(
+                {
+                    self.v_tgt: True,
+                    self.p_tgt: True,
+                    self.opt: True,
+                    self.min_web: True,
+                    self.lg_max: True,
+                    self.p_control: True,
+                    self.drop_opt_tgt: True,
+                    self.tbl_mm: False,
+                    self.web_mm: False,
+                }
+            )
+
+        for widget, enabled in states.items():
+            widget.enable() if enabled else widget.disable()
+
     def on_guide(self):
-        self.focus()  # remove focus to force widget entry validation
-
-        self.guide_process = Process(target=guide, args=(self.guide_job_queue, self.log_queue, self.kwargs))
+        self.focus()
+        self.guide_process = Process(target=guide, args=(self.guide_job_queue, self.log_queue, self.config))
         self.guide_process.start()
-
         self._inhibit_widgets()
 
     def on_calculate(self):
-        self.focus()  # remove focus to force widget entry validation
-
-        self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, self.kwargs))
+        self.focus()
+        cfg = self.config
+        if cfg is None:
+            return
+        self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, cfg))
         self.process.start()
-
         self._inhibit_widgets()
 
     def get_value(self):
-        kwargs: dict[str, int | float] | None = None
+        cfg: SimulationConfig | None = None
         while not self.job_queue.empty():
-            kwargs, self.gun, self.gun_result = self.job_queue.get_nowait()
+            cfg, self.gun, self.gun_result = self.job_queue.get_nowait()
 
-        if kwargs is None:
+        if cfg is None:
             return
 
         try:
-            constrain = kwargs["con"]
-            lock = kwargs["lock"]
-            optimize = kwargs["opt"]
-            sigfig = int(-log10(kwargs["tol"])) + 1
-            if self.gun:
-                if constrain:
-                    web_mm = round_sig(kwargs["web"] * 1e3, n=sigfig)
-                    self.web_mm.set(web_mm)
-                    if not lock:
-                        lg_mm = round_sig(kwargs["length_gun"] * 1e3, n=sigfig)
-                        self.tbl_mm.set(lg_mm)
-                    if optimize:
-                        self.cv_L.set(round_sig(kwargs["chamber_volume"] * 1e3, n=sigfig))
-            else:
-                pass
+            sigfig = int(-log10(cfg.tolerance)) + 1
+            if self.gun and cfg.constrained:
+                self.web_mm.set(round_sig(cfg.web * 1e3, n=sigfig))
+                if not cfg.lock_length:
+                    self.tbl_mm.set(round_sig(cfg.gun_length * 1e3, n=sigfig))
+                if cfg.optimize:
+                    self.cv_L.set(round_sig(cfg.chamber_volume * 1e3, n=sigfig))
 
         except Exception as e:
             self.handle_errors(e, level=logging.WARNING)
@@ -1308,86 +1359,32 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
     def on_state_change(self, *_):
         self.notebook_frame.on_state_change(type_option=self.type_optn.get_obj())
-        if self.type_optn.get_obj() == CONVENTIONAL:
-            self.drop_gradient.enable()
+        self._apply_type_option()
+        mode = self._compute_mode()
+        self._apply_mode(mode)
+        (
+            self.max_iter.enable()
+            if mode in (MODE_CONSTRAINED, MODE_OPT) and self.type_optn.get_obj() == CONVENTIONAL
+            else self.max_iter.disable()
+        )
+        self._toggle_group(
+            self.use_aux_grain,
+            self.aux_grain_r1,
+            self.aux_grain_r2,
+            self.aux_web_ratio,
+            self.aux_mass_ratio,
+            self.aux_geom,
+        )
+        self._toggle_group(
+            self.use_material, self.material_yield, self.material_density, self.material_ssf, self.material_is_af
+        )
+        self._toggle_group(self.in_atmos, self.amb_p, self.amb_rho, self.amb_gamma)
+        self._toggle_group(self.use_combustible, self.combustible_mass_kg, self.combustible_force_kJ__kg)
 
-            self.nozz_exp.remove()
-            self.nozz_eff.remove()
-
-            self.p_control.reset(
-                {point: point for point in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH)}, overwrite=False
-            )
-
-        elif self.type_optn.get_obj() == RECOILLESS:
-            self.drop_gradient.set_by_obj(SOL_LAGRANGE)
-            self.drop_gradient.disable()
-
-            self.nozz_exp.restore()
-            self.nozz_eff.restore()
-
-            self.p_control.reset(
-                {point: point for point in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)},
-                overwrite=False,
-            )
-
-        if not self.use_cons.get():
-            self.v_tgt.disable()
-            self.p_tgt.disable()
-
-            self.opt.disable()
-            self.lock_Lg.disable()
-            self.min_web.disable()
-            self.lg_max.disable()
-            self.p_control.disable()
-            self.tbl_mm.enable()
-
-            self.drop_opt_tgt.disable()
-
-        else:
-            if self.lock_Lg.get():
-                self.v_tgt.disable()
-                self.opt.disable()
-                self.tbl_mm.enable()
-            else:
-                self.v_tgt.enable()
-                self.opt.enable()
-                self.tbl_mm.disable()
-
-            if self.opt.get():
-                self.lock_Lg.disable()
-                self.drop_opt_tgt.enable()
-            else:
-                self.lock_Lg.enable()
-                self.drop_opt_tgt.disable()
-
-            self.p_tgt.enable()
-            self.min_web.enable()
-            self.lg_max.enable()
-            self.p_control.enable()
-
-        for entry in (self.aux_grain_r1, self.aux_grain_r2, self.aux_web_ratio, self.aux_mass_ratio, self.aux_geom):
-            if self.use_aux_grain.get():
-                entry.enable()
-            else:
-                entry.disable()
-
-        for entry in (self.material_yield, self.material_density, self.material_ssf, self.material_is_af):
-            if self.use_material.get():
-                entry.enable()
-            else:
-                entry.disable()
-
-        for entry in (self.amb_p, self.amb_rho, self.amb_gamma):
-            if self.in_atmos.get():
-                entry.enable()
-            else:
-                entry.disable()
-
-        for entry in (self.combustible_mass_kg, self.combustible_force_kJ__kg):
-            if self.use_combustible.get():
-                entry.enable()
-            else:
-                entry.disable()
+    @staticmethod
+    def _toggle_group(control, *widgets):
+        for w in widgets:
+            w.enable() if control.get() else w.disable()
 
     @lock_out
     def use_theme(self):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import asdict
 from math import log
 from typing import TYPE_CHECKING
 
@@ -16,60 +17,37 @@ from . import (
     Points,
     Solutions,
 )
+from .constrained import Constrained
+from .config import DesignConstraint, Environment, GunGeometry, PropellantLoad, Solver
 from .gun import pidduck
 from .num import dekker, gss, rkf
 
 if TYPE_CHECKING:
     from .prop import Propellant
 
-from .constrained import Constrained
-
 
 class ConstrainedGun(Constrained):
 
     def __init__(
         self,
-        caliber: float,
-        shot_mass: float,
-        propellant: Propellant,
-        start_pressure: float,
-        drag_coefficient: float,
-        design_pressure: float,
-        design_velocity: float,
-        chambrage: float,
-        tol: float,
-        min_web: float = 1e-6,
-        max_length: float = 1e3,
-        sol: Solutions = SOL_LAGRANGE,
-        ambient_density: float = 1.204,
-        ambient_pressure: float = 101.325e3,
-        ambient_adb_index: float = 1.4,
-        control: Points = POINT_PEAK_AVG,
-        max_iterations: int = MAX_ITER,
+        geometry: GunGeometry,
+        load: PropellantLoad,
+        design: DesignConstraint,
+        solver: Solver | None = None,
+        environment: Environment | None = None,
         logger: logging.Logger | None = None,
-        **_,
     ):
         super().__init__(
-            caliber=caliber,
-            shot_mass=shot_mass,
-            propellant=propellant,
-            start_pressure=start_pressure,
-            drag_coefficient=drag_coefficient,
-            design_pressure=design_pressure,
-            design_velocity=design_velocity,
-            tol=tol,
-            chambrage=chambrage,
-            min_web=min_web,
-            max_length=max_length,
-            ambient_density=ambient_density,
-            ambient_pressure=ambient_pressure,
-            ambient_adb_index=ambient_adb_index,
-            control=control,
+            geometry=geometry,
+            load=load,
+            design=design,
+            solver=solver,
+            environment=environment,
             logger=logger,
         )
 
-        self.sol = sol
-        self.max_iterations = max_iterations
+        self.sol = self.solver.solution_method
+        self.max_iterations = self.solver.max_iterations
 
     def to_json(self) -> str:
         return json.dumps(
@@ -80,7 +58,7 @@ class ConstrainedGun(Constrained):
     @Constrained.validate_solve_inputs
     def solve(
         self,
-        *_,
+        *,
         load_fraction: float,
         charge_mass_ratio: float,
         length_gun: float | None = None,
@@ -89,7 +67,6 @@ class ConstrainedGun(Constrained):
         labda_2: float | None = None,
         cc: float | None = None,
         it: int = 0,
-        **__,
     ) -> tuple[float, float]:
         w = self.m * charge_mass_ratio
         v_0 = w / (self.rho_p * load_fraction)
@@ -104,9 +81,6 @@ class ConstrainedGun(Constrained):
 
         if cc is None:
             cc = 1 - (1 - 1 / self.chi_k) * log(l_bar_g_0 + 1) / l_bar_g_0
-        """
-        张小兵，金志明（2014），《枪炮内弹道学》，北京理工大学出版社，pp 70 (1-128)
-        """
 
         if any((labda_1 is None, labda_2 is None)):
             if self.sol == SOL_LAGRANGE:
@@ -141,7 +115,7 @@ class ConstrainedGun(Constrained):
             psi = self.f_psi_z(z)
             l_psi_bar = 1 - delta / self.rho_p - delta * (self.alpha - 1 / self.rho_p) * psi
             p_bar = max((psi - v_bar**2) / (l_bar + l_psi_bar), p_a_bar)
-            if self.control == POINT_PEAK_AVG:
+            if self.design.pressure_control == POINT_PEAK_AVG:
                 return p_bar
             else:
                 cc_prime = (1 / self.chi_k + l_bar) / (1 + l_bar)
@@ -151,12 +125,12 @@ class ConstrainedGun(Constrained):
                 factor_s = 1 + labda_2_prime * (w / (self.phi_1 * self.m))
                 factor_b = (self.phi_1 * self.m + labda_2_prime * w) / (self.phi_1 * self.m + labda_1_prime * w)
 
-                if self.control == POINT_PEAK_SHOT:
+                if self.design.pressure_control == POINT_PEAK_SHOT:
                     return p_bar / factor_s
-                elif self.control == POINT_PEAK_BREECH:
+                elif self.design.pressure_control == POINT_PEAK_BREECH:
                     return p_bar / factor_b
                 else:
-                    raise ValueError(f"Unknown control {self.control}")
+                    raise ValueError(f"Unknown control {self.design.pressure_control}")
 
         p_bar_s = func_p_control_bar(z_0, 0, 0)
         p_bar_d = self.p_d / (self.f * delta)
@@ -183,14 +157,13 @@ class ConstrainedGun(Constrained):
             )
 
             def ode_z(z: float, t_l_v: tuple[float, float, float], __: float) -> tuple[float, float, float]:
-                """burnup domain ode of internal ballistics"""
                 t_bar, l_bar, v_bar = t_l_v
                 psi = self.f_psi_z(z)
                 l_psi_bar = 1 - delta / self.rho_p - delta * (self.alpha - 1 / self.rho_p) * psi
 
                 p_bar = max((psi - v_bar**2) / (l_bar + l_psi_bar), p_a_bar)
 
-                dt_bar = (2 * b_e_1 / self.theta) ** 0.5 * p_bar**-self.n  # dt_bar/dz
+                dt_bar = (2 * b_e_1 / self.theta) ** 0.5 * p_bar**-self.n
                 dl_bar = v_bar * dt_bar
                 dv_bar = 0.5 * self.theta * (p_bar - self.func_p_ad_bar(v_bar, c_a_bar, p_a_bar)) * dt_bar
 
@@ -210,7 +183,7 @@ class ConstrainedGun(Constrained):
 
             p_bar_j = func_p_control_bar(z_k, l_bar_k, v_bar_k)
 
-            if p_bar_j >= 2 * p_bar_d:  # case for abort due to excessive pressure
+            if p_bar_j >= 2 * p_bar_d:
                 return p_bar_j - p_bar_d, z_k, t_bar_k, l_bar_k, v_bar_k
 
             if len(record) > 1:
@@ -238,15 +211,13 @@ class ConstrainedGun(Constrained):
         dp_bar_probe = next_dp_bar_probe = func_p_e_1(probe_web)[0]
         next_probe_web = probe_web
 
-        while dp_bar_probe * next_dp_bar_probe > 0:  # is same sign
+        while dp_bar_probe * next_dp_bar_probe > 0:
             probe_web = next_probe_web
             dp_bar_probe = next_dp_bar_probe
             next_probe_web = probe_web * 2 if dp_bar_probe > 0 else probe_web * 0.5
             next_dp_bar_probe = func_p_e_1(next_probe_web)[0]
 
-        e_1_solved, _ = dekker(
-            lambda _e_1: func_p_e_1(_e_1)[0], probe_web, next_probe_web, y_rel_tol=self.tol  # >0  # ?0
-        )
+        e_1_solved, _ = dekker(lambda _e_1: func_p_e_1(_e_1)[0], probe_web, next_probe_web, y_rel_tol=self.tol)
         p_bar_dev, z_i, t_bar_i, l_bar_i, v_bar_i = func_p_e_1(e_1_solved)
 
         if known_bore:
@@ -330,7 +301,3 @@ class ConstrainedGun(Constrained):
                 f"ω/m = {charge_mass_ratio:.2f}, Δ/ρ = {load_fraction:.2f} -> e_1 = {e_1_solved * 1e3:.2f} mm, l_g = {l_g * 1e3:.0f} mm ({it+1} iterations)"
             )
             return e_1_solved, l_g
-
-
-if __name__ == "__main__":
-    pass

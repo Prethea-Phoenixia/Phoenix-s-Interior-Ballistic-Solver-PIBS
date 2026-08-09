@@ -3,55 +3,58 @@ from __future__ import annotations
 import json
 import logging
 import math
+from dataclasses import asdict
+from typing import TYPE_CHECKING
 
 from . import JSONable
+from .config import Environment, GunGeometry, PropellantLoad, Solver
 from .num import dekker
-from .prop import DelegatesPropellant, Propellant
+from .prop import DelegatesPropellant
+
+if TYPE_CHECKING:
+    from .prop import Propellant
 
 
 class BaseGun(DelegatesPropellant, JSONable):
     def __init__(
         self,
-        caliber: float,
-        shot_mass: float,
-        propellant: Propellant,
-        web: float,
-        charge_mass: float,
-        chamber_volume: float,
-        start_pressure: float,
-        length_gun: float,
-        chambrage: float,
-        tol: float,
-        drag_coefficient: float,
-        ambient_density: float,
-        ambient_pressure: float,
-        ambient_adb_index: float,
+        geometry: GunGeometry,
+        load: PropellantLoad,
+        environment: Environment | None = None,
+        solver: Solver | None = None,
         logger: logging.Logger | None = None,
     ):
         self.logger = logger if logger else logging.getLogger(__name__)
-        super().__init__(propellant=propellant)
-        self.caliber = caliber
-        self.e_1 = 0.5 * web
-        self.s = (0.5 * caliber) ** 2 * math.pi
-        self.m = shot_mass
-        self.w = charge_mass
-        self.vol_0 = chamber_volume
-        self.p_0 = start_pressure
-        self.l_g = length_gun
-        self.chi_k = chambrage
+        super().__init__(propellant=load.propellant)
+
+        self.geometry = geometry
+        self.load = load
+        self.environment = environment if environment else Environment()
+        self.solver = solver if solver else Solver()
+
+        self.caliber = geometry.caliber
+        self.e_1 = 0.5 * geometry.web_thickness
+        self.s = (0.5 * self.caliber) ** 2 * math.pi
+        self.m = geometry.shot_mass
+        self.w = load.charge_mass
+        self.vol_0 = geometry.chamber_volume
+        self.p_0 = load.start_pressure
+        self.l_g = geometry.barrel_length
+        self.chi_k = geometry.chambrage
         self.l_0 = self.vol_0 / self.s
         self.l_c = self.l_0 / self.chi_k
         self.delta = self.w / self.vol_0
-        self.tol = tol
-        self.phi_1 = 1 / (1 - drag_coefficient)  # drag work coefficient
-        self.ambient_density = ambient_density
-        self.ambient_pressure = ambient_pressure
-        self.ambient_adb_index = ambient_adb_index
+        self.tol = self.solver.tolerance
+        self.phi_1 = 1 / (1 - self.solver.drag_coefficient)
 
-        ambient_pressure, ambient_adb_index = max(ambient_pressure, 1), max(ambient_adb_index, 1)
+        self.ambient_density = self.environment.ambient_density
+        self.ambient_pressure = self.environment.ambient_pressure
+        self.ambient_adb_index = self.environment.adiabatic_index
+
+        ambient_pressure, ambient_adb_index = max(self.ambient_pressure, 1), max(self.ambient_adb_index, 1)
 
         self.p_a_bar = ambient_pressure / (self.f * self.delta)
-        self.c_a = (ambient_adb_index * ambient_pressure / ambient_density) ** 0.5 if ambient_density else 0
+        self.c_a = (ambient_adb_index * ambient_pressure / self.ambient_density) ** 0.5 if self.ambient_density else 0
         self.k_1 = ambient_adb_index
 
         self.psi_0 = (1 / self.delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
@@ -63,9 +66,9 @@ class BaseGun(DelegatesPropellant, JSONable):
             raise ValueError(
                 "Initial burnup fraction is solved to be greater than unity. This indicate an excessively low loading density for start-pressure."
             )
-        self.z_0, _ = dekker(self.propellant.f_psi_z, 0, self.propellant.z_b, y=self.psi_0, y_rel_tol=tol)
+        self.z_0, _ = dekker(self.propellant.f_psi_z, 0, self.propellant.z_b, y=self.psi_0, y_rel_tol=self.tol)
 
-        self.phi_1 = 1 / (1 - drag_coefficient)
+        self.phi_1 = 1 / (1 - self.solver.drag_coefficient)
         self.phi = self.phi_1 + self.w / (3 * self.m)
 
         self.v_j = (2 * self.f * self.w / (self.theta * self.phi * self.m)) ** 0.5
@@ -90,45 +93,41 @@ class BaseGun(DelegatesPropellant, JSONable):
     def to_json(self) -> str:
         return json.dumps(
             {
-                "caliber": self.caliber,
-                "shot_mass": self.m,
-                "propellant": json.loads(self.propellant.to_json()),
-                "web": self.e_1 * 2,
-                "charge_mass": self.w,
-                "chamber_volume": self.vol_0,
-                "start_pressure": self.p_0,
-                "length_gun": self.l_g,
-                "chambrage": self.chi_k,
-                "tol": self.tol,
-                "drag_coefficient": 1 - 1 / self.phi_1,
-                "ambient_density": self.ambient_density,
-                "ambient_pressure": self.ambient_pressure,
-                "ambient_adb_index": self.ambient_adb_index,
+                "geometry": asdict(self.geometry),
+                "load": {
+                    "charge_mass": self.w,
+                    "start_pressure": self.p_0,
+                    "propellant": json.loads(self.propellant.to_json()),
+                },
+                "environment": asdict(self.environment),
+                "solver": asdict(self.solver),
             },
             ensure_ascii=False,
         )
 
     @classmethod
     def from_json(cls, json_dict: dict) -> BaseGun:
-        deserialized_dict = {}
-        for key, value in json_dict.items():
-            if key == "propellant":
-                value = Propellant.from_json(value)
-            deserialized_dict[key] = value
+        from .prop import Propellant
 
-        return cls(**deserialized_dict)
+        geometry = GunGeometry(**json_dict["geometry"])
+        load_data = json_dict["load"]
+        load = PropellantLoad(
+            propellant=Propellant.from_json(load_data["propellant"]),
+            charge_mass=load_data["charge_mass"],
+            start_pressure=load_data["start_pressure"],
+        )
+        environment = Environment(**json_dict.get("environment", {}))
+        solver = Solver(**json_dict.get("solver", {}))
+
+        return cls(geometry=geometry, load=load, environment=environment, solver=solver)
 
     @staticmethod
     def barrel_monoblock(
-        xs: list[float],  # probe location
-        ps: list[float],  # probe pressure
-        ss: list[float],  # probe cross-section area
-        yield_strength: float,  # yield strength
+        xs: list[float],
+        ps: list[float],
+        ss: list[float],
+        yield_strength: float,
     ) -> tuple[float, list[float], list[float]]:
-        """
-        P_tr, i = sigma_y (k^2 - 1)/(2 * k^2)
-        P_tr, o = sigma_y (k^2 - 1)/2
-        """
         v, ks, ms = 0.0, [], []
 
         for p in ps:
@@ -137,7 +136,7 @@ class BaseGun(DelegatesPropellant, JSONable):
                     f"Limit to conventional construction ({yield_strength * 0.5 * 1e-6:.3f} MPa)"
                     + " exceeded in section."
                 )
-            k = (1 - 2 * p / yield_strength) ** -0.5  # Tresca criteria
+            k = (1 - 2 * p / yield_strength) ** -0.5
             ks.append(k)
             ms.append(1)
 
@@ -152,27 +151,16 @@ class BaseGun(DelegatesPropellant, JSONable):
 
     @staticmethod
     def barrel_autofrettage(
-        xs: list[float],  # probe location
-        ps: list[float],  # probe pressure
-        ss: list[float],  # probe cross-section area
-        yield_strength: float,  # yield strength
+        xs: list[float],
+        ps: list[float],
+        ss: list[float],
+        yield_strength: float,
     ) -> tuple[float, list[float], list[float]]:
-        """
-        m : r_a / r_i
-        k : r_o / r_i
-        n : p_vM_max / sigma
-
-        1 < m < k
-
-        m_opt = exp(p / sigma_y)
-        P_y,i = sigma_y / 2 * (2 * ln(m) + 1 - (m/k)^2)
-        P_y,o = sigma_y / 2 * (2 * ln(m) + k^2 - m^2)
-        """
         v, ks, ms = 0.0, [], []
 
         for _p in ps:
-            m_opt = math.exp(_p / yield_strength)  # Tresca
-            k = m_opt  # full autofrettage
+            m_opt = math.exp(_p / yield_strength)
+            k = m_opt
             ks.append(k)
             ms.append(m_opt)
 

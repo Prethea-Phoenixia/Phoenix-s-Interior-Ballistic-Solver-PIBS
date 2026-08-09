@@ -4,7 +4,6 @@ import logging
 import math
 from tkinter import Text, ttk
 from tkinter.ttk import Frame, Notebook
-from typing import Protocol, runtime_checkable
 
 import matplotlib as mpl
 from labellines import labelLines
@@ -16,44 +15,17 @@ from . import FONTNAME, FONTSIZE, THEMES
 from .ballistics import CONVENTIONAL, DOMAIN_LEN, DOMAIN_TIME, RECOILLESS, Propellant
 from .ballistics.gun import Gun, GunResult
 from .ballistics.recoilless import RecoillessTableEntry
+from .config import SimulationConfig
 from .localized_widget import Descriptive, LocalizedFrame
 from .misc import validate_ce, validate_nn
 from .table_frame import TableFrame
 from .theme import ThemedMixin
 
 
-@runtime_checkable
-class MasterInterface(Protocol):
-    """Protocol defining the expected interface for NotebookFrame's master."""
-
-    gun: Gun | None
-    """The gun object or None if not computed."""
-
-    kwargs: dict[str, object]
-    """Dictionary containing simulation parameters including:
-        - design_velocity: float
-        - design_pressure: float
-        - typ: str (CONVENTIONAL or RECOILLESS)
-        - dom: str (DOMAIN_TIME or DOMAIN_LEN)
-        - control: str
-        - charge_mass: float
-        - chamber_volume: float
-    """
-
-    gun_result: GunResult | None
-    """The gun simulation result, None on startup or invalid compute output."""
-
-    guide_result: list[tuple] | None
-    """The guide graph result, None on startup or invalid compute output."""
-
-    prop: Propellant | None
-    """The propellant, None if invalid propellant entry state"""
-
-
 class NotebookFrame(ThemedMixin, LocalizedFrame):
     def __init__(
         self,
-        master: MasterInterface | None = None,
+        master: "InteriorBallisticsFrame",
         *args,
         font,
         default_lang,
@@ -63,9 +35,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
     ):
         super().__init__(master, *args, default_lang=default_lang, localization_dict=localization_dict, **kwargs)
 
-        if not isinstance(master, MasterInterface):
-            raise ValueError
-        self.master: MasterInterface = master  # type: ignore[assignment]
+        self.master = master
 
         validation_nn = self.register(validate_nn)
         validation_ce = self.register(validate_ce)
@@ -292,15 +262,16 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
             )
             for j, (locKey, default, unit, validation) in enumerate(
                 (
-                    ("stepLFLabel", "1.0", "%", validation_ce),
+                    ("stepLFLabel", "5.0", "%", validation_ce),
                     ("minCMRLabel", "0.05", "", validation_nn),
                     ("maxCMRLabel", "1.00", "", validation_nn),
                     ("stepCMRLabel", "0.05", "", validation_nn),
                 )
             )
         )
+
         self.guide_button = ttk.Button(guide_input_frame, text=self.get_loc_str("guideLabel"), command=on_guide_func)
-        self.guide_button.grid(row=j + 1, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
+        self.guide_button.grid(row=4, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
 
         for check in (
             *(self.plot_avg_p, self.plot_base_p, self.plot_breech_p, self.plot_stag_p, self.plot_stag_l, self.plot_vel),
@@ -337,14 +308,14 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         self.update_geom_plot()
 
     @property
+    def config(self) -> SimulationConfig:
+        """Simulation configuration from master."""
+        return self.master.config
+
+    @property
     def gun(self) -> Gun | None:
         """The gun object from master."""
         return self.master.gun
-
-    @property
-    def kwargs(self) -> dict[str, object]:
-        """Simulation parameters dictionary from master."""
-        return self.master.kwargs
 
     @property
     def gun_result(self) -> GunResult | None:
@@ -384,10 +355,10 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
             ax_p, ax_v = ax.twinx(), ax.twinx()
 
             if self.gun:
-                v_tgt = self.kwargs["design_velocity"]
-                p_tgt = self.kwargs["design_pressure"]
-                gun_type = self.kwargs["typ"]
-                dom = self.kwargs["dom"]
+                v_tgt = self.config.design_velocity
+                p_tgt = self.config.design_pressure / 1e6  # Pa -> MPa to match axis
+                gun_type = self.config.gun_type
+                dom = self.config.domain
 
                 xs, vs, vxs, pas, pss, pbs, p0s, psis, etas, stags = [], [], [], [], [], [], [], [], [], []
 
@@ -411,7 +382,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
                     p = entry.avg_pressure
                     ps = entry.shot_pressure
 
-                    if tag == self.kwargs["control"]:
+                    if tag == self.config.pressure_control_point:
                         x_peak = (time * 1e3) if dom == DOMAIN_TIME else travel
                         # noinspection PyTypeChecker
                         ax_p.spines.right.set_position(("data", x_peak))
@@ -694,8 +665,8 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
 
                 if self.gun:
                     guide_ax.scatter(
-                        float(self.kwargs["charge_mass"]) / float(self.kwargs["chamber_volume"]),
-                        self.kwargs["charge_mass"],
+                        self.config.charge_mass / self.config.chamber_volume,
+                        self.config.charge_mass,
                         c=fgc,
                         marker="x",
                         s=FONTSIZE * 4,

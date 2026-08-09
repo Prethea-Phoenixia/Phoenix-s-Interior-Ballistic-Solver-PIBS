@@ -39,8 +39,8 @@ SOL_PIDDUCK = "SOL_PIDDUCK"
 SOL_MAMONTOV = "SOL_MAMONTOV"
 
 
-MIN_BARR_VOLUME = "MIN_BARR_VOLUME"  # minimum bore volume
-MIN_PROJ_TRAVEL = "MIN_PROJ_TRAVEL"  # minimum barrel length
+MIN_BARR_VOLUME = "MIN_BARR_VOLUME"
+MIN_PROJ_TRAVEL = "MIN_PROJ_TRAVEL"
 OptimizationTargets = Union[Literal["MIN_BARR_VOLUME", "MIN_PROJ_TRAVEL"], str]
 
 Solutions = Union[Literal["SOL_LAGRANGE", "SOL_PIDDUCK", "SOL_MAMONTOV"], str]
@@ -50,7 +50,6 @@ RECOILLESS = "RECOILLESS"
 
 GunTypes = Union[Literal["CONVENTIONAL", "RECOILLESS"], str]
 
-# maximum iteration to correct for chambrage effects.
 MAX_ITER = 10
 
 
@@ -64,8 +63,16 @@ class JSONable:
     def from_json(cls: T, json_dict: dict) -> T: ...
 
 
+from .config import DesignConstraint, Environment, GunGeometry, Nozzle, PropellantLoad, Solver, Structural
 from .material import Material
-from .prop import Composition, Geometry, MultPerfGeometry, Propellant, SimpleGeometry
+from .prop import (
+    Composition,
+    Geometry,
+    Geometry as PropGeometry,
+    MultPerfGeometry,
+    Propellant,
+    SimpleGeometry,
+)
 from .gun import (
     GenericEntry,
     GenericResult,

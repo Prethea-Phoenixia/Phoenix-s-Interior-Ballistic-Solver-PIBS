@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import asdict
 
 from . import (
     POINT_PEAK_AVG,
@@ -11,65 +12,44 @@ from . import (
     Points,
 )
 from .constrained import Constrained
+from .config import DesignConstraint, Environment, GunGeometry, Nozzle, PropellantLoad, Solver
 from .num import dekker, gss, rkf
-from .prop import Propellant
 from .recoilless import Recoilless
 
 
 class ConstrainedRecoilless(Constrained):
     def __init__(
         self,
-        caliber: float,
-        shot_mass: float,
-        propellant: Propellant,
-        start_pressure: float,
-        drag_coefficient: float,
-        nozzle_expansion: float,
-        nozzle_efficiency: float,
-        chambrage: float,
-        tol: float,
-        design_pressure: float,
-        design_velocity: float,
-        min_web: float = 1e-6,
-        max_length: float = 1e3,
-        ambient_density: float = 1.204,
-        ambient_pressure: float = 101.325e3,
-        ambient_adb_index: float = 1.4,
-        control: Points = POINT_PEAK_AVG,
+        geometry: GunGeometry,
+        load: PropellantLoad,
+        design: DesignConstraint,
+        nozzle: Nozzle,
+        solver: Solver | None = None,
+        environment: Environment | None = None,
         logger: logging.Logger | None = None,
-        **_,
     ):
         super().__init__(
-            caliber=caliber,
-            shot_mass=shot_mass,
-            propellant=propellant,
-            start_pressure=start_pressure,
-            drag_coefficient=drag_coefficient,
-            chambrage=chambrage,
-            tol=tol,
-            design_pressure=design_pressure,
-            design_velocity=design_velocity,
-            min_web=min_web,
-            max_length=max_length,
-            ambient_density=ambient_density,
-            ambient_pressure=ambient_pressure,
-            ambient_adb_index=ambient_adb_index,
-            control=control,
+            geometry=geometry,
+            load=load,
+            design=design,
+            solver=solver,
+            environment=environment,
             logger=logger,
         )
 
-        if any((nozzle_expansion < 1, nozzle_efficiency > 1, nozzle_efficiency <= 0)):
+        self.nozzle = nozzle
+
+        if any((nozzle.expansion_ratio < 1, nozzle.efficiency > 1, nozzle.efficiency <= 0)):
             raise ValueError("Invalid parameters for constrained design")
 
-        self.chi_0 = nozzle_efficiency
-        self.a_bar = nozzle_expansion
+        self.chi_0 = nozzle.efficiency
+        self.a_bar = nozzle.expansion_ratio
 
     def to_json(self) -> str:
         return json.dumps(
             {
-                **super().to_json(),
-                "nozzle_expansion": self.a_bar,
-                "nozzle_efficiency": self.chi_0,
+                **json.loads(super().to_json()),
+                "nozzle": asdict(self.nozzle),
             },
             ensure_ascii=False,
         )
@@ -77,11 +57,11 @@ class ConstrainedRecoilless(Constrained):
     @Constrained.validate_solve_inputs
     def solve(
         self,
+        *,
         load_fraction: float,
         charge_mass_ratio: float,
         length_gun: float | None = None,
         known_bore: bool = False,
-        **_,
     ) -> tuple[float, float]:
 
         w = self.m * charge_mass_ratio
@@ -103,7 +83,7 @@ class ConstrainedRecoilless(Constrained):
         k_0 = (2 / (gamma + 1)) ** ((gamma + 1) / (2 * (gamma - 1))) * gamma**0.5
 
         phi_2 = 1
-        c_a = (0.5 * self.theta * phi * self.m / w) ** 0.5 * k_0 * phi_2  # flow rate value
+        c_a = (0.5 * self.theta * phi * self.m / w) ** 0.5 * k_0 * phi_2
         v_j = (2 * self.f * w / (self.theta * phi * self.m)) ** 0.5
 
         t_scale = l_0 / v_j
@@ -139,22 +119,22 @@ class ConstrainedRecoilless(Constrained):
             h_lim = 2 * self.phi_1 * self.m / (w * (1 - eta)) + 1
             h = h_lim if v_bar == 0 else min(h_lim, vb / (v_j * v_bar))
 
-            if self.control == POINT_PEAK_AVG:
+            if self.design.pressure_control == POINT_PEAK_AVG:
                 return p_bar
             else:
                 p_s_bar = p_bar / (1 + w * (1 - eta) / (3 * self.phi_1 * self.m) * (1 - 0.5 * h))
-                if self.control == POINT_PEAK_SHOT:
+                if self.design.pressure_control == POINT_PEAK_SHOT:
                     return p_s_bar
-                elif self.control == POINT_PEAK_STAG:
+                elif self.design.pressure_control == POINT_PEAK_STAG:
                     return p_s_bar * (1 + w * (1 - eta) / (2 * self.phi_1 * self.m) * (1 + h) ** -1)
-                elif self.control == POINT_PEAK_BREECH:
+                elif self.design.pressure_control == POINT_PEAK_BREECH:
                     if h == h_lim:
                         return 0.0
                     else:
                         return p_s_bar * (1 + w * (1 - eta) / (2 * self.phi_1 * self.m) * (1 - h))
-            raise ValueError(f"unknown control {self.control}")
+            raise ValueError(f"unknown control {self.design.pressure_control}")
 
-        p_bar_d = self.p_d / (self.f * delta)  # convert to unitless
+        p_bar_d = self.p_d / (self.f * delta)
         l_bar_d = self.max_length / l_0
 
         def abort_t(
@@ -217,7 +197,7 @@ class ConstrainedRecoilless(Constrained):
             t_bar_k, (z_k, l_bar_k, v_bar_k, eta_k, tau_k) = record[-1]
             p_bar_k = f_p_bar_control(z_k, l_bar_k, v_bar_k, eta_k, tau_k)
 
-            if p_bar_k > (1 + 2 * self.tol) * p_bar_d:  # case for abort due to excessive pressure
+            if p_bar_k > (1 + 2 * self.tol) * p_bar_d:
                 return p_bar_k - p_bar_d, t_bar_k, (z_k, l_bar_k, v_bar_k, eta_k, tau_k)
 
             t_bar_j = 0.0
@@ -227,10 +207,12 @@ class ConstrainedRecoilless(Constrained):
                 x = record[i][0]
                 ys = record[i][1]
 
-                z, l_bar, v_bar, eta, tau = rkf(
-                    d_func=ode_t, ini_val=ys, x_0=x, x_1=t_bar, rel_tol=self.tol, record=record
-                )[1]
-
+                r: list[tuple[float, tuple[float, float, float, float, float]]] = []
+                z, l_bar, v_bar, eta, tau = rkf(d_func=ode_t, ini_val=ys, x_0=x, x_1=t_bar, rel_tol=self.tol, record=r)[
+                    1
+                ]
+                xs = [v[0] for v in record]
+                record.extend(v for v in r if v[0] not in xs)
                 record.sort()
                 return f_p_bar_control(z, l_bar, v_bar, eta, tau) - p_bar_d, t_bar, (z, l_bar, v_bar, eta, tau)
 
@@ -240,7 +222,7 @@ class ConstrainedRecoilless(Constrained):
         probe_web = next_probe_web = 0.5 * self.min_web
         dp_bar_probe = next_dp_bar_probe = func_p_e1(probe_web)[0]
 
-        while dp_bar_probe * next_dp_bar_probe > 0:  # is same sign
+        while dp_bar_probe * next_dp_bar_probe > 0:
             probe_web = next_probe_web
             dp_bar_probe = next_dp_bar_probe
             next_probe_web = (probe_web * 2) if dp_bar_probe > 0 else (probe_web * 0.5)
@@ -250,7 +232,7 @@ class ConstrainedRecoilless(Constrained):
             lambda _e_1: func_p_e1(_e_1)[0],
             probe_web,
             next_probe_web,
-            y_abs_tol=self.tol * p_bar_d,  # debug=True
+            y_abs_tol=self.tol * p_bar_d,
         )
 
         if known_bore:
@@ -341,7 +323,3 @@ class ConstrainedRecoilless(Constrained):
             f"ω/m = {charge_mass_ratio:.2f}, Δ/ρ = {load_fraction:.2f} -> e_1 = {e_1_solved * 1e3:.2f} mm, l_g = {l_g * 1e3:.0f} mm"
         )
         return e_1_solved, l_bar_g * l_0
-
-
-if __name__ == "__main__":
-    pass

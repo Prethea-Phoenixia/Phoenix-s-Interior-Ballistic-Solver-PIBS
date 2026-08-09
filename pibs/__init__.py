@@ -13,15 +13,11 @@ BOLDSIZE = 9
 THEMES = {
     "awlight": {"cmap": "afmhot_r", "is_light": True},
     "awdark": {"cmap": "afmhot", "is_light": False},
-    "awwinxpblue": {"cmap": "afmhot_r", "is_light": True},
-    "awclearlooks": {"cmap": "afmhot_r", "is_light": True},
 }
 
 
 root_logger = logging.getLogger(__name__)
 root_logger.setLevel(logging.INFO)
-# log_formatter = logging.Formatter("%(asctime)s.%(msecs)03d - %(module)s.%(funcName)s: %(message)s", datefmt="%H:%M:%S")
-
 log_formatter = logging.Formatter("%(asctime)s.%(msecs)03d - %(message)s", datefmt="%H:%M:%S")
 handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(log_formatter)
