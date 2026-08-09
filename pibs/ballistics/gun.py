@@ -49,6 +49,16 @@ class GunTableEntry(GenericEntry):
 
 
 def pidduck(wpm: float, k: float, tol: float) -> tuple[float, float]:
+    """
+    Pidduck's limiting solution to the Lagrange problem.
+    wpm : w/(phi_1 * m), charge mass to equivalent corrected (fictitious) shot
+          weight
+    k   : adiabatic index of the gas, in practice this is not a great influence
+    tol : numerical tolerance
+
+    Pidduck's solution is reduced to that of M.A.Mamontov's solution at k -> 1,
+    however numerical difficulty necessitates taking the limit.
+    """
     if k < 1:
         raise ValueError("Invalid adiabatic index passed", k)
 
@@ -62,6 +72,16 @@ def pidduck(wpm: float, k: float, tol: float) -> tuple[float, float]:
         return f(om, x) * x**2
 
     def f_omega(om: float) -> float:
+        """
+        Solve Ω by finding the root of:
+        1
+        ∫ (1-Ωξ²)^[1/(k-1)] dξ = (w/m) (k-1)/(2 k) (1-Ω)^[k/(k-1)]/Ω
+        0
+        金（2014）《枪炮内弹道学》(3-114) pp.160
+
+        for the case of k -> 1:
+        鲍廷钰，邱文坚（1995）《内弹道学》pp.196
+        """
         if om == 0:
             return -math.inf
 
@@ -119,6 +139,9 @@ class Gun(BaseGun):
 
         self.phi = self.phi_1 + self.labda_2 * cc * self.w / self.m
 
+        """
+        见《枪炮内弹道学》（金，2014）p.70 式
+        """
         self.b = (
             self.s**2
             * self.e_1**2
@@ -150,6 +173,9 @@ class Gun(BaseGun):
         return dz, dl_bar, dv_bar
 
     def ode_l(self, l_bar: float, tzv: tuple[float, float, float], _: float) -> tuple[float, float, float]:
+        """length domain ode of internal ballistics
+        the 1/v_bar pose a starting problem that prevent us from using it from
+        initial condition."""
         t_bar, z, v_bar = tzv
 
         p_bar = self.f_p_bar(z, l_bar, v_bar)
@@ -172,6 +198,10 @@ class Gun(BaseGun):
         return dt_bar, dl_bar, dv_bar
 
     def get_temperature(self, psi: float, l: float, p: float) -> float | None:
+        """
+        given pressure and travel, return temperature
+        using the Nobel-Abel EOS
+        """
         if not self.temp_v:
             return None
 
@@ -286,6 +316,10 @@ class Gun(BaseGun):
                 t_bar_i, l_bar_i, v_bar_i = t_bar_j, l_bar_j, v_bar_j
 
                 z_i = z_j
+                """
+                this way the group of values denoted by _i is always updated
+                as a group.
+                """
                 z_j += delta_z / n
 
         if t_bar_i == 0:
@@ -425,6 +459,16 @@ class Gun(BaseGun):
         return l_bar > l_g_bar or p_bar > p_bar_max or v_bar < 0
 
     def to_ps_pb(self, l: float, p: float) -> tuple[float, float]:
+        """
+        Convert average chamber pressure at certain travel to
+        shot base pressure, and breech face pressure
+
+        l: travel of the projectile
+        p: average pressure
+
+        Ps: pressure at shot
+        Pb: pressure at breech
+        """
         labda_g = l / self.l_0
         labda_1_prime = self.labda_1 * (1 / self.chi_k + labda_g) / (1 + labda_g)
         labda_2_prime = self.labda_2 * (1 / self.chi_k + labda_g) / (1 + labda_g)
@@ -435,6 +479,19 @@ class Gun(BaseGun):
         return p / factor_s, p / factor_b
 
     def to_px_u(self, l: float, p_s: float, p_b: float, v: float, x: float) -> tuple[float, float]:
+        """
+        Convert the average chamber to pressure and gas flow speed
+        at arbitrary point x for projectile travel of l and average pressure
+        of p, **assuming the Lagrangian distribution**.
+
+        Note that with the current state of research, only characteristic point
+        values are available for other distributions, use to_ps_pb() instead for that.
+
+        l: projectile travel
+        p_s: pressure of shot
+        p_b: pressure of breech
+        x: probe point, start from the breech face.
+        """
         r = self.chi_k * x if x < self.l_c else (x - self.l_c) + self.l_0
         k = (r / (self.l_0 + l)) ** 2
         p_x = p_s * k + p_b * (1 - k)

@@ -67,6 +67,10 @@ class Recoilless(BaseGun):
         self.a_bar = nozzle.expansion_ratio
 
         gamma = self.theta + 1
+        """
+        Enforce the "recoilless condition" by setting the size of the
+        throat.
+        """
         phi_2 = 1
         self.C_a = (
             (0.5 * self.theta * self.phi * self.m / self.w) ** 0.5
@@ -121,6 +125,13 @@ class Recoilless(BaseGun):
     def ode_l(
         self, l_bar: float, t_z_v_eta_tau: tuple[float, float, float, float, float], _: float
     ) -> tuple[float, float, float, float, float]:
+        """length domain ode of internal ballistics
+        the 1/v_bar pose a starting problem that prevent us from using it from
+        initial condition.
+
+        in general, d/dl_bar = d/dt_bar * dt_bar/dl_bar
+
+        """
         t, z, v_bar, eta, tau = t_z_v_eta_tau
 
         psi = self.f_psi_z(z)
@@ -333,6 +344,10 @@ class Recoilless(BaseGun):
         for i, peak in enumerate([POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH, POINT_PEAK_STAG]):
             find_peak(lambda _t_bar: self.g(_t_bar, peak, tol)[0], peak)
 
+        """
+        populate data for output purposes
+        """
+
         if dom == DOMAIN_TIME:
             z_j, l_bar_j, v_bar_j, t_bar_j, eta_j, tau_j = self.z_0, 0.0, 0.0, 0.0, 0.0, 1.0
         else:
@@ -360,6 +375,10 @@ class Recoilless(BaseGun):
             )
 
         self.logger.info(f"sampled for {step} points.")
+
+        """
+        sort the data points
+        """
 
         data, p_trace = [], []
         l_c = self.l_c
@@ -465,6 +484,28 @@ class Recoilless(BaseGun):
     def to_ps_p0_pb_vb_stag(
         self, l: float, v: float, p: float, tau: float, eta: float
     ) -> tuple[float, float, float, float, float]:
+        """
+        Diagrammatic explanation of the calculated values:
+            ----\\___     __________________
+                    |---|                  |_________________________________
+                       ==                                       |        \
+           Nozzle Breech|    Chamber                  Barrel    |  Shot  |>
+                       ==                   ____________________|________/____
+                 ___|---|__________________|
+            ----//
+        Cross-section of the breech face:
+           _
+         *- -*
+        | 0 0 |   0+0: Nozzle throat area, S_j
+         *-_-*
+
+        returns:
+            Ps: Shot base pressure
+            Pb: Breech pressure, chamber pressure at rearward of chamber
+            P0: Stagnation point pressure
+            vb: Rearward flow velocity at the rear of chamber
+            stag: relative location of the stagnation point compared to the volume behind projectile.
+        """
         y = self.w * eta
         m_dot = self.C_a * self.v_j * self.s_j * p / (self.f * tau**0.5)
         sb = self.s * self.chi_k
@@ -480,6 +521,10 @@ class Recoilless(BaseGun):
         return ps, p0, pb, vb, stag
 
     def to_px(self, l: float, v: float, vb: float, ps: float, eta: float, x: float) -> float:
+        """
+        convert x, the physical displacement from breech bottom, to
+        effective length in the equivalent gun.
+        """
         y = self.w * eta
         l_k = self.l_0 / self.chi_k
         s_k = self.s * self.chi_k
@@ -500,6 +545,13 @@ class Recoilless(BaseGun):
 
     @staticmethod
     def get_cf(gamma: float, sr: float, tol: float = 1e-5) -> float:
+        """
+        takes the adiabatic index and area ration between constriction throat
+        and the exit, calculate the thrust factor Cf
+        See Hunt (1953) Interior Ballistics, appendix I.A01-A03
+        Sr = S/St
+        Vr = V/Vt
+        """
         vr_old = 0
         vr = 1
         while abs(vr - vr_old) / vr > tol:
@@ -560,6 +612,14 @@ class Recoilless(BaseGun):
         for i in range(len(p_probes)):
             p_probes[i] *= structural.safety_factor
 
+        """
+        subscript k denote the end of the chamber
+        subscript b denote the throat of nozzle
+        subscript a denote the nozzle base.
+
+        beta is the half angle of the constriction section
+        alpha is the half angle of the expansion section
+        """
         beta = 30
         l_b = (r_c - r_t) / tan(beta * pi / 180)
         alpha = 15
@@ -639,6 +699,20 @@ class Recoilless(BaseGun):
 
     @staticmethod
     def get_pr(gamma: float, ar: float, tol: float) -> tuple[float, float]:
+        """
+        Given an area ratio Ar, calculate the pressure ratio Pr for a
+        converging-diverging nozzle. One area ratio corresponds to two
+        pressure ratio, for subsonic and supersonic, respectively.
+
+        Ar: Nozzle cs area at probe point x over throat area
+            Ar = Ax / At
+        Pr: pressure ratio at probe point x over upstream chamber pressure
+            Pr = Px / Pc
+
+        returns:
+            Pr_sub: subsonic solution
+            Pr_sup: supersonic solution
+        """
         pr_c = (2 / (gamma + 1)) ** (gamma / (gamma - 1))
 
         if ar == 1:

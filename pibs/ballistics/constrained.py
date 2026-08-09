@@ -178,6 +178,10 @@ class Constrained(DelegatesPropellant, JSONable):
 
     @property
     def minimum_load_fraction(self) -> float:
+        """
+        p = fΔ / (1 - αΔ)
+        Δ = 1 / (f/p + α)
+        """
         return (1 / (self.f / self.p_d + self.alpha)) / self.rho_p * (1 + self.tol)
 
     def get_f(self, charge_mass_ratio: float) -> Callable[[float], tuple[float, float, float]]:
@@ -224,6 +228,9 @@ class Constrained(DelegatesPropellant, JSONable):
         opt_target: OptimizationTargets = MIN_BARR_VOLUME,
         **_,
     ) -> tuple[float, float, float]:
+        """
+        find the minimum volume solution.
+        """
         self.logger.info("Optimizing under constraints.")
         low = self.minimum_load_fraction
         self.logger.info(f"Min Δ/ρ = {low:.3%}.")

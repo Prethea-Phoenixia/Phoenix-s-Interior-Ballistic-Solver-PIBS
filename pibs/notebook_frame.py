@@ -16,16 +16,21 @@ from .ballistics import CONVENTIONAL, DOMAIN_LEN, DOMAIN_TIME, RECOILLESS, Prope
 from .ballistics.gun import Gun, GunResult
 from .ballistics.recoilless import RecoillessTableEntry
 from .config import SimulationConfig
-from .localized_widget import Descriptive, LocalizedFrame
+from .localized_widget import LocalizedFrame
 from .misc import validate_ce, validate_nn
 from .table_frame import TableFrame
 from .theme import ThemedMixin
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .interior_ballistics_frame import InteriorBallisticsFrame
 
 
 class NotebookFrame(ThemedMixin, LocalizedFrame):
     def __init__(
         self,
-        master: "InteriorBallisticsFrame",
+        master: InteriorBallisticsFrame,
         *args,
         font,
         default_lang,
@@ -35,7 +40,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
     ):
         super().__init__(master, *args, default_lang=default_lang, localization_dict=localization_dict, **kwargs)
 
-        self.master = master
+        self.master: InteriorBallisticsFrame = master
 
         validation_nn = self.register(validate_nn)
         validation_ce = self.register(validate_ce)

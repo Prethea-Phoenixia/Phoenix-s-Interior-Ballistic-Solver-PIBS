@@ -82,6 +82,10 @@ class ConstrainedGun(Constrained):
         if cc is None:
             cc = 1 - (1 - 1 / self.chi_k) * log(l_bar_g_0 + 1) / l_bar_g_0
 
+        """
+        张小兵，金志明（2014），《枪炮内弹道学》，北京理工大学出版社，pp 70 (1-128)
+        """
+
         if any((labda_1 is None, labda_2 is None)):
             if self.sol == SOL_LAGRANGE:
                 labda_1, labda_2 = 1 / 2, 1 / 3
@@ -157,6 +161,7 @@ class ConstrainedGun(Constrained):
             )
 
             def ode_z(z: float, t_l_v: tuple[float, float, float], __: float) -> tuple[float, float, float]:
+                """burnup domain ode of internal ballistics"""
                 t_bar, l_bar, v_bar = t_l_v
                 psi = self.f_psi_z(z)
                 l_psi_bar = 1 - delta / self.rho_p - delta * (self.alpha - 1 / self.rho_p) * psi
