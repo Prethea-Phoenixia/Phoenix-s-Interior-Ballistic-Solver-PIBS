@@ -225,7 +225,6 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         plot_label_frame = self.add_localized_label_frame(self.guide_tab, label_loc_key="guideFrmLabel")
         plot_label_frame.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
         guide_fig = Figure(dpi=None, layout="constrained")
-
         self.guide_canvas = FigureCanvasTkAgg(guide_fig, master=plot_label_frame)
         self.guide_canvas.get_tk_widget().place(relheight=1, relwidth=1)
 

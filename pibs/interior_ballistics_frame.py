@@ -225,6 +225,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         ### specs_frame: caliber, barrel length, shot mass, charge mass
         specs_frame = self.add_localized_label_frame(design_frame, label_loc_key="specFrmLabel")
         specs_frame.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+        specs_frame.columnconfigure(0, weight=1)
 
         sb = RowBuilder(self, specs_frame)
         self.type_optn = sb.dropdown(
@@ -317,7 +318,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.aux_grain_frm.grid(row=gb.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         gb.next()
         aux_row = gb.current_row
-        self.aux_grain_frm.columnconfigure(1, weight=1)
+        self.aux_grain_frm.columnconfigure(0, weight=1)
 
         ab = RowBuilder(self, self.aux_grain_frm)
         self.aux_mass_ratio = ab.input_3(
@@ -467,8 +468,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         environment_frame = self.add_localized_label_frame(design_frame, labelwidget=self.in_atmos.check_widget)
         environment_frame.grid(row=3, column=0, sticky="nsew", padx=2, pady=2)
 
-        design_frame.rowconfigure(4, weight=1)
-
         environment_frame.columnconfigure(0, weight=1)
         eb = RowBuilder(self, environment_frame)
         self.amb_p = eb.input_3(
@@ -492,6 +491,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             validation=validation_nn,
             dtype=float,
         )
+
+        # design_frame.rowconfigure(sb.next(), weight=100)
 
         calc_frame = Frame(self)
         calc_frame.grid(row=0, column=3, rowspan=2, sticky="nsew")
@@ -719,7 +720,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         self.calc_button = ttk.Button(control_frame, text=self.get_loc_str("calcLabel"), command=self.on_calculate)
         self.calc_button.grid(row=ob.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-
         control_frame.rowconfigure(ob.current_row, weight=1)
 
         self.calc_button_tip = StringVar(value=self.get_loc_str("calcButtonText"))
@@ -759,7 +759,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         root.protocol("WM_DELETE_WINDOW", self.quit)
         self.use_theme()
-        self.reset_entries()  # this fires off traces to initially set the UI into a consistent state.
         self.t_lid = None
 
         text_handler = TextHandler(self.notebook_frame.error_text)
@@ -770,13 +769,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.listener.start()
 
         logger.info("text handler attached to subprocess log queue listener.")
-
         self.timed_loop()
-
-        self.after(
-            100,
-            lambda: self.load_gun(file_path=resolve_path("examples/Guns/120x570_Rh-120/120x570_M256(L44)_M829A1.json")),
-        )
+        self.after_idle(self.reset)
 
     @staticmethod
     def handle_error_wrapper(level: Literal[Log.ERROR, Log.WARNING]):
@@ -962,6 +956,12 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.name_var.set(self.get_loc_str("newDesign"))
         self.notebook_frame.set_description("")
         self.gun, self.gun_result, self.guide_result = None, None, None
+        self.update_stats()
+        self.notebook_frame.update_aux_plot()
+        self.notebook_frame.update_fig_plot()
+        self.notebook_frame.update_geom_plot()
+        self.notebook_frame.update_guide_graph()
+        self.update_table()
 
     @lock_out
     @handle_error_wrapper(Log.WARNING)
@@ -1090,27 +1090,19 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     def _apply_type_option(self):
         if self.type_optn.get_obj() == CONVENTIONAL:
             self.drop_gradient.enable()
-            self.nozz_exp.remove()
-            self.nozz_eff.remove()
+            self.nozz_exp.disable()
+            self.nozz_eff.disable()
             self.p_control.reset({p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH)}, overwrite=False)
+
         elif self.type_optn.get_obj() == RECOILLESS:
             self.drop_gradient.set_by_obj(SOL_LAGRANGE)
             self.drop_gradient.disable()
-            self.nozz_exp.restore()
-            self.nozz_eff.restore()
+            self.nozz_exp.enable()
+            self.nozz_eff.enable()
             self.p_control.reset(
                 {p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)},
                 overwrite=False,
             )
-
-    def _compute_mode(self) -> str:
-        if not self.use_cons.get():
-            return MODE_FREE
-        if self.opt.get():
-            return MODE_OPT
-        if self.lock_Lg.get():
-            return MODE_LOCK_LG
-        return MODE_CONSTRAINED
 
     def _apply_mode(self, mode: str):
         states = {
@@ -1355,14 +1347,22 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     def on_state_change(self, *_):
         self.notebook_frame.on_state_change(type_option=self.type_optn.get_obj())
         self._apply_type_option()
-        mode = self._compute_mode()
+
+        mode = MODE_CONSTRAINED
+        if not self.use_cons.get():
+            mode = MODE_FREE
+        if self.opt.get():
+            mode = MODE_OPT
+        if self.lock_Lg.get():
+            mode = MODE_LOCK_LG
         self._apply_mode(mode)
-        (
+
+        if mode in (MODE_CONSTRAINED, MODE_OPT) and self.type_optn.get_obj() == CONVENTIONAL:
             self.max_iter.enable()
-            if mode in (MODE_CONSTRAINED, MODE_OPT) and self.type_optn.get_obj() == CONVENTIONAL
-            else self.max_iter.disable()
-        )
-        self._toggle_group(
+        else:
+            self.max_iter.disable()
+
+        self._enable_group(
             self.use_aux_grain,
             self.aux_grain_r1,
             self.aux_grain_r2,
@@ -1370,14 +1370,14 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             self.aux_mass_ratio,
             self.aux_geom,
         )
-        self._toggle_group(
+        self._enable_group(
             self.use_material, self.material_yield, self.material_density, self.material_ssf, self.material_is_af
         )
-        self._toggle_group(self.in_atmos, self.amb_p, self.amb_rho, self.amb_gamma)
-        self._toggle_group(self.use_combustible, self.combustible_mass_kg, self.combustible_force_kJ__kg)
+        self._enable_group(self.in_atmos, self.amb_p, self.amb_rho, self.amb_gamma)
+        self._enable_group(self.use_combustible, self.combustible_mass_kg, self.combustible_force_kJ__kg)
 
     @staticmethod
-    def _toggle_group(control, *widgets):
+    def _enable_group(control, *widgets):
         for w in widgets:
             w.enable() if control.get() else w.disable()
 

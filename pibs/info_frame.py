@@ -43,6 +43,9 @@ class InfoFrame(LocalizedFrame):
         ):
             entry.reset()
 
+        if not gun:
+            return
+
         caliber = gun.caliber
         eta_t, eta_b, eta_p = gun_result.get_eff()
         self.te.set(f"{eta_t * 100:.2f} %")
@@ -58,11 +61,8 @@ class InfoFrame(LocalizedFrame):
         self.ammo.set(to_si(gun.l_c, unit="m"))
         ps = gun_result.read_table_data(POINT_PEAK_SHOT).shot_pressure
         self.pa.set(to_si(ps * gun.s / gun.m, unit="m/s²"))
-        if gun_result.tube_mass:
-            self.gm.set(format_mass(gun_result.tube_mass))
-            self.gm.restore()
-        else:
-            self.gm.remove()
+
+        self.gm.set(format_mass(gun_result.tube_mass) if gun_result.tube_mass else "N/A")
 
         peak_average_entry = gun_result.read_table_data(POINT_PEAK_AVG)
         peak_breech_entry = gun_result.read_table_data(POINT_PEAK_BREECH)
@@ -80,11 +80,7 @@ class InfoFrame(LocalizedFrame):
         except ValueError:
             self.bop.set(self.get_loc_str("uncontained"))
 
-        if isinstance(gun, Recoilless):
-            self.sj.set(f"{to_si(gun.s_j, unit='m²', unit_dim=2)}")
-            self.sj.restore()
-        else:
-            self.sj.remove()
+        self.sj.set(f"{to_si(gun.s_j, unit='m²', unit_dim=2)}" if isinstance(gun, Recoilless) else "N/A")
 
         sigfig = acc_exp + 1
         w = gun.w
