@@ -40,12 +40,9 @@ from .ballistics import (
     SOL_LAGRANGE,
     SOL_MAMONTOV,
     SOL_PIDDUCK,
-    Composition,
-    Geometry,
-    Material,
-    Propellant,
-    SimpleGeometry,
 )
+from .ballistics.material import Material
+from .ballistics.prop import Composition, Geometry, Propellant, SimpleGeometry
 from .config import SimulationConfig
 from .dispatch import calculate, guide
 from .info_frame import InfoFrame

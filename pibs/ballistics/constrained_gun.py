@@ -17,8 +17,8 @@ from . import (
     Points,
     Solutions,
 )
-from .constrained import Constrained
 from .config import DesignConstraint, Environment, GunGeometry, PropellantLoad, Solver
+from .constrained import Constrained
 from .gun import pidduck
 from .num import dekker, gss, rkf
 

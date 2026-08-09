@@ -4,16 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [tool.isort]
 profile = "black"
+line_length = 120
+known_first_party = ["pibs"]
 
 [tool.black]
 line-length = 120
-target-version=["py312"]
+target-version = ["py312"]
 
 [tool.setuptools]
 py-modules = []
 
 [tool.setuptools.dynamic]
-version = {attr = "pibs.__version__"}
+version = { attr = "pibs.__version__" }
 
 [project]
 name = "pibs"
@@ -24,7 +26,7 @@ readme = "README.md"
 license = "unlicense"
 license-files = ["LICENSE"]
 dependencies = ["matplotlib", "matplotlib-label-lines", "tabulate", "psutil", "tqdm", "screeninfo"] # pip install .
-authors = [{name = "Jinpeng Zhai", email = "914962409@qq.com"}]
+authors = [{ name = "Jinpeng Zhai", email = "914962409@qq.com" }]
 keywords = ["interior ballistics"]
 classifiers = ["Development Status :: 4 - Beta", "Programming Language :: Python"]
 

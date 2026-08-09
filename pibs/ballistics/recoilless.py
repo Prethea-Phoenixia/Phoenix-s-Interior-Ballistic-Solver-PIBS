@@ -15,17 +15,11 @@ from . import (
     POINT_PEAK_SHOT,
     POINT_PEAK_STAG,
     POINT_START,
-    SAMPLE,
-    Domains,
-    GenericEntry,
-    GenericResult,
-    OutlineEntry,
-    Points,
-    PressureProbePoint,
-    PressureTraceEntry,
 )
+from . import SAMPLE, Domains, Points
 from .base_gun import BaseGun
 from .config import Environment, GunGeometry, Nozzle, PropellantLoad, Solver, Structural
+from .gun import GenericEntry, GenericResult, OutlineEntry, PressureProbePoint, PressureTraceEntry
 from .material import Material
 from .num import dekker, gss, rkf
 

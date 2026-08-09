@@ -61,26 +61,3 @@ class JSONable:
 
     @classmethod
     def from_json(cls: T, json_dict: dict) -> T: ...
-
-
-from .config import DesignConstraint, Environment, GunGeometry, Nozzle, PropellantLoad, Solver, Structural
-from .material import Material
-from .prop import (
-    Composition,
-    Geometry,
-    Geometry as PropGeometry,
-    MultPerfGeometry,
-    Propellant,
-    SimpleGeometry,
-)
-from .gun import (
-    GenericEntry,
-    GenericResult,
-    Gun,
-    OutlineEntry,
-    PressureProbePoint,
-    PressureTraceEntry,
-)
-from .recoilless import Recoilless
-from .constrained_gun import ConstrainedGun
-from .constrained_recoilless import ConstrainedRecoilless

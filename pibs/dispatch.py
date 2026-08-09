@@ -3,21 +3,12 @@ import sys
 import traceback
 from logging.handlers import QueueHandler
 
-from .ballistics import (
-    CONVENTIONAL,
-    RECOILLESS,
-    ConstrainedGun,
-    ConstrainedRecoilless,
-    DesignConstraint,
-    Environment,
-    GunGeometry,
-    Gun,
-    Nozzle,
-    PropellantLoad,
-    Recoilless,
-    Solver,
-    Structural,
-)
+from .ballistics import CONVENTIONAL, RECOILLESS
+from .ballistics.config import DesignConstraint, PropellantLoad, Solver, Structural
+from .ballistics.constrained_gun import ConstrainedGun
+from .ballistics.constrained_recoilless import ConstrainedRecoilless
+from .ballistics.gun import Environment, Gun, GunGeometry
+from .ballistics.recoilless import Nozzle, Recoilless
 from .config import SimulationConfig
 from .guidegraph import guide_graph
 

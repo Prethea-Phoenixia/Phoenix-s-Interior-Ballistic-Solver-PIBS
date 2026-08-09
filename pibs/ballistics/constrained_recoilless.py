@@ -9,10 +9,9 @@ from . import (
     POINT_PEAK_BREECH,
     POINT_PEAK_SHOT,
     POINT_PEAK_STAG,
-    Points,
 )
-from .constrained import Constrained
 from .config import DesignConstraint, Environment, GunGeometry, Nozzle, PropellantLoad, Solver
+from .constrained import Constrained
 from .num import dekker, gss, rkf
 from .recoilless import Recoilless
 

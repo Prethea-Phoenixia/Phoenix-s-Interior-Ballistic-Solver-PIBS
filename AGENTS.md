@@ -20,6 +20,14 @@
 - **Dispatch**: `pibs/dispatch.py` — `calculate()` and `guide()` run in separate processes; `sim_config_to_ballistics()` converts `SimulationConfig` to ballistics objects.
 - **Resources**: loaded via `resolve_path()` from `pibs/misc.py` — handles both dev mode and frozen PyInstaller builds.
 
+## Considered Design Decisions
+
+**"God objects" in ballistics core are intentional, not technical debt.**
+
+- `Gun`/`Recoilless` own the full simulation pipeline (ODE setup, integration, peak finding, sampling, pressure traces). Splitting into separate `PressureCalculator`, `BurnModel`, `MotionSolver` classes would add indirection over inherently coupled state (`z`, `l_bar`, `v_bar`, `p_bar`) without real benefit for this scope.
+- `InteriorBallisticsFrame` (1400+ lines) is a tkinter God frame — framework limitation, not design oversight.
+- Refactors should not break these classes apart "for purity." Tight coupling here tracks the physics, not accidental complexity.
+
 ## Save / Load
 
 - Save files use **widget descriptive strings** as JSON keys (from `loc.get_descriptive()`), NOT magic keys.

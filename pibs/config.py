@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from .ballistics import Material, Propellant
+from .ballistics.material import Material
+from .ballistics.prop import Propellant
 
 
 @dataclass

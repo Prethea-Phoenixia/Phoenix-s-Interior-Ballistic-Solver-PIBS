@@ -6,15 +6,7 @@ import math
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, Callable
 
-from . import (
-    MAX_ITER,
-    MIN_BARR_VOLUME,
-    MIN_PROJ_TRAVEL,
-    POINT_PEAK_AVG,
-    JSONable,
-    OptimizationTargets,
-    Points,
-)
+from . import MIN_BARR_VOLUME, MIN_PROJ_TRAVEL, JSONable, OptimizationTargets
 from .config import DesignConstraint, Environment, GunGeometry, PropellantLoad, Solver
 from .num import gss
 from .prop import DelegatesPropellant

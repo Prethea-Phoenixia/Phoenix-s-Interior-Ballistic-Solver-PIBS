@@ -4,7 +4,7 @@ import logging
 import sys
 import traceback
 from math import inf
-from typing import Callable, TypeVar, Sequence
+from typing import Callable, Sequence, TypeVar
 
 T = TypeVar("T", bound=Sequence[float])
 logger = logging.getLogger(__name__)

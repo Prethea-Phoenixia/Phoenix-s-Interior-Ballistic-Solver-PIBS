@@ -4,6 +4,7 @@ import logging
 import math
 from tkinter import Text, ttk
 from tkinter.ttk import Frame, Notebook
+from typing import TYPE_CHECKING
 
 import matplotlib as mpl
 from labellines import labelLines
@@ -12,16 +13,15 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from . import FONTNAME, FONTSIZE, THEMES
-from .ballistics import CONVENTIONAL, DOMAIN_LEN, DOMAIN_TIME, RECOILLESS, Propellant
+from .ballistics import CONVENTIONAL, DOMAIN_LEN, DOMAIN_TIME, RECOILLESS
 from .ballistics.gun import Gun, GunResult
+from .ballistics.prop import Propellant
 from .ballistics.recoilless import RecoillessTableEntry
 from .config import SimulationConfig
 from .localized_widget import LocalizedFrame
 from .misc import validate_ce, validate_nn
 from .table_frame import TableFrame
 from .theme import ThemedMixin
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .interior_ballistics_frame import InteriorBallisticsFrame

@@ -1,16 +1,8 @@
 from __future__ import annotations
 
-from .ballistics import (
-    POINT_BURNOUT,
-    POINT_EXIT,
-    POINT_PEAK_AVG,
-    POINT_PEAK_BREECH,
-    POINT_PEAK_SHOT,
-    Gun,
-    Recoilless,
-)
-from .ballistics.gun import GunResult
-from .ballistics.recoilless import RecoillessResult
+from .ballistics import POINT_BURNOUT, POINT_EXIT, POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT
+from .ballistics.gun import Gun, GunResult
+from .ballistics.recoilless import Recoilless, RecoillessResult
 from .localized_widget import LocalizedFrame, RowBuilder
 from .misc import format_mass, round_sig, to_si
 
