@@ -67,6 +67,15 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
         cfg.logger = logger
         geo, load, solver, env, struct, design, nozzle = sim_config_to_ballistics(cfg)
 
+        """
+        - constrained -> match: velocity & pressure
+            - varies: web, gun length
+        - constrained + optimize -> match: velocity & pressure
+            - varies: chamber volume, web, gun length
+        - constrained + lock_length -> match: pressure
+            - varies: web
+        """
+
         if cfg.constrained:
             if cfg.gun_type == CONVENTIONAL:
                 constrained = ConstrainedGun(
@@ -79,21 +88,23 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
             else:
                 raise ValueError("unknown gun type")
 
-            if cfg.optimize:
+            if cfg.optimize:  # constrained + optimize
                 l_f, e_1, l_g = constrained.find_min_v(
                     charge_mass_ratio=cfg.charge_mass_ratio,
                     opt_target=cfg.optimization_target,
                 )
                 cfg.load_fraction = l_f
                 cfg.chamber_volume = cfg.charge_mass / cfg.propellant.rho_p / cfg.load_fraction
-            else:
+
+            else:  # constrained and constrained + lock_length
                 e_1, l_g = constrained.solve(
                     load_fraction=cfg.load_fraction,
                     charge_mass_ratio=cfg.charge_mass_ratio,
+                    length_gun=geo.barrel_length,
                     known_bore=cfg.lock_length,
                 )
 
-            geo.web_thickness = 2 * e_1
+            geo.web_thickness = 2 * e_1  # update web in all cases.
             if not cfg.lock_length:
                 geo.barrel_length = l_g
 

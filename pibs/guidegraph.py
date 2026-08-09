@@ -105,25 +105,17 @@ def guide_graph(
     processes = psutil.cpu_count(logical=False) or 1
     logger.info(f"Dispatching {processes} processes for finding maximum load fractions.")
 
-    print(charge_mass_ratios)
-
     with multiprocessing.Pool(processes=processes) as pool:
-        # lf_maxs = pool.map(func=target.maximum_load_fraction, iterable=tqdm(charge_mass_ratios, **tqdm_kwargs))
-
-        iterable = tuple((cmr, step_lf) for cmr in charge_mass_ratios)
-        print(iterable)
-        lf_maxs = pool.starmap(
+        proposed_lfs = [i * step_lf for i in range(math.ceil(1 / step_lf))]
+        iterable = tuple((cmr, proposed_lfs) for cmr in charge_mass_ratios)
+        validated_lfs = pool.starmap(
             func=target.validate_load_fraction,
             iterable=tqdm(iterable, **tqdm_kwargs),
         )
 
     parameters = []
-    for charge_mass_ratio, max_lf in zip(charge_mass_ratios, lf_maxs):
-        load_fraction = target.minimum_load_fraction
-
-        while load_fraction < max_lf + 0.5 * step_lf:
-            load_fraction += step_lf
-
+    for charge_mass_ratio, lfs in zip(charge_mass_ratios, validated_lfs):
+        for load_fraction in lfs:
             parameters.append((target, gun_class, load_fraction, charge_mass_ratio))
 
     logger.info(f"Dispatching {processes} processes for constructing guidance diagram.")

@@ -773,6 +773,11 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         self.timed_loop()
 
+        self.after(
+            100,
+            lambda: self.load_gun(file_path=resolve_path("examples/Guns/120x570_Rh-120/120x570_M256(L44)_M829A1.json")),
+        )
+
     @staticmethod
     def handle_error_wrapper(level: Literal[Log.ERROR, Log.WARNING]):
         def decorator(func):
@@ -895,8 +900,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
     @lock_out
     @handle_error_wrapper(level=Log.WARNING)
-    def load_gun(self, initial_dir: str | None = None):
-        file_name = filedialog.askopenfilename(
+    def load_gun(self, initial_dir: str | None = None, file_path: str | None = None):
+        file_name = file_path or filedialog.askopenfilename(
             title=self.get_loc_str("loadLabel"),
             filetypes=(("JSON File", "*.json"),),
             defaultextension=".json",
@@ -908,12 +913,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         self.reset_entries()
         self.name_var.set(Path(file_name).stem)
-
-        # loc_dict = {
-        #     loc.get_descriptive(): loc
-        #     for loc in self.localized_widgets
-        #     if (hasattr(loc, "get_descriptive") and loc.get_descriptive())
-        # }
 
         loc_dict = {
             loc.get_descriptive(): loc
@@ -1196,11 +1195,10 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         try:
             sigfig = int(-log10(cfg.tolerance)) + 1
             if self.gun and cfg.constrained:
-                self.web_mm.set(round_sig(cfg.web * 1e3, n=sigfig))
+                self.web_mm.set(round_sig(self.gun.geometry.web_thickness * 1e3, n=sigfig))
                 if not cfg.lock_length:
-                    self.tbl_mm.set(round_sig(cfg.gun_length * 1e3, n=sigfig))
-                if cfg.optimize:
-                    self.cv_L.set(round_sig(cfg.chamber_volume * 1e3, n=sigfig))
+                    self.tbl_mm.set(round_sig(self.gun.geometry.barrel_length * 1e3, n=sigfig))
+                self.cv_L.set(round_sig(self.gun.geometry.chamber_volume * 1e3, n=sigfig))
 
         except Exception as e:
             self.handle_errors(e, level=logging.WARNING)
