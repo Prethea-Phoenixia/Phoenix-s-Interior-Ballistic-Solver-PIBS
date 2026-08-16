@@ -1104,7 +1104,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 overwrite=False,
             )
 
-    def _apply_mode(self, mode: str):
+    def _apply_mode(self, mode: str, gun_type: str):
         states = {
             self.v_tgt: False,
             self.p_tgt: False,
@@ -1160,6 +1160,11 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         for widget, enabled in states.items():
             widget.enable() if enabled else widget.disable()
+
+        if mode in (MODE_CONSTRAINED, MODE_OPT) and gun_type == CONVENTIONAL:
+            self.max_iter.enable()
+        else:
+            self.max_iter.disable()
 
     def on_guide(self):
         self.focus()
@@ -1355,12 +1360,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             mode = MODE_OPT
         if self.lock_Lg.get():
             mode = MODE_LOCK_LG
-        self._apply_mode(mode)
-
-        if mode in (MODE_CONSTRAINED, MODE_OPT) and self.type_optn.get_obj() == CONVENTIONAL:
-            self.max_iter.enable()
-        else:
-            self.max_iter.disable()
+        self._apply_mode(mode, self.type_optn.get_obj())
 
         self._enable_group(
             self.use_aux_grain,
