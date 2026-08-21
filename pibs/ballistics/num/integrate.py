@@ -1,6 +1,8 @@
 import math
 from typing import Callable
 
+from . import FLOAT_MIN
+
 
 def integrate(f: Callable[[float], float], l: float, u: float, tol: float = 1e-3) -> tuple[float, float]:
     """
@@ -84,7 +86,7 @@ def integrate(f: Callable[[float], float], l: float, u: float, tol: float = 1e-3
         integral = next_integral
         it += 1
 
-        if delta < tol * (abs(integral) + tol):
+        if delta < tol * (abs(integral) + tol) or delta < FLOAT_MIN:
             count += 1
         else:
             count = 0

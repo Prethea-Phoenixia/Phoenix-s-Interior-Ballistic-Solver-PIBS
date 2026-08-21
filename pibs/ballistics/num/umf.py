@@ -53,7 +53,7 @@ from typing import Callable
 invphi = (math.sqrt(5) - 1) / 2  # 1 / phi
 invphi2 = (3 - math.sqrt(5)) / 2  # 1 / phi^2
 
-FLOAT_MIN = 1e-16
+from . import FLOAT_MIN
 
 
 def gss(
@@ -64,7 +64,7 @@ def gss(
     y_rel_tol: float = 0,
     y_abs_tol: float = FLOAT_MIN,
     find_min: bool = True,
-    it: int = 1e4,
+    it: int = 100,
     debug: bool = False,
 ):
     """Golden-section search. improved from the example
@@ -136,7 +136,7 @@ def gss(
             if (
                 (abs(c - b) < x_tol)
                 or (abs(yc - yb) < (y_rel_tol * min(abs(yc), abs(yb))))
-                or (abs(yc - yd) < y_abs_tol)
+                or (abs(yc - yb) < y_abs_tol)
             ):
                 break
 
