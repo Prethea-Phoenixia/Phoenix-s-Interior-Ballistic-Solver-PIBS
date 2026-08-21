@@ -1,26 +1,25 @@
 import math
+import sys
 from typing import Callable
 
-from . import FLOAT_MIN
 
-
-def integrate(f: Callable[[float], float], l: float, u: float, tol: float = 1e-3) -> tuple[float, float]:
+def integrate(f: Callable[[float], float], l_lim: float, u_lim: float, tol: float = 1e-3) -> tuple[float, float]:
     """
     Integration, a.la the HP-34C. For more info see:
     "Handheld Calculator Evaluates Integrals", William M.Kahan
     Hewlett Packard Journal, August 1980 Volume 31, number 8.
 
     f: function, single variable.
-    l: lower limit
-    u: upper limit of integration
+    l_lim: lower limit
+    u_lim: upper limit of integration
     tol: tolerance, see below
 
     To apply the quadrature procedure, first the problem is transformed on
     interval to:
 
-    u              1                        given:
-    ∫ f(x) dx -> a ∫ f(ax+b) dx             a = (u - l) / 2
-    l             -1                        b = (u + l) / 2
+    u_lim              1                        given:
+    ∫ f(x) dx -> a ∫ f(ax+b) dx                a = (u_lim - l_lim) / 2
+    l_lim             -1                        b = (u_lim + l_lim) / 2
 
     another transformation on the variable of integration eliminates the need
     to sample at either end points, which makes it possible to evaluate improper
@@ -62,8 +61,8 @@ def integrate(f: Callable[[float], float], l: float, u: float, tol: float = 1e-3
     submitting the result as a good enough estimate for the integral.
     """
 
-    a = (u - l) / 2
-    b = (u + l) / 2
+    a = (u_lim - l_lim) / 2
+    b = (u_lim + l_lim) / 2
 
     tol = abs(tol)  # ensure positive
 
@@ -86,7 +85,7 @@ def integrate(f: Callable[[float], float], l: float, u: float, tol: float = 1e-3
         integral = next_integral
         it += 1
 
-        if delta < tol * (abs(integral) + tol) or delta < FLOAT_MIN:
+        if delta < tol * (abs(integral) + tol) or delta < sys.float_info.epsilon:
             count += 1
         else:
             count = 0
@@ -94,18 +93,4 @@ def integrate(f: Callable[[float], float], l: float, u: float, tol: float = 1e-3
     return integral, delta
 
 
-if __name__ == "__main__":
-
-    import sys
-    import trace
-
-    # create a Trace object, telling it what to ignore, and whether to
-    # do tracing or line-counting or both.
-    tracer = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix], trace=0, count=1)
-
-    # run the new command using the given tracer
-    tracer.run("main()")
-
-    # make a report, placing output in the current directory
-    r = tracer.results()
-    r.write_results(show_missing=True, coverdir=".")
+# if __name__ == "__main__":

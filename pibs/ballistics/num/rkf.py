@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-import sys
 import traceback
 from math import inf
 from typing import Callable, Sequence, TypeVar
+import sys
 
 T = TypeVar("T", bound=Sequence[float])
 logger = logging.getLogger(__name__)
@@ -29,8 +29,8 @@ def rkf(
     x_0: float,
     x_1: float,
     rel_tol: float,
-    abs_tol: float = 1e-16,
-    min_tol: float = 1e-16,
+    abs_tol: float = sys.float_info.epsilon,
+    min_tol: float = sys.float_info.epsilon,
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] | None = None,
     record: list[tuple[float, T]] = None,
     debug: bool = False,
@@ -177,8 +177,8 @@ def rkf78(
     x_0: float,
     x_1: float,
     rel_tol: float,
-    abs_tol: float = 1e-16,
-    min_tol: float = 1e-16,
+    abs_tol: float = sys.float_info.epsilon,
+    min_tol: float = sys.float_info.epsilon,
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] = None,
     record: list[tuple[float, T]] = None,
     debug: bool = False,
@@ -261,8 +261,8 @@ def rkf45(
     x_0: float,
     x_1: float,
     rel_tol: float,
-    abs_tol: float = 1e-16,
-    min_tol: float = 1e-16,
+    abs_tol: float = sys.float_info.epsilon,
+    min_tol: float = sys.float_info.epsilon,
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] = None,
     record: list[tuple[float, T]] = None,
     debug: bool = False,
@@ -336,8 +336,8 @@ def rkf34(
     x_0: float,
     x_1: float,
     rel_tol: float,
-    abs_tol: float = 1e-16,
-    min_tol: float = 1e-16,
+    abs_tol: float = sys.float_info.epsilon,
+    min_tol: float = sys.float_info.epsilon,
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] = None,
     record: list[tuple[float, T]] = None,
     debug: bool = False,
@@ -404,8 +404,8 @@ def rkf23(
     x_0: float,
     x_1: float,
     rel_tol: float,
-    abs_tol: float = 1e-16,
-    min_tol: float = 1e-16,
+    abs_tol: float = sys.float_info.epsilon,
+    min_tol: float = sys.float_info.epsilon,
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] = None,
     record: list[tuple[float, T]] = None,
     debug: bool = False,
@@ -417,7 +417,7 @@ def rkf23(
     Constants used for Runge-Kutta-Fehlberg 2(3), see Table XII, pp.28 in ref:
     *Low Order Classical Runge-Kutta Formulas With Stepsize Control and Their Application
     to Some Heat Transfer Problems, Erwin Fehlberg, George C. Marshall Space Flight Center,
-    Marshall, Alabama, NASA, Washington D.C., July, 1969*
+    Marshall, Alabama, NASA, Washington D.C., July 1969*
 
 
     Arguments:
@@ -466,10 +466,10 @@ def rkf23(
     )
 
 
-def main():
+if __name__ == "__main__":
     import time
 
-    logging.basicConfig(encoding="utf-8", level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
 
     def df(x: float, ys: tuple[float], dx: float):
         y = ys[0]
@@ -489,7 +489,3 @@ def main():
         print(f"expected value {true_val}")
         print(f"absolute error {v[0]- true_val}")
         print(f"relative error {(v[0] - true_val)/true_val}")
-
-
-if __name__ == "__main__":
-    main()
