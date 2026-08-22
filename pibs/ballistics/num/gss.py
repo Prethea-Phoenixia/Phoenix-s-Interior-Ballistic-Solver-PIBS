@@ -25,17 +25,15 @@ def gss(
     """
 
     a, b = (min(a, b), max(a, b))
-    h = b - a
-    if h <= x_tol:
-        return a, b
-
     x_tol = max(abs(x_tol), sys.float_info.epsilon * max(abs(a), abs(b)))
+    h = b - a
+    if h < x_tol:
+        return a, b
 
     n = int(math.ceil(math.log(x_tol / h) / math.log(invphi))) - 1
 
     c, d = a + invphi2 * h, a + invphi * h
-    yc = f(c)
-    yd = f(d)
+    yc, yd = f(c), f(d)
 
     for _ in range(n):
         h *= invphi

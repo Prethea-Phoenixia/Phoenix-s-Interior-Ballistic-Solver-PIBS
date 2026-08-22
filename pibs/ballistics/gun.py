@@ -163,7 +163,7 @@ class Gun(BaseGun):
         p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
         return max(p_bar, self.p_a_bar)
 
-    def ode_t(self, _: float, zlv: tuple[float, float, float], __: float) -> tuple[float, float, float]:
+    def ode_t(self, _: float, zlv: tuple[float, float, float]) -> tuple[float, float, float]:
         z, l_bar, v_bar = zlv
         p_bar = self.f_p_bar(z, l_bar, v_bar)
         dz = (0.5 * self.theta / self.b) ** 0.5 * p_bar**self.n
@@ -172,7 +172,7 @@ class Gun(BaseGun):
 
         return dz, dl_bar, dv_bar
 
-    def ode_l(self, l_bar: float, tzv: tuple[float, float, float], _: float) -> tuple[float, float, float]:
+    def ode_l(self, l_bar: float, tzv: tuple[float, float, float]) -> tuple[float, float, float]:
         """length domain ode of internal ballistics
         the 1/v_bar pose a starting problem that prevent us from using it from
         initial condition."""
@@ -187,7 +187,7 @@ class Gun(BaseGun):
 
         return dt_bar, dz, dv_bar
 
-    def ode_z(self, z: float, tlv: tuple[float, float, float], _: float) -> tuple[float, float, float]:
+    def ode_z(self, z: float, tlv: tuple[float, float, float]) -> tuple[float, float, float]:
         t_bar, l_bar, v_bar = tlv
         p_bar = self.f_p_bar(z, l_bar, v_bar)
 

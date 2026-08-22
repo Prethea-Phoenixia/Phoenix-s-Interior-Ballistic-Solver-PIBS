@@ -98,7 +98,7 @@ class Recoilless(BaseGun):
         return max(p_bar, self.p_a_bar)
 
     def ode_t(
-        self, t: float, z_t_l_v_eta_tau: tuple[float, float, float, float, float], __: float
+        self, t: float, z_t_l_v_eta_tau: tuple[float, float, float, float, float]
     ) -> tuple[float, float, float, float, float]:
         z, l_bar, v_bar, eta, tau = z_t_l_v_eta_tau
         psi = self.f_psi_z(z)
@@ -117,7 +117,7 @@ class Recoilless(BaseGun):
         return dz, dl_bar, dv_bar, d_eta, d_tau
 
     def ode_l(
-        self, l_bar: float, t_z_v_eta_tau: tuple[float, float, float, float, float], _: float
+        self, l_bar: float, t_z_v_eta_tau: tuple[float, float, float, float, float]
     ) -> tuple[float, float, float, float, float]:
         """length domain ode of internal ballistics
         the 1/v_bar pose a starting problem that prevent us from using it from
@@ -144,7 +144,7 @@ class Recoilless(BaseGun):
         return dt_bar, dz, dv_bar, d_eta, d_tau
 
     def ode_z(
-        self, z: float, t_l_v_eta_tau: tuple[float, float, float, float, float], _: float
+        self, z: float, t_l_v_eta_tau: tuple[float, float, float, float, float]
     ) -> tuple[float, float, float, float, float]:
         t, l_bar, v_bar, eta, tau = t_l_v_eta_tau
         psi = self.f_psi_z(z)

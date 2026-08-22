@@ -160,7 +160,7 @@ class ConstrainedGun(Constrained):
                 self.s**2 * e_1**2 / (self.f * phi * w * self.m * self.u_1**2) * (self.f * delta) ** (2 * (1 - self.n))
             )
 
-            def ode_z(z: float, t_l_v: tuple[float, float, float], __: float) -> tuple[float, float, float]:
+            def ode_z(z: float, t_l_v: tuple[float, float, float]) -> tuple[float, float, float]:
                 """burnup domain ode of internal ballistics"""
                 t_bar, l_bar, v_bar = t_l_v
                 psi = self.f_psi_z(z)
@@ -238,7 +238,7 @@ class ConstrainedGun(Constrained):
             * (self.f * delta) ** (2 * (1 - self.n))
         )
 
-        def ode_v(v_bar: float, t_z_l: tuple[float, float, float], __: float) -> tuple[float, float, float]:
+        def ode_v(v_bar: float, t_z_l: tuple[float, float, float]) -> tuple[float, float, float]:
             t_bar, z, l_bar = t_z_l
             psi = self.f_psi_z(z)
 

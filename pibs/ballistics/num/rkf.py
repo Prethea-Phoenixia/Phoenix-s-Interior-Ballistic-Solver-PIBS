@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import traceback
 from typing import Callable, Sequence, TypeVar
 
 T = TypeVar("T", bound=Sequence[float])
@@ -22,7 +23,7 @@ def handle_record(record: list[tuple[float, T]]):
 
 def rkf(
     order: int,
-    d_func: Callable[[float, T, float], T],
+    d_func: Callable[[float, T], T],
     ini_val: T,
     x_0: float,
     x_1: float,
@@ -30,7 +31,7 @@ def rkf(
     abs_tol: float = sys.float_info.epsilon,
     min_tol: float = sys.float_info.epsilon,
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] | None = None,
-    record: list[tuple[float, T]] = None,
+    record: list[tuple[float, T]] | None = None,
     debug: bool = False,
     alphas: tuple[float, ...] = (),
     betas: tuple[tuple[float, ...], ...] = (),
@@ -44,7 +45,7 @@ def rkf(
     truncation error estimate that drives the adaptive step size control.
 
     Arguments:
-        d_func     : d/dx|x = dFunc(x, (y1, y2, y3...), dx)
+        d_func     : d/dx|x = dFunc(x, (y1, y2, y3...))
         ini_val    : initial values for (y1, y2, y3...)
         x_0        : integration start point
         x_1        : integration end point
@@ -78,7 +79,7 @@ def rkf(
     beta = 0.84  # "safety" factor
     h = x_1 - x_0  # initial step size
 
-    all_k = [list() for _ in range(len(betas))]
+    all_k: list[list[float]] = [list() for _ in range(len(betas))]
 
     if h == 0:
         return x, y_this, False
@@ -102,7 +103,7 @@ def rkf(
                     yi = [y + k * bij for y, k in zip(yi, kj)]
 
                 # after the loop, yi is the new y we can call dFunc with.
-                di = d_func(xi, yi, h)
+                di = d_func(xi, yi)
                 """
                 ki   = h   *   di
                 vector scalar  vector
@@ -138,7 +139,7 @@ def rkf(
             h *= beta
             continue
 
-        max_relative_error = 0.0  # initialize R
+        max_relative_error = sys.float_info.epsilon  # initialize R
         for te, y1, y2 in zip(truncation_errors, y_this, y_next):
             ry = abs(te) / max((rel_tol * min(abs(y1), abs(y2))), abs_tol, min_tol)
             max_relative_error = max(max_relative_error, ry)
@@ -147,7 +148,6 @@ def rkf(
             x, y_this = x + h, y_next
 
             if abort_func is not None and abort_func(x, y_this, record):
-                # premature terminating cond. is met
                 if debug:
                     handle_record(record=record)
 
@@ -155,14 +155,14 @@ def rkf(
 
             record.append((x, tuple(y_this)))
 
-        delta = beta * abs(1 / max_relative_error) ** (1 / (order + 1)) if max_relative_error else inf
+        delta = beta * abs(1 / max_relative_error) ** (1 / (order + 1))
         h *= min(max(delta, 0.125), 2)
 
     if debug:
         logger.debug("exiting main loop normally")
         handle_record(record=record)
 
-    if abs(x - x_1) > 8 * sys.float_info.epsilon * max(abs(x), abs(x_1)):
+    if abs(x - x_1) > sys.float_info.epsilon * max(abs(x), abs(x_1)):
         raise ValueError(
             "Premature Termination of Integration due to vanishing step size," + " x at {}, h at {}.".format(x, h)
         )
@@ -171,15 +171,15 @@ def rkf(
 
 
 def rkf45(
-    d_func: Callable[[float, T, float], T],
+    d_func: Callable[[float, T], T],
     ini_val: T,
     x_0: float,
     x_1: float,
     rel_tol: float,
     abs_tol: float = sys.float_info.epsilon,
     min_tol: float = sys.float_info.epsilon,
-    abort_func: Callable[[float, T, list[tuple[float, T]]], bool] = None,
-    record: list[tuple[float, T]] = None,
+    abort_func: Callable[[float, T, list[tuple[float, T]]], bool] | None = None,
+    record: list[tuple[float, T]] | None = None,
     debug: bool = False,
 ) -> tuple[float, T, bool]:
     """
@@ -193,7 +193,7 @@ def rkf45(
 
 
     Arguments:
-        d_func     : d/dx|x=x(y1, y2, y3....) = dFunc(x, y1, y2, y3..., dx)
+        d_func     : d/dx|x=x(y1, y2, y3....) = dFunc(x, (y1, y2, y3...))
         ini_val    : initial values for (y1, y2, y3...)
         x_0        : integration start point
         x_1        : integration end point
@@ -249,7 +249,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.DEBUG)
 
-    def df(x: float, ys: tuple[float], dx: float):
+    def df(x: float, ys: tuple[float]):
         y = ys[0]
         return (7 * y**2 * x**3,)
 
@@ -257,7 +257,7 @@ if __name__ == "__main__":
     t_0 = time.time()
     v = (0,)
     for _ in range(100):
-        _, v, _ = rkf45(df, (3,), 2, 0, rel_tol=1e-4, abs_tol=1e-4, min_tol=1e-14, debug=False)
+        _, v, _ = rkf45(df, (3.0,), 2, 0, rel_tol=1e-4, abs_tol=1e-4, min_tol=1e-14, debug=False)
     t_1 = time.time()
 
     print(f"time: {t_1 - t_0}")

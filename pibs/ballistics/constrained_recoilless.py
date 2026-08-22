@@ -161,7 +161,7 @@ class ConstrainedRecoilless(Constrained):
             )
 
             def ode_t(
-                t: float, z_l_v_eta_tau: tuple[float, float, float, float, float], dt: float
+                t: float, z_l_v_eta_tau: tuple[float, float, float, float, float]
             ) -> tuple[float, float, float, float, float]:
                 z, l_bar, v_bar, eta, tau = z_l_v_eta_tau
                 psi = self.f_psi_z(z)
@@ -251,7 +251,7 @@ class ConstrainedRecoilless(Constrained):
         )
 
         def ode_v(
-            v_bar: float, t_z_l_eta_tau: tuple[float, float, float, float, float], d_v_bar: float
+            v_bar: float, t_z_l_eta_tau: tuple[float, float, float, float, float]
         ) -> tuple[float, float, float, float, float]:
             t_bar, z, l_bar, eta, tau = t_z_l_eta_tau
             psi = self.f_psi_z(z)
