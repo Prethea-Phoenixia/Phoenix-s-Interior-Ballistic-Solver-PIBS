@@ -85,12 +85,9 @@ def integrate(f: Callable[[float], float], l_lim: float, u_lim: float, tol: floa
         integral = next_integral
         it += 1
 
-        if delta < tol * (abs(integral) + tol) or delta < sys.float_info.epsilon:
+        if delta < tol * (abs(integral) + tol) or delta < sys.float_info.epsilon * abs(integral):
             count += 1
         else:
             count = 0
 
     return integral, delta
-
-
-# if __name__ == "__main__":

@@ -8,13 +8,15 @@ def dekker(
     x_0: float,
     x_1: float,
     y: float = 0.0,
-    x_tol: float = sys.float_info.epsilon,
-    y_abs_tol: float = sys.float_info.epsilon,
+    x_tol: float = 0.0,
+    y_abs_tol: float = 0.0,
     y_rel_tol: float = 0.0,
     debug: bool = False,
 ) -> tuple[float, float]:
 
-    x_tol = max(x_tol, sys.float_info.epsilon)
+    x_tol = max(abs(x_tol), max(abs(x_0), abs(x_1)) * sys.float_info.epsilon)
+    y_rel_tol = max(abs(y_rel_tol), sys.float_info.epsilon)
+    y_abs_tol = max(abs(y_abs_tol), abs(y) * y_rel_tol)
 
     fx_0 = f(x_0) - y
     fx_1 = f(x_1) - y
@@ -44,8 +46,6 @@ def dekker(
         fb_i = fa_j = fx_0
 
     record = []
-
-    y_abs_tol = max(y_abs_tol, abs(y) * y_rel_tol)
 
     i = 0
 
