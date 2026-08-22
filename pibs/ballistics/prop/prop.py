@@ -18,7 +18,7 @@ from .. import JSONable
 
 
 class Geometry(ABC, JSONable):
-    all_geometries = list()
+    all_geometries: list[Geometry] = []
 
     def __init__(self, desc: str):
         self.desc = desc
@@ -65,7 +65,7 @@ class ABCEnum(ABCMeta, EnumType):
 class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
     """table 1-3 from ref[1] page 23"""
 
-    def __init__(self, desc: str, alpha: int, beta: int):
+    def __init__(self, desc: str, alpha: float, beta: float):
         super().__init__(desc)
         self.alpha = alpha
         self.beta = beta
@@ -175,7 +175,7 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
 
 class Composition:
 
-    all_compositions = []
+    all_compositions: list["Composition"] = []
 
     def __init__(
         self,
@@ -187,7 +187,7 @@ class Composition:
         reduced_adiabatic_index: float,
         burn_rate_coefficient: float,
         pressure_exponent: float,
-        adiabatic_flame_temperature: float = 0,
+        adiabatic_flame_temperature: float | None = None,
     ):
         self.name, self.desc = name, desc
         self.f = force
@@ -284,7 +284,7 @@ class Composition:
             return (2 * self.f / self.theta) ** 0.5
 
     @staticmethod
-    def get_name_composition_dict() -> dict[str, str]:
+    def get_name_composition_dict() -> dict[str, Composition]:
         name_composition_dict = {}
         for composition in Composition.all_compositions:
             name_composition_dict[composition.name] = composition
@@ -434,7 +434,7 @@ class Propellant(JSONable):
         return self.composition.n
 
     @property
-    def temp_v(self) -> float:
+    def temp_v(self) -> float | None:
         return self.composition.temp_v
 
     @staticmethod
@@ -512,7 +512,7 @@ class DelegatesPropellant:
         return self.propellant.n
 
     @property
-    def temp_v(self) -> float:
+    def temp_v(self) -> float | None:
         return self.propellant.temp_v
 
     @property

@@ -57,7 +57,9 @@ T = TypeVar("T")
 
 
 class JSONable:
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        raise NotImplementedError
 
     @classmethod
-    def from_json(cls: T, json_dict: dict) -> T: ...
+    def from_json(cls: T, json_dict: dict) -> T:
+        raise NotImplementedError

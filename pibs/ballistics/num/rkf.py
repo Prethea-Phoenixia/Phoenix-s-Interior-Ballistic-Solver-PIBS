@@ -36,7 +36,7 @@ def rkf(
     betas: tuple[tuple[float, ...], ...] = (),
     cs: tuple[float, ...] = (),
     c_hats: tuple[float, ...] = (),
-    logger: logging.Logger = None,
+    logger: logging.Logger | None = None,
 ) -> tuple[float, T, bool]:
     """
     drive an embedded Runge-Kutta-Fehlberg p(p+1) pair to solve a system of
@@ -68,6 +68,7 @@ def rkf(
         betas       : stage coefficients of the Runge Kutta algorithm
         cs          : weights of the p-th order (committed) solution
         c_hats      : weights of the (p+1)-th order (error estimate) solution
+        logger      :
 
     Returns:
         x_1, (y1, y2, y3...)|x = x_1, abort
@@ -185,7 +186,7 @@ def rkf45(
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] | None = None,
     record: list[tuple[float, T]] | None = None,
     debug: bool = False,
-    logger: logging.Logger = None,
+    logger: logging.Logger | None = None,
 ) -> tuple[float, T, bool]:
     """
     use Runge Kutta Fehlberg of 4(5)th order to solve system of equation
@@ -215,6 +216,7 @@ def rkf45(
 
         record     : optional, if supplied will record all committed steps
         debug      : optional, enables additional debug printing when passed.
+        logger     :
 
     Returns:
         x_1, (y1, y2, y3...)|x=x_1

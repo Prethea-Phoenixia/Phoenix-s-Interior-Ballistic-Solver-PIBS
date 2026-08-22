@@ -16,7 +16,11 @@ if TYPE_CHECKING:
 
 
 def probe_func(
-    func: Callable[[float], Any], start: float, stop: float, tol: float, exceptions: tuple[Exception] = (ValueError,)
+    func: Callable[[float], Any],
+    start: float,
+    stop: float,
+    tol: float,
+    exceptions: tuple[type[Exception], ...] = (ValueError,),
 ) -> float:
     delta = stop - start
     probe = new_probe = start
@@ -121,7 +125,8 @@ class Constrained(DelegatesPropellant, JSONable):
         labda_2: float | None = None,
         cc: float | None = None,
         it: int = 0,
-    ) -> tuple[float, float]: ...
+    ) -> tuple[float, float]:
+        raise NotImplementedError
 
     @staticmethod
     def validate_solve_inputs(solve):
@@ -205,13 +210,14 @@ class Constrained(DelegatesPropellant, JSONable):
         else:
             raise ValueError(f"Unknown target {opt_target}")
 
-        _f = self.get_f(charge_mass_ratio)
+        _f: Callable[[float], tuple[float, float, float]] = self.get_f(charge_mass_ratio)
 
         self.logger.info(f"Solution constrained to Δ/ρ : {low:.3%} - {high:.3%}")
         lf_low, lf_high = gss(
             lambda load_fraction: _f(load_fraction)[_f_index], low, high, x_tol=self.tol, find_min=True
         )
         lf = 0.5 * (lf_high + lf_low)
-        e_1, l_g, _ = _f(lf)
+        e_1 = _f(lf)[0]
+        l_g = _f(lf)[1]
         self.logger.info(f"Optimal Δ/ρ = {lf :.2f}")
         return lf, e_1, l_g

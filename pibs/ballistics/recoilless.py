@@ -16,8 +16,10 @@ from . import (
     POINT_PEAK_SHOT,
     POINT_PEAK_STAG,
     POINT_START,
+    SAMPLE,
+    Domains,
+    Points,
 )
-from . import SAMPLE, Domains, Points
 from .base_gun import BaseGun
 from .config import GunGeometry, Nozzle, PropellantLoad, Solver, Structural
 from .gun import GenericEntry, GenericResult, OutlineEntry, PressureProbePoint, PressureTraceEntry
@@ -174,7 +176,7 @@ class Recoilless(BaseGun):
         def abort_condition(z, tlv_eta_tau, _):
             _, l_bar, v_bar, eta, tau = tlv_eta_tau
             p_bar = self.f_p_bar(z, l_bar, eta, tau)
-            return l_bar > l_g_bar or p_bar > p_bar_max or p_bar < 0
+            return l_bar > l_g_bar or p_bar > p_bar_max  # or p_bar < 0
 
         z_end, (t_bar_end, l_bar_end, v_bar_end, eta_end, tau_end), aborted = rkf(
             self.ode_z,
@@ -213,13 +215,7 @@ class Recoilless(BaseGun):
 
         # Integrate to actual exit point
         l_bar_exit, (t_bar_exit, z_exit, v_bar_exit, eta_exit, tau_exit), _ = rkf(
-            self.ode_l,
-            (t_bar_end, z_end, v_bar_end, eta_end, tau_end),
-            l_bar_end,
-            l_g_bar,
-            rel_tol=tol,
-            debug=True,
-            logger=self.logger,
+            self.ode_l, (t_bar_end, z_end, v_bar_end, eta_end, tau_end), l_bar_end, l_g_bar, rel_tol=tol
         )
         self.append_bar_data(
             bar_data,

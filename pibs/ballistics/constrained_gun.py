@@ -80,6 +80,8 @@ class ConstrainedGun(Constrained):
         if cc is None:
             cc = 1 - (1 - 1 / self.chi_k) * log(l_bar_g_0 + 1) / l_bar_g_0
 
+        assert cc is not None
+
         """
         张小兵，金志明（2014），《枪炮内弹道学》，北京理工大学出版社，pp 70 (1-128)
         """
@@ -94,6 +96,7 @@ class ConstrainedGun(Constrained):
             else:
                 raise ValueError("Unknown Solution")
 
+        assert labda_1 is not None and labda_2 is not None
         phi = self.phi_1 + labda_2 * w / self.m * cc
         v_j: float = (2 * self.f * w / (self.theta * phi * self.m)) ** 0.5
 
