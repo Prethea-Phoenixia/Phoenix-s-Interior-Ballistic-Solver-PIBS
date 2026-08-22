@@ -5,7 +5,7 @@ import logging
 import math
 from dataclasses import asdict, dataclass
 from math import log
-from typing import Callable
+from typing import Callable, Literal
 
 from . import (
     DOMAIN_TIME,
@@ -240,138 +240,78 @@ class Gun(BaseGun):
 
         bar_data = []
         t_scale, p_scale = self.l_0 / self.v_j, self.f * self.delta
-        l_g_bar, p_bar_0 = self.l_g / self.l_0, self.p_0 / p_scale
+        l_g_bar = self.l_g / self.l_0
         z_0, z_b = self.z_0, self.z_b
 
         self.append_bar_data(bar_data, tag=POINT_START, t_bar=0, l_bar=0, z=z_0, v_bar=0)
 
-        z_i = z_0
-        z_j = z_b
-        n = 1
-        delta_z = z_b - z_0
-        t_bar_i, l_bar_i, v_bar_i = 0, 0, 0
-        is_burn_out_contained = True
+        p_bar_max = 1e9 / p_scale  # 1 GPa
 
-        z_t_l_v_record = [(z_0, (0, 0, 0))]
-        p_max = 1e9
-        p_bar_max = p_max / p_scale
+        def abort_condition(z, tlv, _):
+            t_bar, l_bar, v_bar = tlv
+            p_bar = self.f_p_bar(z, l_bar, v_bar)
+            return l_bar > l_g_bar or p_bar > p_bar_max
 
-        while z_i < z_b:
-            z_t_l_v_record_i = []
-            if z_j == z_i:
-                raise ValueError("Numerical accuracy exhausted in search of exit/burnout point.")
+        z_end, (t_bar_end, l_bar_end, v_bar_end), aborted = rkf(
+            self.ode_z,
+            (0, 0, 0),
+            z_0,
+            z_b,
+            rel_tol=tol,
+            abort_func=abort_condition,
+        )
 
-            if z_j > z_b:
-                z_j = z_b
-            z_j, (t_bar_j, l_bar_j, v_bar_j), _ = rkf(
-                self.ode_z,
-                (t_bar_i, l_bar_i, v_bar_i),
-                z_i,
-                z_j,
-                rel_tol=tol,
-                abort_func=lambda _x, _ys, _records: self.abort_z(
-                    _x, _ys, _records, p_bar_max=p_bar_max, l_g_bar=l_g_bar
-                ),
-                record=z_t_l_v_record_i,
+        # check if integration exited due to excess pressure
+        p_bar_end = self.f_p_bar(z_end, l_bar_end, v_bar_end)
+        if p_bar_end > p_bar_max:
+            raise ValueError(
+                "excessive pressure encountered during integration (>1GPa mean). results cannot be expected to \
+be accurate due to gross violation of the applicable domain of Nobel-Abel equation-of-state. "
             )
 
-            p_bar_j = self.f_p_bar(z_j, l_bar_j, v_bar_j)
-
-            if l_bar_j >= l_g_bar:
-                if abs(l_bar_i - l_g_bar) / l_g_bar > tol or l_bar_i == 0:
-                    n *= 2
-                    z_j = z_i + delta_z / n
-                else:
-                    is_burn_out_contained = False
-                    break
-
-            else:
-                z_t_l_v_record.extend(z_t_l_v_record_i)
-                if v_bar_j <= 0:
-                    _, (t_bar, l_bar, v_bar) = z_t_l_v_record[-1]
-                    raise ValueError(
-                        "Squib load condition detected: Shot stopped in bore.\n"
-                        + "Shot is last calculated at {:.0f} mm at {:.0f} mm/s after {:.0f} ms".format(
-                            l_bar * self.l_0 * 1e3, v_bar * self.v_j * 1e3, t_bar * t_scale * 1e3
-                        )
-                    )
-
-                if any(v < 0 for v in (t_bar_j, l_bar_j, p_bar_j)):
-                    raise ValueError(
-                        "Numerical Integration diverged: negative values encountered in results.\n"
-                        + "{:.0f} ms, {:.0f} mm, {:.0f} m/s, {:.0f} MPa".format(
-                            t_bar_j * t_scale * 1e3,
-                            l_bar_j * self.l_0 * 1e3,
-                            v_bar_j * self.v_j,
-                            p_bar_j * p_scale * 1e-6,
-                        )
-                    )
-
-                if p_bar_j > p_bar_max:
-                    raise ValueError(
-                        "Nobel-Abel EoS is generally accurate enough below 600MPa. However, Unreasonably high pressure "
-                        + "(>{:.0f} MPa) was encountered.".format(p_max / 1e6),
-                    )
-
-                t_bar_i, l_bar_i, v_bar_i = t_bar_j, l_bar_j, v_bar_j
-
-                z_i = z_j
-                """
-                this way the group of values denoted by _i is always updated
-                as a group.
-                """
-                z_j += delta_z / n
-
-        if t_bar_i == 0:
-            raise ValueError("burnout point found to be at the origin.")
+        # Determine if exit happened before burnout
+        is_burn_out_contained = not (aborted and l_bar_end >= l_g_bar)
 
         if is_burn_out_contained:
+            self.append_bar_data(bar_data, tag=POINT_BURNOUT, t_bar=t_bar_end, l_bar=l_bar_end, z=z_b, v_bar=v_bar_end)
             self.logger.info("integrated to burnout point.")
         else:
             self.logger.warning("shot exited barrel before burnout.")
 
-        l_t_z_v_record = []
-        l_bar, (t_bar_e, z_e, v_bar_e), _ = rkf(
-            self.ode_l, (t_bar_i, z_i, v_bar_i), l_bar_i, l_g_bar, rel_tol=tol, record=l_t_z_v_record
+        # integrate to actual exit point for both cases
+        l_bar_exit, (t_bar_exit, z_exit, v_bar_exit), _ = rkf(
+            self.ode_l,
+            (t_bar_end, z_end, v_bar_end),
+            l_bar_end,
+            l_g_bar,
+            rel_tol=tol,
         )
+        # Populate exit point
+        self.append_bar_data(bar_data, tag=POINT_EXIT, t_bar=t_bar_exit, l_bar=l_g_bar, z=z_exit, v_bar=v_bar_exit)
 
-        if l_bar != l_g_bar:
-            if v_bar_e <= 0:
-                raise ValueError(
-                    "Squib load condition detected post burnout:"
-                    + " Round stopped in bore at {:.0f} mm".format(l_bar * self.l_0 * 1e3)
-                )
-
-        self.append_bar_data(bar_data, tag=POINT_EXIT, t_bar=t_bar_e, l_bar=l_g_bar, z=z_e, v_bar=v_bar_e)
-
-        t_bar_f = None
-        if z_b > 1.0 and z_e >= 1.0:
+        # Populate fracture point entry at Z = 1
+        if z_b > 1.0 and z_exit >= 1.0:
             t_bar_f, l_bar_f, v_bar_f = rkf(self.ode_z, (0, 0, 0), z_0, 1, rel_tol=tol)[1]
             self.append_bar_data(bar_data, tag=POINT_FRACTURE, t_bar=t_bar_f, l_bar=l_bar_f, z=1, v_bar=v_bar_f)
 
-        t_bar_b = None
-        if is_burn_out_contained:
-            t_bar_b, l_bar_b, v_bar_b = rkf(self.ode_z, (0, 0, 0), z_0, z_b, rel_tol=tol)[1]
-            self.append_bar_data(bar_data, tag=POINT_BURNOUT, t_bar=t_bar_b, l_bar=l_bar_b, z=z_b, v_bar=v_bar_b)
-
         def find_peak(g: Callable[[float], float], tag: Points) -> None:
-            t_bar_tol = tol * min(_t_bar for _t_bar in (t_bar_e, t_bar_b, t_bar_f) if _t_bar is not None)
-            t_bar_p = 0.5 * sum(gss(g, 0, t_bar_e if t_bar_b is None else t_bar_b, x_tol=t_bar_tol, find_min=False))
-
+            t_bar_p = 0.5 * sum(gss(g, 0, t_bar_exit, x_tol=t_bar_exit * tol, find_min=False))
             z_p, l_bar_p, v_bar_p = self.g(t_bar_p, tag, tol)[1]
             self.append_bar_data(bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p)
 
-        for i, peak in enumerate([POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH]):
+        # Find peak pressure in time domain
+        for peak in [POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH]:
             find_peak(lambda _t_bar: self.g(_t_bar, peak, z_0)[0], peak)
 
+        # Sampling
         if dom == DOMAIN_TIME:
             z_j, l_bar_j, v_bar_j, t_bar_j = z_0, 0, 0, 0
-        else:
-            t_bar_j, (z_j, l_bar_j, v_bar_j), _ = rkf(self.ode_t, (z_0, 0, 0), 0, 0.5 * t_bar_i, rel_tol=tol)
+        else:  # length domain ODE requires starting from some point
+            t_bar_j, (z_j, l_bar_j, v_bar_j), _ = rkf(self.ode_t, (z_0, 0, 0), 0, 0.5 * t_bar_exit, rel_tol=tol)
 
         for j in range(step):
             if dom == DOMAIN_TIME:
-                t_bar_k = t_bar_e / (step + 1) * (j + 1)
+                t_bar_k = t_bar_exit / (step + 1) * (j + 1)
                 z_j, l_bar_j, v_bar_j = rkf(self.ode_t, (z_j, l_bar_j, v_bar_j), t_bar_j, t_bar_k, rel_tol=tol)[1]
                 t_bar_j = t_bar_k
             else:
@@ -383,6 +323,7 @@ class Gun(BaseGun):
 
         self.logger.info(f"sampled for {step} points.")
 
+        # Data processing
         data = []
         p_trace = []
         trace_steps = max(step, 1)
@@ -402,30 +343,27 @@ class Gun(BaseGun):
             for i in range(trace_steps):
                 x = i / trace_steps * (l + self.l_c)
                 p_x, _ = self.to_px_u(l, ps, pb, v, x)
-                pp = PressureProbePoint(x, p_x)
-                p_line.append(pp)
+                p_line.append(PressureProbePoint(x, p_x))
 
             p_line.append(PressureProbePoint(l + self.l_c, ps))
             p_trace.append(PressureTraceEntry(dtag, temp, p_line))
 
-            table_entry = GunTableEntry(
-                tag=dtag,
-                time=t,
-                travel=l,
-                burnup=psi,
-                velocity=v,
-                breech_pressure=pb,
-                avg_pressure=p,
-                shot_pressure=ps,
-                temperature=temp,
+            data.append(
+                GunTableEntry(
+                    tag=dtag,
+                    time=t,
+                    travel=l,
+                    burnup=psi,
+                    velocity=v,
+                    breech_pressure=pb,
+                    avg_pressure=p,
+                    shot_pressure=ps,
+                    temperature=temp,
+                )
             )
 
-            data.append(table_entry)
-
-        data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda entries: entries[0].time))
-        gun_result = GunResult(self, data, p_trace)
-
-        return gun_result
+        data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda e: e[0].time))
+        return GunResult(self, data, p_trace)
 
     def append_bar_data(
         self,
@@ -449,8 +387,8 @@ class Gun(BaseGun):
                 return ps_bar, (z, l_bar, v_bar)
             elif tag == POINT_PEAK_BREECH:
                 return pb_bar, (z, l_bar, v_bar)
-            else:
-                raise ValueError("tag not handled.")
+
+        raise ValueError(f"tag {tag} not handled.")
 
     def abort_z(self, z: float, tlv: tuple[float, float, float], _, p_bar_max: float, l_g_bar: float) -> bool:
         t_bar, l_bar, v_bar = tlv
