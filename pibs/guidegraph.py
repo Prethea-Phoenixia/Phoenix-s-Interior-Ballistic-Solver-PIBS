@@ -52,10 +52,17 @@ def f(
         nozzle = getattr(target, "nozzle", None)
         if nozzle is not None:
             gun = gun_class(
-                geometry=geo, load=load, nozzle=nozzle, solver=target.solver, environment=target.environment
+                geometry=geo,
+                load=load,
+                nozzle=nozzle,
+                solver=target.solver,
             )
         else:
-            gun = gun_class(geometry=geo, load=load, solver=target.solver, environment=target.environment)
+            gun = gun_class(
+                geometry=geo,
+                load=load,
+                solver=target.solver,
+            )
 
         gun_result = gun.integrate(step=0)
 

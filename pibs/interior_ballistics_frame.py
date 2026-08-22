@@ -461,38 +461,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             columnspan=2,
         )
 
-        ### environment_frame: atmosphere settings
-        self.in_atmos = self.add_localized_label_check(
-            parent=design_frame, label_loc_key="atmosLabel", desc_label_key="atmosLabel", skip_grid=True
-        )
-        environment_frame = self.add_localized_label_frame(design_frame, labelwidget=self.in_atmos.check_widget)
-        environment_frame.grid(row=3, column=0, sticky="nsew", padx=2, pady=2)
-
-        environment_frame.columnconfigure(0, weight=1)
-        eb = RowBuilder(self, environment_frame)
-        self.amb_p = eb.input_3(
-            label_loc_key="ambPresLabel",
-            unit_text="kPa",
-            default="101.325",
-            validation=validation_nn,
-            dtype=float,
-        )
-        self.amb_rho = eb.input_3(
-            label_loc_key="ambRhoLabel",
-            unit_text="kg/m³",
-            default="1.204",
-            validation=validation_nn,
-            dtype=float,
-        )
-
-        self.amb_gamma = eb.input_3(
-            label_loc_key="ambGamLabel",
-            default="1.400",
-            validation=validation_nn,
-            dtype=float,
-        )
-
-        # design_frame.rowconfigure(sb.next(), weight=100)
+        design_frame.rowconfigure(sb.next(), weight=1)
 
         calc_frame = Frame(self)
         calc_frame.grid(row=0, column=3, rowspan=2, sticky="nsew")
@@ -729,7 +698,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.lock_Lg.trace_add("write", self.on_state_change)
         self.opt.trace_add("write", self.on_state_change)
         self.use_aux_grain.trace_add("write", self.on_state_change)
-        self.in_atmos.trace_add("write", self.on_state_change)
+        # self.in_atmos.trace_add("write", self.on_state_change)  # disabled
         self.type_optn.trace_add("write", self.on_state_change)
         self.use_material.trace_add("write", self.on_state_change)
         self.use_combustible.trace_add("write", self.on_state_change)
@@ -1011,7 +980,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     def config(self) -> SimulationConfig | None:
         try:
             lock = bool(self.lock_Lg.get())
-            atmosphere = bool(self.in_atmos.get())
+            # atmosphere = bool(self.in_atmos.get())  # disabled - aerodynamic drag removed
             material = bool(self.use_material.get())
 
             if self.prop is None:
@@ -1062,9 +1031,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 ),
                 structural_safety_factor=float(self.material_ssf.get()),
                 autofrettage=bool(self.material_is_af.get()),
-                ambient_pressure=float(self.amb_p.get()) * 1e3 if atmosphere else 0.0,
-                ambient_density=float(self.amb_rho.get()) if atmosphere else 0.0,
-                ambient_adiabatic_index=float(self.amb_gamma.get()) if atmosphere else 1.0,
                 guide_min_cmr=float(self.notebook_frame.guide_min_cmr.get()),
                 guide_max_cmr=float(self.notebook_frame.guide_max_cmr.get()),
                 guide_step_cmr=float(self.notebook_frame.guide_step_cmr.get()),
@@ -1373,7 +1339,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self._enable_group(
             self.use_material, self.material_yield, self.material_density, self.material_ssf, self.material_is_af
         )
-        self._enable_group(self.in_atmos, self.amb_p, self.amb_rho, self.amb_gamma)
         self._enable_group(self.use_combustible, self.combustible_mass_kg, self.combustible_force_kJ__kg)
 
     @staticmethod

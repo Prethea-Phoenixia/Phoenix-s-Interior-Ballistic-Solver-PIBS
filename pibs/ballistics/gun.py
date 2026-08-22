@@ -25,7 +25,7 @@ from . import (
     Solutions,
 )
 from .base_gun import BaseGun
-from .config import Environment, GunGeometry, PropellantLoad, Solver, Structural
+from .config import GunGeometry, PropellantLoad, Solver, Structural
 from .generics import (
     GenericEntry,
     GenericResult,
@@ -112,13 +112,11 @@ class Gun(BaseGun):
         geometry: GunGeometry,
         load: PropellantLoad,
         solver: Solver | None = None,
-        environment: Environment | None = None,
         logger: logging.Logger | None = None,
     ):
         super().__init__(
             geometry=geometry,
             load=load,
-            environment=environment,
             solver=solver,
             logger=logger,
         )
@@ -161,14 +159,14 @@ class Gun(BaseGun):
         psi = self.f_psi_z(z)
         l_psi_bar = 1 - self.delta * ((1 - psi) / self.rho_p + (self.alpha * psi))
         p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
-        return max(p_bar, self.p_a_bar)
+        return p_bar
 
     def ode_t(self, _: float, zlv: tuple[float, float, float]) -> tuple[float, float, float]:
         z, l_bar, v_bar = zlv
         p_bar = self.f_p_bar(z, l_bar, v_bar)
         dz = (0.5 * self.theta / self.b) ** 0.5 * p_bar**self.n
         dl_bar = v_bar
-        dv_bar = self.theta * 0.5 * (p_bar - self.func_p_ad_bar(v_bar))
+        dv_bar = self.theta * 0.5 * p_bar
 
         return dz, dl_bar, dv_bar
 
@@ -182,7 +180,7 @@ class Gun(BaseGun):
 
         dz = (0.5 * self.theta / self.b) ** 0.5 * p_bar**self.n / v_bar
 
-        dv_bar = self.theta * 0.5 * (p_bar - self.func_p_ad_bar(v_bar)) / v_bar
+        dv_bar = self.theta * 0.5 * p_bar / v_bar
         dt_bar = 1 / v_bar
 
         return dt_bar, dz, dv_bar
@@ -193,7 +191,7 @@ class Gun(BaseGun):
 
         dt_bar = (2 * self.b / self.theta) ** 0.5 * p_bar**-self.n
         dl_bar = v_bar * dt_bar
-        dv_bar = 0.5 * self.theta * (p_bar - self.func_p_ad_bar(v_bar)) * dt_bar
+        dv_bar = 0.5 * self.theta * p_bar * dt_bar
 
         return dt_bar, dl_bar, dv_bar
 

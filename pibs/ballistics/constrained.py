@@ -7,7 +7,7 @@ from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, Callable
 
 from . import MIN_BARR_VOLUME, MIN_PROJ_TRAVEL, JSONable, OptimizationTargets
-from .config import DesignConstraint, Environment, GunGeometry, PropellantLoad, Solver
+from .config import DesignConstraint, GunGeometry, PropellantLoad, Solver
 from .num import gss
 from .prop import DelegatesPropellant
 
@@ -39,7 +39,6 @@ class Constrained(DelegatesPropellant, JSONable):
         load: PropellantLoad,
         design: DesignConstraint,
         solver: Solver | None = None,
-        environment: Environment | None = None,
         logger: logging.Logger | None = None,
     ):
         self.logger = logger if logger else logging.getLogger(__name__)
@@ -49,7 +48,6 @@ class Constrained(DelegatesPropellant, JSONable):
         self.load = load
         self.design = design
         self.solver = solver if solver else Solver()
-        self.environment = environment if environment else Environment()
 
         if any(
             (
@@ -66,9 +64,6 @@ class Constrained(DelegatesPropellant, JSONable):
         if any((design.design_pressure <= 0, design.design_velocity <= 0)):
             raise ValueError("Invalid design constraint")
 
-        ambient_pressure = max(self.environment.ambient_pressure, 1)
-        ambient_adb_index = max(self.environment.adiabatic_index, 1)
-
         self.caliber = geometry.caliber
 
         self.s = (geometry.caliber / 2) ** 2 * math.pi
@@ -78,10 +73,6 @@ class Constrained(DelegatesPropellant, JSONable):
 
         self.p_d = design.design_pressure
         self.v_d = design.design_velocity
-
-        self.ambient_density = self.environment.ambient_density
-        self.ambient_pressure = ambient_pressure
-        self.ambient_adb_index = ambient_adb_index
 
         self.min_web = design.min_web
         self.max_length = design.max_length
@@ -99,7 +90,6 @@ class Constrained(DelegatesPropellant, JSONable):
                 },
                 "design": asdict(self.design),
                 "solver": asdict(self.solver),
-                "environment": asdict(self.environment),
             },
             ensure_ascii=False,
         )
@@ -116,20 +106,8 @@ class Constrained(DelegatesPropellant, JSONable):
         )
         design = DesignConstraint(**json_dict["design"])
         solver = Solver(**json_dict.get("solver", {}))
-        environment = Environment(**json_dict.get("environment", {}))
 
-        return cls(geometry=geometry, load=load, design=design, solver=solver, environment=environment)
-
-    def func_p_ad_bar(self, v_bar: float, c_a_bar: float, p_a_bar: float) -> float:
-        if c_a_bar and v_bar > 0.0:
-            v_r = v_bar / c_a_bar
-            return (
-                +0.25 * self.ambient_adb_index * (self.ambient_adb_index + 1) * v_r**2
-                + self.ambient_adb_index * v_r * (1 + (0.25 * (self.ambient_adb_index + 1)) ** 2 * v_r**2) ** 0.5
-            ) * p_a_bar
-
-        else:
-            return 0
+        return cls(geometry=geometry, load=load, design=design, solver=solver)
 
     def solve(
         self,

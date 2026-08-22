@@ -17,7 +17,7 @@ from . import (
     Points,
     Solutions,
 )
-from .config import DesignConstraint, Environment, GunGeometry, PropellantLoad, Solver
+from .config import DesignConstraint, GunGeometry, PropellantLoad, Solver
 from .constrained import Constrained
 from .gun import pidduck
 from .num import dekker, gss, rkf
@@ -34,7 +34,6 @@ class ConstrainedGun(Constrained):
         load: PropellantLoad,
         design: DesignConstraint,
         solver: Solver | None = None,
-        environment: Environment | None = None,
         logger: logging.Logger | None = None,
     ):
         super().__init__(
@@ -42,7 +41,6 @@ class ConstrainedGun(Constrained):
             load=load,
             design=design,
             solver=solver,
-            environment=environment,
             logger=logger,
         )
 
@@ -106,11 +104,6 @@ class ConstrainedGun(Constrained):
             )
 
         v_bar_d = self.v_d / v_j
-        if self.ambient_density:
-            c_a_bar = (self.ambient_adb_index * self.ambient_pressure / self.ambient_density) ** 0.5 / v_j
-            p_a_bar = self.ambient_pressure / (self.f * delta)
-        else:
-            c_a_bar, p_a_bar = 0, 0
 
         psi_0 = (1 / delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
         z_0, _ = dekker(self.propellant.f_psi_z, 0, 1, y=psi_0, y_rel_tol=self.tol)
@@ -118,7 +111,7 @@ class ConstrainedGun(Constrained):
         def func_p_control_bar(z: float, l_bar: float, v_bar: float) -> float:
             psi = self.f_psi_z(z)
             l_psi_bar = 1 - delta / self.rho_p - delta * (self.alpha - 1 / self.rho_p) * psi
-            p_bar = max((psi - v_bar**2) / (l_bar + l_psi_bar), p_a_bar)
+            p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
             if self.design.pressure_control == POINT_PEAK_AVG:
                 return p_bar
             else:
@@ -166,11 +159,11 @@ class ConstrainedGun(Constrained):
                 psi = self.f_psi_z(z)
                 l_psi_bar = 1 - delta / self.rho_p - delta * (self.alpha - 1 / self.rho_p) * psi
 
-                p_bar = max((psi - v_bar**2) / (l_bar + l_psi_bar), p_a_bar)
+                p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
 
                 dt_bar = (2 * b_e_1 / self.theta) ** 0.5 * p_bar**-self.n
                 dl_bar = v_bar * dt_bar
-                dv_bar = 0.5 * self.theta * (p_bar - self.func_p_ad_bar(v_bar, c_a_bar, p_a_bar)) * dt_bar
+                dv_bar = 0.5 * self.theta * p_bar * dt_bar
 
                 return dt_bar, dl_bar, dv_bar
 
@@ -243,8 +236,8 @@ class ConstrainedGun(Constrained):
             psi = self.f_psi_z(z)
 
             l_psi_bar = 1 - delta / self.rho_p - delta * (self.alpha - 1 / self.rho_p) * psi
-            p_bar = max((psi - v_bar**2) / (l_bar + l_psi_bar), p_a_bar)
-            dt_bar = 2 / (self.theta * (p_bar - self.func_p_ad_bar(v_bar, c_a_bar, p_a_bar)))
+            p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
+            dt_bar = 2 / (self.theta * p_bar)
             dz = dt_bar * (0.5 * self.theta / b) ** 0.5 * p_bar**self.n
             dl_bar = v_bar * dt_bar
 

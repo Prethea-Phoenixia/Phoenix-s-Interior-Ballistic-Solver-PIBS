@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass
 from math import inf, pi, tan
 from typing import Callable
@@ -18,7 +19,7 @@ from . import (
 )
 from . import SAMPLE, Domains, Points
 from .base_gun import BaseGun
-from .config import Environment, GunGeometry, Nozzle, PropellantLoad, Solver, Structural
+from .config import GunGeometry, Nozzle, PropellantLoad, Solver, Structural
 from .gun import GenericEntry, GenericResult, OutlineEntry, PressureProbePoint, PressureTraceEntry
 from .material import Material
 from .num import dekker, gss, rkf
@@ -45,13 +46,11 @@ class Recoilless(BaseGun):
         load: PropellantLoad,
         nozzle: Nozzle,
         solver: Solver | None = None,
-        environment: Environment | None = None,
         logger=None,
     ):
         super().__init__(
             geometry=geometry,
             load=load,
-            environment=environment,
             solver=solver,
             logger=logger,
         )
@@ -95,7 +94,7 @@ class Recoilless(BaseGun):
 
         p_bar = tau / (l_bar + l_psi_bar) * (psi - eta)
 
-        return max(p_bar, self.p_a_bar)
+        return p_bar
 
     def ode_t(
         self, t: float, z_t_l_v_eta_tau: tuple[float, float, float, float, float]
@@ -105,11 +104,10 @@ class Recoilless(BaseGun):
         d_psi = self.f_sigma_z(z)
         p_bar = self.f_p_bar(z, l_bar, eta, tau, psi)
 
-        p_d_bar = self.func_p_ad_bar(v_bar)
         dz = (0.5 * self.theta / self.b) ** 0.5 * p_bar**self.n
 
         dl_bar = v_bar
-        dv_bar = self.theta * 0.5 * (p_bar - p_d_bar)
+        dv_bar = self.theta * 0.5 * p_bar
 
         d_eta = self.C_a * self.s_j_bar * p_bar * tau**-0.5
         d_tau = ((1 - tau) * (d_psi * dz) - 2 * v_bar * dv_bar - self.theta * tau * d_eta) / (psi - eta)
@@ -122,23 +120,18 @@ class Recoilless(BaseGun):
         """length domain ode of internal ballistics
         the 1/v_bar pose a starting problem that prevent us from using it from
         initial condition.
-
         in general, d/dl_bar = d/dt_bar * dt_bar/dl_bar
-
         """
-        t, z, v_bar, eta, tau = t_z_v_eta_tau
 
+        t, z, v_bar, eta, tau = t_z_v_eta_tau
         psi = self.f_psi_z(z)
         d_psi__d_z = self.f_sigma_z(z)
         p_bar = self.f_p_bar(z, l_bar, eta, tau, psi)
-        p_d_bar = self.func_p_ad_bar(v_bar)
-
         dz = (0.5 * self.theta / self.b) ** 0.5 * p_bar**self.n / v_bar
-        dv_bar = self.theta * 0.5 * (p_bar - p_d_bar) / v_bar
+        dv_bar = self.theta * 0.5 * p_bar / v_bar
         dt_bar = 1 / v_bar
 
         d_eta = self.C_a * self.s_j_bar * p_bar * tau**-0.5 * dt_bar
-
         d_tau = ((1 - tau) * (d_psi__d_z * dz) - 2 * v_bar * dv_bar - self.theta * tau * d_eta) / (psi - eta)
 
         return dt_bar, dz, dv_bar, d_eta, d_tau
@@ -150,11 +143,10 @@ class Recoilless(BaseGun):
         psi = self.f_psi_z(z)
         d_psi__d_z = self.f_sigma_z(z)
         p_bar = self.f_p_bar(z, l_bar, eta, tau, psi)
-        p_d_bar = self.func_p_ad_bar(v_bar)
 
         dt_bar = (2 * self.b / self.theta) ** 0.5 * p_bar**-self.n
         dl_bar = v_bar * dt_bar
-        dv_bar = 0.5 * self.theta * (p_bar - p_d_bar) * dt_bar
+        dv_bar = 0.5 * self.theta * p_bar * dt_bar
         d_eta = self.C_a * self.s_j_bar * p_bar * tau**-0.5 * dt_bar
         d_tau = ((1 - tau) * d_psi__d_z - 2 * v_bar * dv_bar - self.theta * tau * d_eta) / (psi - eta)
 
@@ -169,190 +161,113 @@ class Recoilless(BaseGun):
         tol = tol if tol is not None else self.tol
 
         bar_data = []
-
         t_scale = self.l_0 / self.v_j
         p_scale = self.f * self.delta
-
         l_g_bar = self.l_g / self.l_0
-        p_bar_0 = self.p_0 / p_scale
+        z_0, z_b = self.z_0, self.z_b
 
-        self.append_bar_data(bar_data, tag=POINT_START, t_bar=0, l_bar=0, z=self.z_0, v_bar=0, eta=0, tau=1)
+        self.append_bar_data(bar_data, tag=POINT_START, t_bar=0, l_bar=0, z=z_0, v_bar=0, eta=0, tau=1)
 
-        z_i = self.z_0
-        z_j = self.z_b
-        n = 1
-        delta_z = self.z_b - self.z_0
+        # Phase 1: Integrate to burnout or exit
+        p_bar_max = 1e9 / p_scale  # 1 GPa
 
-        t_bar_i, l_bar_i, v_bar_i, p_bar_i, eta_i, tau_i = 0, 0, 0, p_bar_0, 0, 1
+        def abort_condition(z, tlv_eta_tau, _):
+            _, l_bar, v_bar, eta, tau = tlv_eta_tau
+            p_bar = self.f_p_bar(z, l_bar, eta, tau)
+            return l_bar > l_g_bar or p_bar > p_bar_max or p_bar < 0
 
-        is_burn_out_contained = True
+        z_end, (t_bar_end, l_bar_end, v_bar_end, eta_end, tau_end), aborted = rkf(
+            self.ode_z,
+            (0, 0, 0, 0, 1),
+            z_0,
+            z_b,
+            rel_tol=tol,
+            abort_func=abort_condition,
+        )
 
-        z_t_l_v_eta_tau_record = [(self.z_0, (0, 0, 0, 0, 1))]
-        p_max = 1e9
-        p_bar_max = p_max / p_scale
+        # Check for excessive pressure
+        p_bar_end = self.f_p_bar(z_end, l_bar_end, eta_end, tau_end)
+        if p_bar_end > p_bar_max:
+            raise ValueError(
+                "excessive pressure encountered during integration (>1GPa mean). results cannot be expected to "
+                + "be accurate due to gross violation of the applicable domain of Nobel-Abel equation-of-state."
+            )
 
-        while z_i < self.z_b:
-            z_t_l_v_eta_tau_record_i = []
-            if z_j == z_i:
-                raise ValueError("Numerical accuracy exhausted in search of exit/burnout point.")
-            try:
-                if z_j > self.z_b:
-                    z_j = self.z_b
-
-                z, (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j), _ = rkf(
-                    self.ode_z,
-                    (t_bar_i, l_bar_i, v_bar_i, eta_i, tau_i),
-                    z_i,
-                    z_j,
-                    rel_tol=tol,
-                    abort_func=lambda _x, _ys, _records: self.abort_z(
-                        _x, _ys, _records, p_bar_max=p_bar_max, l_g_bar=l_g_bar
-                    ),
-                    record=z_t_l_v_eta_tau_record_i,
-                )
-
-                p_bar_j = self.f_p_bar(z_j, l_bar_j, eta_j, tau_j)
-
-            except ValueError as e:
-                z_t_l_v_eta_tau_record.extend(z_t_l_v_eta_tau_record_i)
-                z, (t_bar, l_bar, v_bar, eta, tau) = z_t_l_v_eta_tau_record[-1]
-                dt_bar, dl_bar, dv_bar, d_eta, d_tau = self.ode_z(z, (t_bar, l_bar, v_bar, eta, tau), 0)
-
-                if all((dt_bar > 0, dl_bar > 0, dv_bar < 0)):
-                    raise ValueError(
-                        "Extremely low propulsive effort exerted on shot,"
-                        + " impossible to integrate down to numerical precision.\n"
-                        + "Shot last calculated at {:.0f} mm with velocity {:.0f} mm/s after {:.0f} ms\n".format(
-                            l_bar * self.l_0 * 1e3,
-                            v_bar * self.v_j * 1e3,
-                            t_bar * t_scale * 1e3,
-                        )
-                    )
-                else:
-                    raise e
-
-            if l_bar_j >= l_g_bar:
-                if abs(l_bar_i - l_g_bar) / l_g_bar > tol or l_bar_i == 0:
-                    n *= 2
-                    z_j = z_i + delta_z / n
-                else:
-                    is_burn_out_contained = False
-                    break
-
-            else:
-                z_t_l_v_eta_tau_record.extend(z_t_l_v_eta_tau_record_i)
-                if p_bar_j > p_bar_max:
-                    raise ValueError(
-                        "Nobel-Abel EoS is generally accurate enough below 600MPa. However,"
-                        + " Unreasonably high pressure (>{:.0f} MPa) was encountered.".format(p_max / 1e6)
-                    )
-
-                if v_bar_j <= 0:
-                    z, (t_bar, l_bar, v_bar, eta, tau) = z_t_l_v_eta_tau_record[-1]
-
-                    raise ValueError(
-                        "Squib load condition detected: Shot stopped in bore.\n"
-                        + "Shot is last calculated at {:.0f} mm at {:.0f} mm/s after {:.0f} ms".format(
-                            l_bar * self.l_0 * 1e3, v_bar * self.v_j * 1e3, t_bar * t_scale * 1e3
-                        )
-                    )
-
-                if any(v < 0 for v in (t_bar_j, l_bar_j, p_bar_j)):
-                    raise ValueError(
-                        "Numerical Integration diverged: negative values encountered in results.\n"
-                        + "{:.0f} ms, {:.0f} mm, {:.0f} m/s, {:.0f} MPa".format(
-                            t_bar_j * t_scale * 1e3,
-                            l_bar_j * self.l_0 * 1e3,
-                            v_bar_j * self.v_j,
-                            p_bar_j * p_scale * 1e-6,
-                        )
-                    )
-
-                t_bar_i, l_bar_i, v_bar_i, eta_i, tau_i = (t_bar_j, l_bar_j, v_bar_j, eta_j, tau_j)
-                z_i = z_j
-                z_j += delta_z / n
-
-        if t_bar_i == 0:
-            raise ValueError("burnout point found to be at the origin.")
+        # Determine if exit happened before burnout
+        is_burn_out_contained = not (aborted and l_bar_end >= l_g_bar)
 
         if is_burn_out_contained:
+            self.append_bar_data(
+                bar_data,
+                tag=POINT_BURNOUT,
+                t_bar=t_bar_end,
+                l_bar=l_bar_end,
+                z=z_b,
+                v_bar=v_bar_end,
+                eta=eta_end,
+                tau=tau_end,
+            )
             self.logger.info("integrated to burnout point.")
         else:
             self.logger.warning("shot exited barrel before burnout.")
 
-        l_t_z_v_eta_tau_record = []
-        t_bar_e, z_e, v_bar_e, eta_e, tau_e = rkf(
+        # Integrate to actual exit point
+        l_bar_exit, (t_bar_exit, z_exit, v_bar_exit, eta_exit, tau_exit), _ = rkf(
             self.ode_l,
-            (t_bar_i, z_i, v_bar_i, eta_i, tau_i),
-            l_bar_i,
+            (t_bar_end, z_end, v_bar_end, eta_end, tau_end),
+            l_bar_end,
             l_g_bar,
             rel_tol=tol,
-            record=l_t_z_v_eta_tau_record,
-        )[1]
-
+            debug=True,
+            logger=self.logger,
+        )
         self.append_bar_data(
-            bar_data, tag=POINT_EXIT, t_bar=t_bar_e, l_bar=l_g_bar, z=z_e, v_bar=v_bar_e, eta=eta_e, tau=tau_e
+            bar_data,
+            tag=POINT_EXIT,
+            t_bar=t_bar_exit,
+            l_bar=l_g_bar,
+            z=z_exit,
+            v_bar=v_bar_exit,
+            eta=eta_exit,
+            tau=tau_exit,
         )
 
-        t_bar_f = None
-        if self.z_b > 1.0 and z_e >= 1.0:
-            t_bar_f, l_bar_f, v_bar_f, eta_f, tau_f = rkf(self.ode_z, (0, 0, 0, 0, 1), self.z_0, 1, rel_tol=tol)[1]
-
+        # Fracture point
+        if z_b > 1.0 and z_exit >= 1.0:
+            t_bar_f, l_bar_f, v_bar_f, eta_f, tau_f = rkf(self.ode_z, (0, 0, 0, 0, 1), z_0, 1, rel_tol=tol)[1]
             self.append_bar_data(
                 bar_data,
                 tag=POINT_FRACTURE,
                 t_bar=t_bar_f,
                 l_bar=l_bar_f,
                 z=1.0,
+                v_bar=v_bar_f,
                 eta=eta_f,
                 tau=tau_f,
-                v_bar=v_bar_f,
             )
 
-        t_bar_b = None
-        if is_burn_out_contained:
-            t_bar_b, l_bar_b, v_bar_b, eta_b, tau_b = rkf(self.ode_z, (0, 0, 0, 0, 1), self.z_0, self.z_b, rel_tol=tol)[
-                1
-            ]
-
-            self.append_bar_data(
-                bar_data,
-                tag=POINT_BURNOUT,
-                t_bar=t_bar_b,
-                l_bar=l_bar_b,
-                z=self.z_b,
-                v_bar=v_bar_b,
-                eta=eta_b,
-                tau=tau_b,
-            )
-
+        # Peak finding
         def find_peak(g: Callable[[float], float], tag: Points) -> None:
-            t_bar_tol = tol * min(_t_bar for _t_bar in (t_bar_e, t_bar_b, t_bar_f) if _t_bar)
-            t_bar_p = 0.5 * sum(gss(g, 0, t_bar_e, x_tol=t_bar_tol, find_min=False))
-
+            t_bar_p = 0.5 * sum(gss(g, 0, t_bar_exit, x_tol=t_bar_exit * tol, find_min=False))
             z_p, l_bar_p, v_bar_p, eta_p, tau_p = self.g(t_bar_p, tag, tol)[1]
             self.append_bar_data(
                 bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p, eta=eta_p, tau=tau_p
             )
 
-        for i, peak in enumerate([POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH, POINT_PEAK_STAG]):
+        for peak in [POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH, POINT_PEAK_STAG]:
             find_peak(lambda _t_bar: self.g(_t_bar, peak, tol)[0], peak)
 
-        """
-        populate data for output purposes
-        """
-
+        # Sampling
         if dom == DOMAIN_TIME:
-            z_j, l_bar_j, v_bar_j, t_bar_j, eta_j, tau_j = self.z_0, 0.0, 0.0, 0.0, 0.0, 1.0
-        else:
+            z_j, l_bar_j, v_bar_j, t_bar_j, eta_j, tau_j = z_0, 0.0, 0.0, 0.0, 0.0, 1.0
+        else:  # length domain ODE requires starting from some point
             t_bar_j, (z_j, l_bar_j, v_bar_j, eta_j, tau_j), _ = rkf(
-                self.ode_t, (self.z_0, 0.0, 0.0, 0.0, 1.0), 0, 0.5 * t_bar_i, rel_tol=tol
+                self.ode_t, (z_0, 0.0, 0.0, 0.0, 1.0), 0, 0.5 * t_bar_exit, rel_tol=tol
             )
 
         for j in range(step):
-
             if dom == DOMAIN_TIME:
-                t_bar_k = t_bar_e / (step + 1) * (j + 1)
+                t_bar_k = t_bar_exit / (step + 1) * (j + 1)
                 z_j, l_bar_j, v_bar_j, eta_j, tau_j = rkf(
                     self.ode_t, (z_j, l_bar_j, v_bar_j, eta_j, tau_j), t_bar_j, t_bar_k, rel_tol=tol
                 )[1]
@@ -370,17 +285,13 @@ class Recoilless(BaseGun):
 
         self.logger.info(f"sampled for {step} points.")
 
-        """
-        sort the data points
-        """
-
+        # Data processing
         data, p_trace = [], []
         l_c = self.l_c
-
         trace_step = max(step, 1)
 
-        for bar_dataLine in bar_data:
-            dtag, t_bar, l_bar, z, v_bar, p_bar, eta, tau = bar_dataLine
+        for bar_data_line in bar_data:
+            dtag, t_bar, l_bar, z, v_bar, p_bar, eta, tau = bar_data_line
 
             t = t_bar * t_scale
             l = l_bar * self.l_0
@@ -395,7 +306,6 @@ class Recoilless(BaseGun):
             for i in range(trace_step):
                 x = i / trace_step * (l + l_c)
                 px = self.to_px(l, v, vb, ps, eta, x)
-
                 p_line.append(PressureProbePoint(x, px))
 
             p_line.append(PressureProbePoint(l + l_c, ps))
@@ -419,11 +329,8 @@ class Recoilless(BaseGun):
                 )
             )
 
-        data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda entries: entries[0].time))
-
-        recoilless_result = RecoillessResult(self, data, p_trace)
-
-        return recoilless_result
+        data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda e: e[0].time))
+        return RecoillessResult(self, data, p_trace)
 
     def g(self, t: float, tag: Points, tol: float) -> tuple[float, tuple[float, float, float, float, float]]:
         z, l_bar, v_bar, eta, tau = rkf(self.ode_t, (self.z_0, 0, 0, 0, 1), 0, t, rel_tol=tol)[1]

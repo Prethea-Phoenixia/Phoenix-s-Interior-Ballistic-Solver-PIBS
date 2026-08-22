@@ -41,13 +41,6 @@ class DesignConstraint:
 
 
 @dataclass
-class Environment:
-    ambient_pressure: float = 101.325e3
-    ambient_density: float = 1.204
-    adiabatic_index: float = 1.4
-
-
-@dataclass
 class Solver:
     tolerance: float = 1e-5
     max_iterations: int = 10

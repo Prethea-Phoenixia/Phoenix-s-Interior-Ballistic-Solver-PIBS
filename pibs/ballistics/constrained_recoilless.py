@@ -10,7 +10,7 @@ from . import (
     POINT_PEAK_SHOT,
     POINT_PEAK_STAG,
 )
-from .config import DesignConstraint, Environment, GunGeometry, Nozzle, PropellantLoad, Solver
+from .config import DesignConstraint, GunGeometry, Nozzle, PropellantLoad, Solver
 from .constrained import Constrained
 from .num import dekker, gss, rkf
 from .recoilless import Recoilless
@@ -24,7 +24,6 @@ class ConstrainedRecoilless(Constrained):
         design: DesignConstraint,
         nozzle: Nozzle,
         solver: Solver | None = None,
-        environment: Environment | None = None,
         logger: logging.Logger | None = None,
     ):
         super().__init__(
@@ -32,7 +31,6 @@ class ConstrainedRecoilless(Constrained):
             load=load,
             design=design,
             solver=solver,
-            environment=environment,
             logger=logger,
         )
 
@@ -87,13 +85,6 @@ class ConstrainedRecoilless(Constrained):
 
         t_scale = l_0 / v_j
 
-        if self.ambient_density != 0:
-            c_a_bar = (self.ambient_adb_index * self.ambient_pressure / self.ambient_density) ** 0.5 / v_j
-            p_a_bar = self.ambient_pressure / (self.f * delta)
-        else:
-            c_a_bar = 0
-            p_a_bar = 0
-
         if v_j < self.v_d and not known_bore:
             raise ValueError(
                 "propellant load too low to achieve design velocity, "
@@ -106,7 +97,7 @@ class ConstrainedRecoilless(Constrained):
 
         def func_p_avg_bar(psi: float, l_bar: float, eta: float, tau: float) -> float:
             l_psi_bar = 1 - delta * ((1 - psi) / self.rho_p + self.alpha * (psi - eta))
-            return max(tau / (l_bar + l_psi_bar) * (psi - eta), p_a_bar)
+            return tau / (l_bar + l_psi_bar) * (psi - eta)
 
         def f_p_bar_control(z: float, l_bar: float, v_bar: float, eta: float, tau: float) -> float:
             psi = self.f_psi_z(z)
@@ -170,7 +161,7 @@ class ConstrainedRecoilless(Constrained):
                 dz = (0.5 * self.theta / b_e_1) ** 0.5 * p_bar**self.n
 
                 dl_bar = v_bar
-                dv_bar = self.theta * 0.5 * (p_bar - self.func_p_ad_bar(v_bar, c_a_bar, p_a_bar))
+                dv_bar = self.theta * 0.5 * p_bar
 
                 d_eta = c_a * s_j_bar * p_bar * tau**-0.5
                 d_tau = ((1 - tau) * (d_psi__d_z * dz) - 2 * v_bar * dv_bar - self.theta * tau * d_eta) / (psi - eta)
@@ -258,7 +249,7 @@ class ConstrainedRecoilless(Constrained):
             d_psi = self.f_sigma_z(z)
 
             p_bar = func_p_avg_bar(psi=psi, l_bar=l_bar, eta=eta, tau=tau)
-            dt_bar = 2 / (self.theta * (p_bar - self.func_p_ad_bar(v_bar, c_a_bar, p_a_bar)))
+            dt_bar = 2 / (self.theta * p_bar)
             dz = dt_bar * (0.5 * self.theta / b) ** 0.5 * p_bar**self.n
             dl_bar = v_bar * dt_bar
             d_eta = c_a * s_j_bar * p_bar / tau**0.5 * dt_bar

@@ -6,10 +6,9 @@ import traceback
 from typing import Callable, Sequence, TypeVar
 
 T = TypeVar("T", bound=Sequence[float])
-logger = logging.getLogger(__name__)
 
 
-def handle_record(record: list[tuple[float, T]]):
+def handle_record(record: list[tuple[float, T]], logger: logging.Logger):
     output_string = "\nrecord:\n"
     for line in record:
         x, yval = line
@@ -37,6 +36,7 @@ def rkf(
     betas: tuple[tuple[float, ...], ...] = (),
     cs: tuple[float, ...] = (),
     c_hats: tuple[float, ...] = (),
+    logger: logging.Logger = None,
 ) -> tuple[float, T, bool]:
     """
     drive an embedded Runge-Kutta-Fehlberg p(p+1) pair to solve a system of
@@ -72,6 +72,10 @@ def rkf(
     Returns:
         x_1, (y1, y2, y3...)|x = x_1, abort
     """
+
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
     if record is None:
         record = []
     x, y_this = x_0, ini_val
@@ -149,7 +153,7 @@ def rkf(
 
             if abort_func is not None and abort_func(x, y_this, record):
                 if debug:
-                    handle_record(record=record)
+                    handle_record(record=record, logger=logger)
 
                 return x, y_this, True
 
@@ -160,7 +164,7 @@ def rkf(
 
     if debug:
         logger.debug("exiting main loop normally")
-        handle_record(record=record)
+        handle_record(record=record, logger=logger)
 
     if abs(x - x_1) > sys.float_info.epsilon * max(abs(x), abs(x_1)):
         raise ValueError(
@@ -181,6 +185,7 @@ def rkf45(
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] | None = None,
     record: list[tuple[float, T]] | None = None,
     debug: bool = False,
+    logger: logging.Logger = None,
 ) -> tuple[float, T, bool]:
     """
     use Runge Kutta Fehlberg of 4(5)th order to solve system of equation
@@ -241,6 +246,7 @@ def rkf45(
         betas=betas,
         cs=cs,
         c_hats=c_hats,
+        logger=logger,
     )
 
 

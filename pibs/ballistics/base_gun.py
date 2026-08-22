@@ -7,7 +7,7 @@ from dataclasses import asdict
 from typing import TYPE_CHECKING
 
 from . import JSONable
-from .config import Environment, GunGeometry, PropellantLoad, Solver
+from .config import GunGeometry, PropellantLoad, Solver
 from .num import dekker
 from .prop import DelegatesPropellant
 
@@ -20,7 +20,6 @@ class BaseGun(DelegatesPropellant, JSONable):
         self,
         geometry: GunGeometry,
         load: PropellantLoad,
-        environment: Environment | None = None,
         solver: Solver | None = None,
         logger: logging.Logger | None = None,
     ):
@@ -29,7 +28,6 @@ class BaseGun(DelegatesPropellant, JSONable):
 
         self.geometry = geometry
         self.load = load
-        self.environment = environment if environment else Environment()
         self.solver = solver if solver else Solver()
 
         self.caliber = geometry.caliber
@@ -46,16 +44,6 @@ class BaseGun(DelegatesPropellant, JSONable):
         self.delta = self.w / self.vol_0
         self.tol = self.solver.tolerance
         self.phi_1 = 1 / (1 - self.solver.drag_coefficient)
-
-        self.ambient_density = self.environment.ambient_density
-        self.ambient_pressure = self.environment.ambient_pressure
-        self.ambient_adb_index = self.environment.adiabatic_index
-
-        ambient_pressure, ambient_adb_index = max(self.ambient_pressure, 1), max(self.ambient_adb_index, 1)
-
-        self.p_a_bar = ambient_pressure / (self.f * self.delta)
-        self.c_a = (ambient_adb_index * ambient_pressure / self.ambient_density) ** 0.5 if self.ambient_density else 0
-        self.k_1 = ambient_adb_index
 
         self.psi_0 = (1 / self.delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
         if self.psi_0 <= 0:
@@ -80,16 +68,6 @@ class BaseGun(DelegatesPropellant, JSONable):
             * (self.f * self.delta) ** (2 * (1 - self.n))
         )
 
-    def func_p_ad_bar(self, v_bar: float) -> float:
-        if self.c_a and v_bar > 0:
-            v_r = v_bar * self.v_j / self.c_a
-            return (
-                0.25 * self.k_1 * (self.k_1 + 1) * v_r**2
-                + self.k_1 * v_r * (1 + (0.25 * (self.k_1 + 1)) ** 2 * v_r**2) ** 0.5
-            ) * self.p_a_bar
-        else:
-            return 0.0
-
     def to_json(self) -> str:
         return json.dumps(
             {
@@ -99,7 +77,6 @@ class BaseGun(DelegatesPropellant, JSONable):
                     "start_pressure": self.p_0,
                     "propellant": json.loads(self.propellant.to_json()),
                 },
-                "environment": asdict(self.environment),
                 "solver": asdict(self.solver),
             },
             ensure_ascii=False,
@@ -116,10 +93,9 @@ class BaseGun(DelegatesPropellant, JSONable):
             charge_mass=load_data["charge_mass"],
             start_pressure=load_data["start_pressure"],
         )
-        environment = Environment(**json_dict.get("environment", {}))
         solver = Solver(**json_dict.get("solver", {}))
 
-        return cls(geometry=geometry, load=load, environment=environment, solver=solver)
+        return cls(geometry=geometry, load=load, solver=solver)
 
     @staticmethod
     def barrel_monoblock(

@@ -56,11 +56,6 @@ class SimulationConfig:
     structural_safety_factor: float
     autofrettage: bool
 
-    # Environment (zero = vacuum/disabled)
-    ambient_pressure: float
-    ambient_density: float
-    ambient_adiabatic_index: float
-
     # Guide graph params
     guide_min_cmr: float
     guide_max_cmr: float

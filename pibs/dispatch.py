@@ -7,7 +7,7 @@ from .ballistics import CONVENTIONAL, RECOILLESS
 from .ballistics.config import DesignConstraint, PropellantLoad, Solver, Structural
 from .ballistics.constrained_gun import ConstrainedGun
 from .ballistics.constrained_recoilless import ConstrainedRecoilless
-from .ballistics.gun import Environment, Gun, GunGeometry
+from .ballistics.gun import Gun, GunGeometry
 from .ballistics.recoilless import Nozzle, Recoilless
 from .config import SimulationConfig
 from .guidegraph import guide_graph
@@ -33,11 +33,6 @@ def sim_config_to_ballistics(cfg: SimulationConfig):
         solution_method=cfg.solution_method,
         drag_coefficient=cfg.drag_coefficient,
     )
-    environment = Environment(
-        ambient_pressure=cfg.ambient_pressure,
-        ambient_density=cfg.ambient_density,
-        adiabatic_index=cfg.ambient_adiabatic_index,
-    )
     structural = Structural(
         material=cfg.structural_material,
         safety_factor=cfg.structural_safety_factor,
@@ -54,7 +49,7 @@ def sim_config_to_ballistics(cfg: SimulationConfig):
         expansion_ratio=cfg.nozzle_expansion,
         efficiency=cfg.nozzle_efficiency,
     )
-    return geometry, load, solver, environment, structural, design, nozzle
+    return geometry, load, solver, structural, design, nozzle
 
 
 def calculate(job_queue, log_queue, cfg: SimulationConfig):
@@ -65,7 +60,7 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
     gun, gun_result = None, None
     try:
         cfg.logger = logger
-        geo, load, solver, env, struct, design, nozzle = sim_config_to_ballistics(cfg)
+        geo, load, solver, struct, design, nozzle = sim_config_to_ballistics(cfg)
 
         """
         - constrained -> match: velocity & pressure
@@ -78,12 +73,10 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
 
         if cfg.constrained:
             if cfg.gun_type == CONVENTIONAL:
-                constrained = ConstrainedGun(
-                    geometry=geo, load=load, design=design, solver=solver, environment=env, logger=logger
-                )
+                constrained = ConstrainedGun(geometry=geo, load=load, design=design, solver=solver, logger=logger)
             elif cfg.gun_type == RECOILLESS:
                 constrained = ConstrainedRecoilless(
-                    geometry=geo, load=load, design=design, nozzle=nozzle, solver=solver, environment=env, logger=logger
+                    geometry=geo, load=load, design=design, nozzle=nozzle, solver=solver, logger=logger
                 )
             else:
                 raise ValueError("unknown gun type")
@@ -109,9 +102,9 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
                 geo.barrel_length = l_g
 
         if cfg.gun_type == CONVENTIONAL:
-            gun = Gun(geometry=geo, load=load, solver=solver, environment=env, logger=logger)
+            gun = Gun(geometry=geo, load=load, solver=solver, logger=logger)
         elif cfg.gun_type == RECOILLESS:
-            gun = Recoilless(geometry=geo, load=load, nozzle=nozzle, solver=solver, environment=env, logger=logger)
+            gun = Recoilless(geometry=geo, load=load, nozzle=nozzle, solver=solver, logger=logger)
         else:
             raise ValueError("unknown gun type")
 
@@ -137,17 +130,15 @@ def guide(guide_job_queue, log_queue, cfg: SimulationConfig):
     logger.info("guidance diagram calculation started")
     cfg.logger = logger
 
-    geo, load, solver, env, struct, design, nozzle = sim_config_to_ballistics(cfg)
+    geo, load, solver, struct, design, nozzle = sim_config_to_ballistics(cfg)
 
     guide_results = None
     try:
         if cfg.gun_type == CONVENTIONAL:
-            target = ConstrainedGun(
-                geometry=geo, load=load, design=design, solver=solver, environment=env, logger=logger
-            )
+            target = ConstrainedGun(geometry=geo, load=load, design=design, solver=solver, logger=logger)
         elif cfg.gun_type == RECOILLESS:
             target = ConstrainedRecoilless(
-                geometry=geo, load=load, design=design, nozzle=nozzle, solver=solver, environment=env, logger=logger
+                geometry=geo, load=load, design=design, nozzle=nozzle, solver=solver, logger=logger
             )
         else:
             raise ValueError("unknown gun type")
