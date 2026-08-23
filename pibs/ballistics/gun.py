@@ -21,6 +21,7 @@ from . import (
     SOL_MAMONTOV,
     SOL_PIDDUCK,
     Domains,
+    GunPeakPoints,
     Points,
     Solutions,
 )
@@ -292,7 +293,7 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
             t_bar_f, l_bar_f, v_bar_f = rkf(self.ode_z, (0, 0, 0), z_0, 1, rel_tol=tol)[1]
             self.append_bar_data(bar_data, tag=POINT_FRACTURE, t_bar=t_bar_f, l_bar=l_bar_f, z=1, v_bar=v_bar_f)
 
-        def find_peak(g: Callable[[float], float], tag: Points) -> None:
+        def find_peak(g: Callable[[float], float], tag: GunPeakPoints) -> None:
             t_bar_p = 0.5 * sum(gss(g, 0, t_bar_exit, x_tol=t_bar_exit * tol, find_min=False))
             z_p, l_bar_p, v_bar_p = self.g(t_bar_p, tag, tol)[1]
             self.append_bar_data(bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p)
@@ -374,7 +375,7 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
     ) -> None:
         bar_data.append((tag, t_bar, l_bar, z, v_bar, self.f_p_bar(z, l_bar, v_bar)))
 
-    def g(self, t_bar: float, tag: str, tol: float) -> tuple[float, tuple[float, float, float]]:
+    def g(self, t_bar: float, tag: GunPeakPoints, tol: float) -> tuple[float, tuple[float, float, float]]:
         z, l_bar, v_bar = rkf(self.ode_t, (self.z_0, 0, 0), 0, t_bar, rel_tol=tol)[1]
         p_bar = self.f_p_bar(z, l_bar, v_bar)
         if tag == POINT_PEAK_AVG:

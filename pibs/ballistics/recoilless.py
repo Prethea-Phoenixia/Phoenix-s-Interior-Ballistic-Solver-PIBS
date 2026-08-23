@@ -19,6 +19,7 @@ from . import (
     SAMPLE,
     Domains,
     Points,
+    RecoillessPeakPoints,
 )
 from .base_gun import BaseGun
 from .config import GunGeometry, Nozzle, PropellantLoad, Solver, Structural
@@ -243,7 +244,7 @@ class Recoilless(BaseGun):
             )
 
         # Peak finding
-        def find_peak(g: Callable[[float], float], tag: Points) -> None:
+        def find_peak(g: Callable[[float], float], tag: RecoillessPeakPoints) -> None:
             t_bar_p = 0.5 * sum(gss(g, 0, t_bar_exit, x_tol=t_bar_exit * tol, find_min=False))
             z_p, l_bar_p, v_bar_p, eta_p, tau_p = self.g(t_bar_p, tag, tol)[1]
             self.append_bar_data(
@@ -328,7 +329,9 @@ class Recoilless(BaseGun):
         data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda e: e[0].time))
         return RecoillessResult(self, data, p_trace)
 
-    def g(self, t: float, tag: Points, tol: float) -> tuple[float, tuple[float, float, float, float, float]]:
+    def g(
+        self, t: float, tag: RecoillessPeakPoints, tol: float
+    ) -> tuple[float, tuple[float, float, float, float, float]]:
         z, l_bar, v_bar, eta, tau = rkf(self.ode_t, (self.z_0, 0, 0, 0, 1), 0, t, rel_tol=tol)[1]
         p_bar = self.f_p_bar(z, l_bar, eta, tau)
 
