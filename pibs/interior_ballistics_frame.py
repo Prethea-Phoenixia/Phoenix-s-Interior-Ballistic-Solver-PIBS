@@ -817,14 +817,11 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         """
         Return the given string converted to a string that can be used for a clean
         filename. Remove leading and trailing spaces; convert other spaces to
-        underscores; and remove anything that is not an alphanumeric, dash,
-        underscore, or dot.
-
-        Adapted from Django:
-        https://github.com/django/django/blob/main/django/utils/text.py
+        underscores; and remove characters that are unsafe in filenames across
+        platforms (Windows-forbidden characters and control characters).
         """
         s = str(self.name_var.get()).strip().replace(" ", "_")
-        s = re.sub(r"(?u)[^-\w.]", "", s)
+        s = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "", s)
         if s in {"", ".", ".."}:
             messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("nameIssue"))
             raise ValueError(self.get_loc_str("nameIssue"))
