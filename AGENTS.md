@@ -16,8 +16,8 @@
 - **Entry**: `run_pibs.py` → `pibs.interior_ballistics.main()` → `PIBS(Tk)` → `InteriorBallisticsFrame`
 - **UI layer**: `pibs/interior_ballistics_frame.py`, `notebook_frame.py`, `info_frame.py`, `table_frame.py` (tkinter + matplotlib)
 - **Config**: `pibs/config.py` — `SimulationConfig` dataclass (all fields required, no defaults except `logger`). UI gathers values into this; dispatch passes it to ballistics core.
-- **Ballistics core**: `pibs/ballistics/` — `gun.py`, `recoilless.py`, `constrained*.py`, `config.py` (typed dataclasses: `GunGeometry`, `PropellantLoad`, `Solver`, etc.), `num/` (RK45/UMF integrators), `prop/` (propellant models)
-- **Dispatch**: `pibs/dispatch.py` — `calculate()` and `guide()` run in separate processes; `sim_config_to_ballistics()` converts `SimulationConfig` to ballistics objects.
+- **Ballistics core**: `pibs/ballistics/` — `gun.py`, `recoilless.py`, `constrained*.py`, `config.py` (typed dataclasses with `__post_init__` validation: `GunGeometry`, `PropellantLoad`, `Solver`, etc.), `num/` (RK45/UMF integrators), `prop/` (propellant models)
+- **Dispatch**: `pibs/dispatch.py` — `calculate()` and `guide()` run in separate processes; `sim_config_to_ballistics()` converts `SimulationConfig` to ballistics objects (triggers validation).
 - **Resources**: loaded via `resolve_path()` from `pibs/misc.py` — handles both dev mode and frozen PyInstaller builds.
 
 ## Considered Design Decisions
@@ -27,6 +27,14 @@
 - `Gun`/`Recoilless` own the full simulation pipeline (ODE setup, integration, peak finding, sampling, pressure traces). Splitting into separate `PressureCalculator`, `BurnModel`, `MotionSolver` classes would add indirection over inherently coupled state (`z`, `l_bar`, `v_bar`, `p_bar`) without real benefit for this scope.
 - `InteriorBallisticsFrame` (1400+ lines) is a tkinter God frame — framework limitation, not design oversight.
 - Refactors should not break these classes apart "for purity." Tight coupling here tracks the physics, not accidental complexity.
+
+**Input validation lives in the domain layer, not the UI.**
+
+- Ballistics config dataclasses use `__post_init__` to validate constraints (positive values, ranges, membership).
+- The UI performs only **normalization** (empty→0.0, str→float via focus-out formatters), not constraint checking.
+- Invalid values surface as `ValueError` at `dispatch.sim_config_to_ballistics()` — caught by the existing error handling infrastructure.
+- This ensures consistent validation across all entry points (GUI, CLI, API, tests).
+- Valid value collections (`VALID_SOLUTION_METHODS`, `VALID_PRESSURE_POINTS`, etc.) are defined in `ballistics/__init__.py` alongside their `Literal` type aliases.
 
 ## Save / Load
 
