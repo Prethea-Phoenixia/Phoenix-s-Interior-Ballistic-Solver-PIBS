@@ -19,7 +19,6 @@ from .ballistics.prop import Propellant
 from .ballistics.recoilless import RecoillessTableEntry
 from .config import SimulationConfig
 from .localized_widget import LocalizedFrame
-from .misc import validate_ce, validate_nn
 from .table_frame import TableFrame
 from .theme import ThemedMixin
 
@@ -42,8 +41,6 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
 
         self.master: InteriorBallisticsFrame = master
 
-        validation_nn = self.register(validate_nn)
-        validation_ce = self.register(validate_ce)
         self.font = font
 
         self.columnconfigure(0, weight=1)
@@ -259,17 +256,16 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
                 desc_label_key=None,
                 default=default,
                 unit_text=unit,
-                validation=validation,
                 row=j,
                 dtype=float,
                 label_width=25,
             )
-            for j, (locKey, default, unit, validation) in enumerate(
+            for j, (locKey, default, unit) in enumerate(
                 (
-                    ("stepLFLabel", "5.0", "%", validation_ce),
-                    ("minCMRLabel", "0.05", "", validation_nn),
-                    ("maxCMRLabel", "1.00", "", validation_nn),
-                    ("stepCMRLabel", "0.05", "", validation_nn),
+                    ("stepLFLabel", "5.0", "%"),
+                    ("minCMRLabel", "0.05", ""),
+                    ("maxCMRLabel", "1.00", ""),
+                    ("stepCMRLabel", "0.05", ""),
                 )
             )
         )

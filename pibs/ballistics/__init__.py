@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Literal, TypeVar, Union
+from typing import Literal, TypeVar
 
 DOMAIN_TIME = "DOMAIN_TIME"
 DOMAIN_LEN = "DOMAIN_LEN"
 
-Domains = Union[Literal["DOMAIN_TIME", "DOMAIN_LEN"], str]
+VALID_DOMAINS = (DOMAIN_TIME, DOMAIN_LEN)
+Domains = Literal["DOMAIN_TIME", "DOMAIN_LEN"]
 
 POINT_START = "SHOT_START"
 POINT_PEAK_AVG = "PEAK_AVG_P"
@@ -18,37 +19,49 @@ POINT_PEAK_STAG = "PEAK_STAG_P"
 SAMPLE = "SAMPLE"
 COMPUTE = "COMPUTE"
 
-Points = Union[
-    Literal[
-        "SHOT_START",
-        "PEAK_AVG_P",
-        "PEAK_BREECH_P",
-        "PEAK_SHOT_P",
-        "FRACTURE",
-        "BURNOUT",
-        "SHOT_EXIT",
-        "PEAK_STAG_P",
-        "COMPUTE",
-        "SAMPLE",
-    ],
-    str,
+VALID_POINTS = (
+    POINT_START,
+    POINT_PEAK_AVG,
+    POINT_PEAK_BREECH,
+    POINT_PEAK_SHOT,
+    POINT_FRACTURE,
+    POINT_BURNOUT,
+    POINT_EXIT,
+    POINT_PEAK_STAG,
+    SAMPLE,
+    COMPUTE,
+)
+Points = Literal[
+    "SHOT_START",
+    "PEAK_AVG_P",
+    "PEAK_BREECH_P",
+    "PEAK_SHOT_P",
+    "FRACTURE",
+    "BURNOUT",
+    "SHOT_EXIT",
+    "PEAK_STAG_P",
+    "SAMPLE",
+    "COMPUTE",
 ]
 
 SOL_LAGRANGE = "SOL_LAGRANGE"
 SOL_PIDDUCK = "SOL_PIDDUCK"
 SOL_MAMONTOV = "SOL_MAMONTOV"
 
+VALID_SOLUTION_METHODS = (SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV)
+Solutions = Literal["SOL_LAGRANGE", "SOL_PIDDUCK", "SOL_MAMONTOV"]
+
+VALID_PRESSURE_POINTS = (POINT_PEAK_BREECH, POINT_PEAK_SHOT, POINT_PEAK_AVG, POINT_PEAK_STAG)
 
 MIN_BARR_VOLUME = "MIN_BARR_VOLUME"
 MIN_PROJ_TRAVEL = "MIN_PROJ_TRAVEL"
-OptimizationTargets = Union[Literal["MIN_BARR_VOLUME", "MIN_PROJ_TRAVEL"], str]
-
-Solutions = Union[Literal["SOL_LAGRANGE", "SOL_PIDDUCK", "SOL_MAMONTOV"], str]
+VALID_OPT_TARGETS = (MIN_BARR_VOLUME, MIN_PROJ_TRAVEL)
+OptimizationTargets = Literal["MIN_BARR_VOLUME", "MIN_PROJ_TRAVEL"]
 
 CONVENTIONAL = "CONVENTIONAL"
 RECOILLESS = "RECOILLESS"
-
-GunTypes = Union[Literal["CONVENTIONAL", "RECOILLESS"], str]
+VALID_GUN_TYPES = (CONVENTIONAL, RECOILLESS)
+GunTypes = Literal["CONVENTIONAL", "RECOILLESS"]
 
 MAX_ITER = 10
 

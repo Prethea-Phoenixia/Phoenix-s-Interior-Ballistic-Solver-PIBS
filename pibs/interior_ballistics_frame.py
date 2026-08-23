@@ -53,9 +53,6 @@ from .misc import (
     resolve_path,
     round_sig,
     to_si,
-    validate_ce,
-    validate_nn,
-    validate_pi,
 )
 from .notebook_frame import NotebookFrame
 from .theme import ThemedMixin
@@ -94,10 +91,11 @@ class TextHandler(logging.Handler):
         def append():
             self.text.configure(state="normal")
 
-            # use record name as tags
             # tags = record.name.split(".")
-            tags = []
-            self.text.insert("end", msg.strip("\n") + "\n", [record.levelno, *tags])
+            # tags = []
+            # self.text.insert("end", msg.strip("\n") + "\n", [record.levelno, *tags])
+
+            self.text.insert("end", msg.strip("\n") + "\n", record.levelno)
             self.text.configure(state="disabled")
 
             # Autoscroll to the bottom
@@ -119,10 +117,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             localization_dict=localization_dict,
             os_dark=os_dark,
         )
-
-        validation_nn = self.register(validate_nn)
-        validation_pi = self.register(validate_pi)
-        validation_ce = self.register(validate_ce)
 
         self.font = font
         self.job_queue, self.guide_job_queue, self.log_queue = Queue(), Queue(), Queue()
@@ -238,7 +232,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="calLabel",
             unit_text="mm",
             default="50.0",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -246,7 +239,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="tblLabel",
             unit_text="mm",
             default="3500.0",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -254,7 +246,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="shtLabel",
             unit_text="kg",
             default="2.0",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -262,7 +253,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="chgLabel",
             unit_text="kg",
             default="0.5",
-            validation=validation_nn,
             tooltip_loc_key="chgText",
             dtype=float,
         )
@@ -283,7 +273,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             desc_label_key="Web",
             unit_text="mm",
             default="1.0",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -291,7 +280,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             desc_label_key="1/α",
             unit_text="x",
             default="1.0",
-            validation=validation_nn,
             tooltip_loc_key="",
             dtype=float,
         )
@@ -300,7 +288,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             desc_label_key="1/β",
             unit_text="x",
             default="10.0",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -325,7 +312,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="auxMassRatio",
             default="1.0",
             unit_text="x",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -339,7 +325,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             default="1.0",
             unit_text="x",
             label_loc_key="auxWebRatio",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -347,7 +332,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             unit_text="x",
             default="1.0",
             desc_label_key="Auxiliary 1/α",
-            validation=validation_nn,
             tooltip_loc_key="",
             dtype=float,
         )
@@ -356,7 +340,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             unit_text="x",
             default="10.0",
             desc_label_key="Auxiliary 1/β",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -368,7 +351,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="cvLabel",
             unit_text="L",
             default="1.0",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -376,7 +358,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="clrLabel",
             unit_text="x",
             default="1.5",
-            validation=validation_nn,
             tooltip_loc_key="clrText",
             dtype=float,
         )
@@ -385,7 +366,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="dgcLabel",
             unit_text="%",
             default="3.0",
-            validation=validation_ce,
             tooltip_loc_key="dgcText",
             dtype=float,
         )
@@ -394,7 +374,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="stpLabel",
             unit_text="MPa",
             default="30.0",
-            validation=validation_nn,
             tooltip_loc_key="stpText",
             dtype=float,
         )
@@ -403,7 +382,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="nozzExpLabel",
             unit_text="x",
             default="4.0",
-            validation=validation_nn,
             tooltip_loc_key="nozzExpText",
             dtype=float,
         )
@@ -412,7 +390,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="nozzEffLabel",
             unit_text="%",
             default="92.0",
-            validation=validation_ce,
             tooltip_loc_key="nozzEffText",
             dtype=float,
         )
@@ -435,21 +412,18 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="matDensityLabel",
             unit_text="kg/m³",
             default="7850.0",
-            validation=validation_nn,
             dtype=float,
         )
         self.material_yield = mb.input_3(
             label_loc_key="matYieldLabel",
             unit_text="MPa",
             default="1000.0",
-            validation=validation_nn,
             dtype=float,
         )
 
         self.material_ssf = mb.input_2(
             label_loc_key="sffLabel",
             default="1.35",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -526,7 +500,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             unit_text="kg",
             desc_label_key="ωʹ",
             dtype=float,
-            validation=validation_nn,
         )
 
         self.combustible_force_kJ__kg = cb.input_3(
@@ -535,7 +508,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             unit_text="kJ/kg",
             desc_label_key="fʹ",
             dtype=float,
-            validation=validation_nn,
         )
 
         force_fudge_frame = Frame(propellant_frame)
@@ -552,7 +524,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             default="100.0",
             unit_text="%",
             dtype=float,
-            validation=validation_nn,
         )
 
         ### solution_frame: IB model selection
@@ -614,7 +585,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="vTgtLabel",
             unit_text="m/s",
             default="1000.0",
-            validation=validation_nn,
             dtype=float,
         )
 
@@ -622,7 +592,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="pTgtLabel",
             unit_text="MPa",
             default="350.0",
-            validation=validation_nn,
             tooltip_loc_key="pTgtText",
             dtype=float,
         )
@@ -633,7 +602,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="iniWebLabel",
             unit_text="μm",
             default="100.0",
-            validation=validation_nn,
             color="red",
             dtype=float,
         )
@@ -641,7 +609,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             label_loc_key="maxLgLabel",
             unit_text="m",
             default="10.0",
-            validation=validation_nn,
             color="red",
             dtype=float,
         )
@@ -666,14 +633,12 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.step = sb.input_2(
             label_loc_key="stepLabel",
             default="33",
-            validation=validation_nn,
             formatter=format_int_input,
         )
 
         self.acc_exp = ob.input_2(
             label_loc_key="-log10(ε)",
             default="3",
-            validation=validation_pi,
             formatter=format_int_input,
             color="red",
             tooltip_loc_key="tolText",
@@ -682,7 +647,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.max_iter = ob.input_2(
             label_loc_key="maxIterLabel",
             default="10",
-            validation=validation_pi,
             formatter=format_int_input,
             color="red",
         )

@@ -323,69 +323,6 @@ def to_si(v: float | str, dec: int = 4, unit: str = "", unit_dim: int = 1, use_s
         raise ValueError(f"Cannot convert type of {type(v):} to SI notation")
 
 
-def validate_nn(inp):
-    """
-    validate an input if it results in:
-    - result >=0
-    - result is empty
-    in the latter case, the empty field will be handled by tracing
-    change in variable.
-    """
-    if (
-        inp == ""
-        or inp == "."
-        or (inp.count("e") == 1 and inp[-1] == "e")  # scientific input
-        or (inp.count("e") == 1 and inp[-2:] == "e-")  # scientific input with negative exponent
-    ):
-        return True
-    try:
-        if float(inp) >= 0:
-            return True
-        else:
-            return False
-    except ValueError:
-        return False
-
-
-def validate_pi(inp: str):  # validate an input such that the result is a positive integer
-    if inp == "":
-        return True  # we will catch this by filling the default value
-    try:
-        return float(inp).is_integer() and float(inp) > 0 and "." not in inp
-    except ValueError:
-        return False
-
-
-def validate_ce(inp: str) -> float:
-    return validate_range(inp, low=0.0, high=100.0)
-
-
-def validate_range(inp: str, low: float, high: float) -> float:  # validate a range
-    high, low = max((high, low)), min((high, low))
-    if inp == "":
-        return True
-    try:
-        return high >= float(inp) >= low
-    except ValueError:
-        return False
-
-
-def validate_flt(inp):  # validate an input such that the result is a float.
-    if (
-        inp == ""
-        or inp == "."
-        or inp == "-"
-        or (inp.count("e") == 1 and inp[-1] == "e")  # scientific input
-        or (inp.count("e") == 1 and inp[-2:] == "e-")  # scientific input with negative exponent
-    ):
-        return True
-    try:
-        float(inp)
-        return True
-    except ValueError:
-        return False
-
-
 def format_float_input(event, var):
     # v = event.widget.get()
     v = var.get()
