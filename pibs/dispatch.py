@@ -5,8 +5,8 @@ from logging.handlers import QueueHandler
 
 from .ballistics import CONVENTIONAL, RECOILLESS
 from .ballistics.config import DesignConstraint, PropellantLoad, Solver, Structural
-from .ballistics.constrained_gun import ConstrainedGun
-from .ballistics.constrained_recoilless import ConstrainedRecoilless
+from .ballistics.cons_gun import ConstrainedGun
+from .ballistics.cons_rcl import ConstrainedRecoilless
 from .ballistics.gun import Gun, GunGeometry
 from .ballistics.recoilless import Nozzle, Recoilless
 from .config import SimulationConfig
