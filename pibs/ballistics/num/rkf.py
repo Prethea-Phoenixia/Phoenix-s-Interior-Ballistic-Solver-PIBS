@@ -28,7 +28,6 @@ def rkf(
     x_1: float,
     rel_tol: float,
     abs_tol: float = sys.float_info.epsilon,
-    min_tol: float = sys.float_info.epsilon,
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] | None = None,
     record: list[tuple[float, T]] | None = None,
     debug: bool = False,
@@ -51,9 +50,6 @@ def rkf(
         x_1        : integration end point
         rel_tol    : relative tolerance, per component
         abs_tol    : absolute tolerance, per component
-        min_tol    : minimum tolerance, per component. This is added to the error
-                    estimation, to encourage conservatism in the integrator, and to
-                    guard against division by 0 if functional value tends to 0
 
         abort_func : optional, function that accepts arguments of
                     (x - current value of integrand, ys - current values of the SoE,
@@ -79,6 +75,8 @@ def rkf(
 
     if record is None:
         record = []
+
+    abs_tol = max(abs(abs_tol), sys.float_info.epsilon)
     x, y_this = x_0, ini_val
 
     beta = 0.84  # "safety" factor
@@ -146,7 +144,7 @@ def rkf(
 
         max_relative_error = sys.float_info.epsilon  # initialize R
         for te, y1, y2 in zip(truncation_errors, y_this, y_next):
-            ry = abs(te) / max((rel_tol * min(abs(y1), abs(y2))), abs_tol, min_tol)
+            ry = abs(te) / max((rel_tol * min(abs(y1), abs(y2))), abs_tol)
             max_relative_error = max(max_relative_error, ry)
 
         if max_relative_error < 1:  # error is acceptable
@@ -182,7 +180,6 @@ def rkf45(
     x_1: float,
     rel_tol: float,
     abs_tol: float = sys.float_info.epsilon,
-    min_tol: float = sys.float_info.epsilon,
     abort_func: Callable[[float, T, list[tuple[float, T]]], bool] | None = None,
     record: list[tuple[float, T]] | None = None,
     debug: bool = False,
@@ -205,9 +202,6 @@ def rkf45(
         x_1        : integration end point
         rel_tol    : relative tolerance, per component
         abs_tol    : absolute tolerance, per component
-        min_tol    : minimum tolerance, per component. This is added to the error
-                    estimation, to encourage conservatism in the integrator, and to
-                    guard against division by 0 if functional value tends to 0
 
         abort_func : optional, function that accepts arguments of
                     (x - current value of integrand, ys - current value of the SoE,
@@ -240,7 +234,6 @@ def rkf45(
         x_1=x_1,
         rel_tol=rel_tol,
         abs_tol=abs_tol,
-        min_tol=min_tol,
         abort_func=abort_func,
         record=record,
         debug=debug,
@@ -265,7 +258,7 @@ if __name__ == "__main__":
     t_0 = time.time()
     v = (0,)
     for _ in range(100):
-        _, v, _ = rkf45(df, (3.0,), 2, 0, rel_tol=1e-4, abs_tol=1e-4, min_tol=1e-14, debug=False)
+        _, v, _ = rkf45(df, (3.0,), 2, 0, rel_tol=1e-4, abs_tol=1e-4, debug=False)
     t_1 = time.time()
 
     print(f"time: {t_1 - t_0}")

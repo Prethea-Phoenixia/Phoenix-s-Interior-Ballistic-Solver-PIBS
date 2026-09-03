@@ -213,8 +213,10 @@ class ConstrainedGun(Constrained):
         next_probe_web = probe_web
 
         while dp_bar_probe * next_dp_bar_probe > 0:
+
             probe_web = next_probe_web
             dp_bar_probe = next_dp_bar_probe
+
             next_probe_web = probe_web * 2 if dp_bar_probe > 0 else probe_web * 0.5
             next_dp_bar_probe = func_p_e_1(next_probe_web)[0]
 
