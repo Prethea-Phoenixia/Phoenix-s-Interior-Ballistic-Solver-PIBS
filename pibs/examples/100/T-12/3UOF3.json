@@ -13,7 +13,7 @@
 	"Combustible Cartridge": false,
 	"Constrain Design": true,
 	"Constrain Travel": true,
-	"Description": "Ballistics of the 3UOF3 100x910mmR HE-F-FS round with the 3OF15 projectile, fired from the T-12 and MT-12 anti-tank guns, adopted in 1960.\n\nLoads 3.785 kg of 13/1 DG-3 grains. Tabulated velocity is 700 m/s.\n\nReferences:\n- 100-мм ПРОТИВОТАНКОВАЯ ПУШКА MT-12 РУКОВОДСТВО СЛУЖБЫ (1980)\n- артиллерийские метательные заряды (Г.Г. Валеев, В.Ф. Сопин, Б.А. Соков, 2004)",
+	"Description": "Ballistics of the 3UOF3 100x910mmR HE-F-FS round with the 3OF15 projectile, fired from the T-12 and MT-12 anti-tank guns, adopted in 1960.\n\nLoads 3.785 kg of 13/1 DG-3 grains. Tabulated velocity is 700 m/s. Pressure adjusted to yield tabulated velocity.\n\nReferences:\n- 100-мм ПРОТИВОТАНКОВАЯ ПУШКА MT-12 РУКОВОДСТВО СЛУЖБЫ (1980)\n- артиллерийские метательные заряды (Г.Г. Валеев, В.Ф. Сопин, Б.А. Соков, 2004)",
 	"Expansion Ratio (x)": 4.0,
 	"Force Modifier (%)": 100.0,
 	"Gradient": "SOL_LAGRANGE",
