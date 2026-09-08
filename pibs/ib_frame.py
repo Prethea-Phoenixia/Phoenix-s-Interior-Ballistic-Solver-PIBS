@@ -657,7 +657,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.lock_Lg.trace_add("write", self.on_state_change)
         self.opt.trace_add("write", self.on_state_change)
         self.use_aux_grain.trace_add("write", self.on_state_change)
-        # self.in_atmos.trace_add("write", self.on_state_change)  # disabled
         self.type_optn.trace_add("write", self.on_state_change)
         self.use_material.trace_add("write", self.on_state_change)
         self.use_combustible.trace_add("write", self.on_state_change)
@@ -935,7 +934,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     def config(self) -> SimulationConfig | None:
         try:
             lock = bool(self.lock_Lg.get())
-            # atmosphere = bool(self.in_atmos.get())  # disabled - aerodynamic drag removed
             material = bool(self.use_material.get())
 
             if self.prop is None:
@@ -1087,12 +1085,14 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         else:
             self.max_iter.disable()
 
+    @lock_out
     def on_guide(self):
         self.focus()
         self.guide_process = Process(target=guide, args=(self.guide_job_queue, self.log_queue, self.config))
         self.guide_process.start()
         self._inhibit_widgets()
 
+    @lock_out
     def on_calculate(self):
         self.focus()
         cfg = self.config
@@ -1104,6 +1104,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
     def get_value(self):
         cfg: SimulationConfig | None = None
+        
         while not self.job_queue.empty():
             cfg, self.gun, self.gun_result = self.job_queue.get_nowait()
 
