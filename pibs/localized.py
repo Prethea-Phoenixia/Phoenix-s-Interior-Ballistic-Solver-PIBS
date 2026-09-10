@@ -62,6 +62,7 @@ from typing import (
     Callable,
     Literal,
     Union,
+    TypeVar,
 )
 
 from .misc import format_float_input
@@ -466,18 +467,20 @@ class Loc3Input(Loc2Input):
             return super().get_descriptive() + (f" ({self.unit_text})" if self.unit_text else "")
 
 
+T = TypeVar("T")
+
 class LocDropdown(ComputableWidget, Descriptive):
     def __init__(
         self,
         parent: ttk.Widget,
         loc_func: localize_function_type = placeholder_loc_func,
         font: Font | None = None,
-        str_obj_dict: dict[str, object] | None = None,
+        str_obj_dict: dict[str, T] | None = None,
         all_localized: list[LocalizableWidget] | None = None,
         desc_label_key: str = "",
         tooltip_loc_key: str = "",
     ) -> None:
-        self.str_obj_dict: dict[str, object] = str_obj_dict if str_obj_dict else {"": ""}
+        self.str_obj_dict: dict[str, T] = str_obj_dict if str_obj_dict else {"": ""}
         self.loc_str_obj_dict = self._update_loc_str_obj_dict(loc_func)
         var = StringVar()
         widget = ttk.Combobox(
@@ -515,13 +518,13 @@ class LocDropdown(ComputableWidget, Descriptive):
     def get(self) -> str:
         return self.get_obj().__str__()
 
-    def get_obj(self) -> object:
+    def get_obj(self) ->T:
         return self.loc_str_obj_dict[self.var.get()]
 
     def set_by_str(self, string: str) -> None:
         self.widget.set(self.widget["values"][list(self.str_obj_dict.keys()).index(string)])
 
-    def set_by_obj(self, obj: object) -> None:
+    def set_by_obj(self, obj: T) -> None:
         index = list(self.str_obj_dict.values()).index(obj)
         self.widget.current(index)
 
@@ -534,7 +537,7 @@ class LocDropdown(ComputableWidget, Descriptive):
     def get_descriptive(self) -> str:
         return self.loc_func(self.desc_label_key, True)
 
-    def reset(self, str_obj_dict: dict[str, object] | None = None, overwrite: bool = True) -> None:
+    def reset(self, str_obj_dict: dict[str, T] | None = None, overwrite: bool = True) -> None:
         if str_obj_dict is not None:
             self.str_obj_dict = str_obj_dict
             self.loc_str_obj_dict = self._update_loc_str_obj_dict(self.loc_func)

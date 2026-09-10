@@ -44,7 +44,7 @@ from .ballistics import (
 from .ballistics.material import Material
 from .ballistics.prop import Composition, Geometry, Propellant, SimpleGeometry
 from .config import SimulationConfig
-from .dispatch import calculate, guide
+from .dispatch import calculate
 from .info_frame import InfoFrame
 from .localized import Descriptive, LocalizableWidget, LocalizedFrame, RowBuilder
 from .misc import (
@@ -114,8 +114,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.font = font
-        self.job_queue, self.guide_job_queue, self.log_queue = Queue(), Queue(), Queue()
-        self.process, self.guide_process, self.gun_result = None, None, None
+        self.job_queue, self.log_queue = Queue(), Queue()
+        self.process, self.gun_result = None, None
         self.root = root
 
         self.menubar = menubar
@@ -159,10 +159,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         design_menu.add_command(label=self.get_loc_str("calcLabel"), command=self.on_calculate, accelerator="Ctrl+R")
         self.root.bind("<Control-R>", lambda *_: self.on_calculate())
         self.root.bind("<Control-r>", lambda *_: self.on_calculate())
-
-        design_menu.add_command(label=self.get_loc_str("guideLabel"), command=self.on_guide, accelerator="Ctrl+G")
-        self.root.bind("<Control-G>", lambda *_: self.on_guide())
-        self.root.bind("<Control-g>", lambda *_: self.on_guide())
 
         data_menu.add_command(label=self.get_loc_str("exportMain"), command=lambda *_: self.export_graph(save="main"))
         data_menu.add_command(label=self.get_loc_str("exportAux"), command=lambda *_: self.export_graph(save="aux"))
@@ -646,6 +642,16 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             color="red",
         )
 
+        self.compute_guide = self.add_localized_label_check(
+            parent=control_frame,
+            label_loc_key="guideLabel",
+            desc_label_key="guideLabel",
+            default=False,
+            skip_grid=True,
+        )
+        self.compute_guide.check_widget.grid(row=ob.current_row, column=0, columnspan=3, sticky="w", padx=2, pady=2)
+        ob.next()
+
         self.calc_button = ttk.Button(control_frame, text=self.get_loc_str("calcLabel"), command=self.on_calculate)
         self.calc_button.grid(row=ob.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
         control_frame.rowconfigure(ob.current_row, weight=1)
@@ -680,7 +686,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             default_lang=default_lang,
             localization_dict=localization_dict,
             lang_var=self.lang_var,
-            on_guide_func=self.on_guide,
         )
         self.notebook_frame.grid(row=1, column=1, sticky="nsew", padx=0, pady=0)
 
@@ -714,11 +719,11 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
     @staticmethod
     def lock_out(func):
-        """Manipulating data while a solution or guide graph is being computed can lead to inconsistent program
+        """Manipulating data while a solution is being computed can lead to inconsistent program
         state. This decorator locks out execution of a certain program route during said sensitive phases."""
 
         def handled_func(self, *args, **kwargs):
-            if self.process or self.guide_process:
+            if self.process:
                 return None
             else:
                 return func(self, *args, **kwargs)
@@ -735,7 +740,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     def _reset_ui(self):
         """Restore buttons and disinhibit widgets after a computation completes."""
         self.calc_button.config(state="normal")
-        self.notebook_frame.guide_button.config(state="normal")
         self.swap_button.config(state="normal")
         for loc in self.localized_widgets:
             try:
@@ -747,21 +751,16 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         if self.process:
             self.get_value()
 
-        if self.guide_process:
-            self.get_guide()
-
         self.t_lid = self.root.after(100, self.timed_loop)
 
     @lock_out
     def reset(self, *_):
         self.reset_entries()
 
+    @lock_out
     def quit(self):
         if self.process:
             self.process.terminate()
-
-        if self.guide_process:
-            self.guide_process.terminate()
 
         self.listener.stop()
 
@@ -912,7 +911,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.design_menu.entryconfig(2, label=self.get_loc_str("loadPresetLabel"))
         self.design_menu.entryconfig(3, label=self.get_loc_str("resetLabel"))
         self.design_menu.entryconfig(4, label=self.get_loc_str("calcLabel"))
-        self.design_menu.entryconfig(5, label=self.get_loc_str("guideLabel"))
 
         self.data_menu.entryconfig(0, label=self.get_loc_str("exportMain"))
         self.data_menu.entryconfig(1, label=self.get_loc_str("exportAux"))
@@ -984,6 +982,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 ),
                 structural_safety_factor=float(self.material_ssf.get()),
                 autofrettage=bool(self.material_is_af.get()),
+                compute_guide=bool(self.compute_guide.get()),
                 guide_min_cmr=float(self.notebook_frame.guide_min_cmr.get()),
                 guide_max_cmr=float(self.notebook_frame.guide_max_cmr.get()),
                 guide_step_cmr=float(self.notebook_frame.guide_step_cmr.get()),
@@ -1003,7 +1002,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 pass
 
         self.calc_button.config(state="disabled")
-        self.notebook_frame.guide_button.config(state="disabled")
         self.swap_button.config(state="disabled")
 
     def _apply_type_option(self):
@@ -1078,19 +1076,16 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             )
 
         for widget, enabled in states.items():
-            widget.enable() if enabled else widget.disable()
+
+            if enabled:
+                widget.enable()
+            else:
+                widget.disable()
 
         if mode in (MODE_CONSTRAINED, MODE_OPT) and gun_type == CONVENTIONAL:
             self.max_iter.enable()
         else:
             self.max_iter.disable()
-
-    @lock_out
-    def on_guide(self):
-        self.focus()
-        self.guide_process = Process(target=guide, args=(self.guide_job_queue, self.log_queue, self.config))
-        self.guide_process.start()
-        self._inhibit_widgets()
 
     @lock_out
     def on_calculate(self):
@@ -1104,9 +1099,9 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
     def get_value(self):
         cfg: SimulationConfig | None = None
-        
+
         while not self.job_queue.empty():
-            cfg, self.gun, self.gun_result = self.job_queue.get_nowait()
+            cfg, self.gun, self.gun_result, self.guide_result = self.job_queue.get_nowait()
 
         if cfg is None:
             return
@@ -1131,18 +1126,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         self._reset_ui()
         self.process = None
-
-    def get_guide(self):
-
-        initial_result = self.guide_result
-        while not self.guide_job_queue.empty():
-            self.guide_result = self.guide_job_queue.get_nowait()
-        if initial_result == self.guide_result:
-            return
-
-        self.notebook_frame.update_guide_graph()
-        self._reset_ui()
-        self.guide_process = None
 
     @handle_error_wrapper(Log.WARNING)
     def update_table(self):

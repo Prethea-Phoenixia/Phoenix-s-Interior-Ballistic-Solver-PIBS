@@ -34,7 +34,6 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         font,
         default_lang,
         localization_dict,
-        on_guide_func,
         **kwargs,
     ):
         super().__init__(master, *args, default_lang=default_lang, localization_dict=localization_dict, **kwargs)
@@ -270,9 +269,6 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
             )
         )
 
-        self.guide_button = ttk.Button(guide_input_frame, text=self.get_loc_str("guideLabel"), command=on_guide_func)
-        self.guide_button.grid(row=4, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-
         for check in (
             *(self.plot_avg_p, self.plot_base_p, self.plot_breech_p, self.plot_stag_p, self.plot_stag_l, self.plot_vel),
             *(self.plot_nozzle_v, self.plot_burnup, self.plot_eta),
@@ -333,7 +329,6 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
 
     def change_lang(self):
         super().change_lang()
-        self.guide_button.config(text=self.get_loc_str("guideLabel"))
         self.tab_parent.tab(self.desc_tab, text=self.get_loc_str("descTab"))
         self.tab_parent.tab(self.plot_tab, text=self.get_loc_str("plotTab"))
         self.tab_parent.tab(self.table_tab, text=self.get_loc_str("tableTab"))
