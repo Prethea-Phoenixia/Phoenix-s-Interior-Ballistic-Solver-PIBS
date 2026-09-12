@@ -18,6 +18,7 @@ from .ballistics.gun import Gun, GunResult
 from .ballistics.prop import Propellant
 from .ballistics.recoilless import RecoillessTableEntry
 from .config import SimulationConfig
+from .guidegraph import GuideResults
 from .localized import LocalizedFrame
 from .tbl_frame import TableFrame
 from .theme import ThemedMixin
@@ -36,7 +37,9 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         localization_dict,
         **kwargs,
     ):
-        super().__init__(master, *args, default_lang=default_lang, localization_dict=localization_dict, **kwargs)
+        super().__init__(
+            master, *args, font=font, default_lang=default_lang, localization_dict=localization_dict, **kwargs
+        )
 
         self.master: InteriorBallisticsFrame = master
 
@@ -304,7 +307,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         self.update_geom_plot()
 
     @property
-    def config(self) -> SimulationConfig:
+    def config(self) -> SimulationConfig | None:
         """Simulation configuration from master."""
         return self.master.config
 
@@ -319,9 +322,9 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         return self.master.gun_result
 
     @property
-    def guide_result(self) -> list[tuple] | None:
+    def guide_results(self) -> GuideResults | None:
         """Guide graph result from master."""
-        return self.master.guide_result
+        return self.master.guide_results
 
     @property
     def prop(self) -> Propellant | None:
@@ -643,10 +646,10 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
             self.guide_canvas.figure.clear()
             self.guide_canvas.figure.set_facecolor(self.context["figure.facecolor"])
             guide_ax = self.guide_canvas.figure.add_subplot(111)
-
-            if self.guide_result and any(line for line in self.guide_result):
-                load_densities = list(line[0] for line in self.guide_result)
-                charge_masses = list(line[1] for line in self.guide_result)
+            guide_results = self.guide_results
+            if isinstance(guide_results, GuideResults):
+                load_densities = list(line.load_density for line in guide_results.lines)
+                charge_masses = list(line.charge_mass for line in guide_results.lines)
 
                 delta_max = max(load_densities)
                 delta_min = min(load_densities)
@@ -694,7 +697,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
                 titles = []
 
                 for index, show, scaling, levels_func, title_loc_str, linestyle, unit in zip(
-                    (3, 4, 5),
+                    ("length_gun", "volume", "burnout"),
                     (self.guide_plot_travel.get(), self.guide_plot_volume.get(), self.guide_plot_burnout.get()),
                     (1, 1000, 1),
                     (get_adaptive_scale, get_adaptive_scale, get_01_scale),
@@ -706,9 +709,9 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
                         continue
 
                     titles.append(self.get_loc_str(title_loc_str))
-                    results = list(line[index] * scaling for line in self.guide_result)
+                    results = list(line.__getattribute__(index) * scaling for line in guide_results.lines)
                     result_levels = levels_func(results)
-                    # noinspection PyTypeChecker
+
                     cs = guide_ax.tricontour(
                         load_densities,
                         charge_masses,

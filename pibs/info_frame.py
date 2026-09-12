@@ -36,7 +36,7 @@ class InfoFrame(LocalizedFrame):
 
         par_frm.rowconfigure(b.current_row + 1, weight=1)
 
-    def update_stats(self, gun: Gun | Recoilless, gun_result: GunResult | RecoillessResult, acc_exp: int):
+    def update_stats(self, gun: Gun | Recoilless | None, gun_result: GunResult | RecoillessResult, acc_exp: int):
         for entry in (
             *(self.te, self.be, self.pe, self.va, self.lx, self.ammo, self.pa, self.gm, self.pp, self.mv, self.bop),
             *(self.sj, self.ld, self.lf),

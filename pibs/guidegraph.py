@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import math
 import multiprocessing
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 import psutil
 from tqdm import tqdm
@@ -27,13 +27,27 @@ class TqdmLogger:
         self.string_buffer = ""
 
 
+@dataclass
+class GuideResultLine:
+    load_density: float
+    charge_mass: float
+    half_web: float
+    length_gun: float
+    volume: float
+    burnout: float
+
+
+@dataclass
+class GuideResults:
+    lines: list[GuideResultLine]
+
+
 def f(
     target: Constrained,
     gun_class,
     load_fraction: float,
     charge_mass_ratio: float,
-) -> tuple[float, float, float | None, float | None, float | None, float | None]:
-
+) -> GuideResultLine | None:
     charge_mass = target.m * charge_mass_ratio
     load_density = load_fraction * target.propellant.rho_p
     try:
@@ -73,10 +87,17 @@ def f(
 
         volume = chamber_volume + length_gun * target.s
 
-    except ValueError:
-        half_web, length_gun, volume, burnout = None, None, None, None
+        return GuideResultLine(
+            load_density=load_density,
+            charge_mass=charge_mass,
+            half_web=half_web,
+            length_gun=length_gun,
+            volume=volume,
+            burnout=burnout,
+        )
 
-    return load_density, charge_mass, half_web, length_gun, volume, burnout
+    except ValueError:
+        return None
 
 
 def guide_graph(
@@ -88,7 +109,7 @@ def guide_graph(
     step_cmr: float,
     step_lf: float,
     logger: logging.Logger | None = None,
-):
+) -> GuideResults:
     logger = logger if logger else logging.getLogger(__name__)
     tqdm_logger = TqdmLogger(logger)
     tqdm_kwargs = dict(
@@ -133,4 +154,6 @@ def guide_graph(
             iterable=tqdm(parameters, total=len(parameters), **tqdm_kwargs),
         )
 
-    return [result for result in results if result[2]]
+    # return [result for result in results if result[2]]
+
+    return GuideResults(lines=[result for result in results if result is not None])

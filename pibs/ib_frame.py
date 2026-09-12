@@ -41,8 +41,10 @@ from .ballistics import (
     SOL_MAMONTOV,
     SOL_PIDDUCK,
 )
+from .ballistics.gun import Gun
 from .ballistics.material import Material
 from .ballistics.prop import Composition, Geometry, Propellant, SimpleGeometry
+from .ballistics.recoilless import Recoilless
 from .config import SimulationConfig
 from .dispatch import calculate
 from .info_frame import InfoFrame
@@ -113,12 +115,14 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             os_dark=os_dark,
         )
 
-        self.font = font
-        self.job_queue, self.log_queue = Queue(), Queue()
-        self.process, self.gun_result = None, None
         self.root = root
-
         self.menubar = menubar
+        self.font = font
+
+        self.process, self.gun_result = None, None
+        self.prop, self.gun, self.guide_results = None, None, None
+
+        self.job_queue, self.log_queue = Queue(), Queue()
 
         data_menu = Menu(menubar)
         menubar.add_cascade(label=self.get_loc_str("dataLabel"), menu=data_menu)
@@ -174,8 +178,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             )
 
         debug_menu.add_checkbutton(label=self.get_loc_str("enableLabel"), variable=self.debug, onvalue=1, offvalue=0)
-
-        self.prop, self.gun, self.guide_result = None, None, None
 
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
@@ -737,25 +739,15 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         else:
             logger.log(level, str(exception))
 
-    def _reset_ui(self):
-        """Restore buttons and disinhibit widgets after a computation completes."""
-        self.calc_button.config(state="normal")
-        self.swap_button.config(state="normal")
-        for loc in self.localized_widgets:
-            try:
-                loc.disinhibit()
-            except AttributeError:
-                pass
-
     def timed_loop(self):
         if self.process:
             self.get_value()
-
         self.t_lid = self.root.after(100, self.timed_loop)
 
     @lock_out
     def reset(self, *_):
         self.reset_entries()
+        self.on_calculate()
 
     @lock_out
     def quit(self):
@@ -878,13 +870,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         self.name_var.set(self.get_loc_str("newDesign"))
         self.notebook_frame.set_description("")
-        self.gun, self.gun_result, self.guide_result = None, None, None
-        self.update_stats()
-        self.notebook_frame.update_aux_plot()
-        self.notebook_frame.update_fig_plot()
-        self.notebook_frame.update_geom_plot()
-        self.notebook_frame.update_guide_graph()
-        self.update_table()
 
     @lock_out
     @handle_error_wrapper(Log.WARNING)
@@ -925,8 +910,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.calc_button.config(text=self.get_loc_str("calcLabel"))
         self.swap_button.config(text=self.get_loc_str("swapLabel"))
 
-        self.notebook_frame.update_geom_plot()
-        self.update_table()
+        self.on_calculate()
 
     @property
     def config(self) -> SimulationConfig | None:
@@ -994,7 +978,11 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             self.handle_errors(e, level=logging.ERROR)
             return None
 
-    def _inhibit_widgets(self):
+    @lock_out
+    def on_calculate(self):
+        self.focus()
+        self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, self.config))
+        self.process.start()
         for loc in self.localized_widgets:
             try:
                 loc.inhibit()
@@ -1004,136 +992,42 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.calc_button.config(state="disabled")
         self.swap_button.config(state="disabled")
 
-    def _apply_type_option(self):
-        if self.type_optn.get_obj() == CONVENTIONAL:
-            self.drop_gradient.enable()
-            self.nozz_exp.disable()
-            self.nozz_eff.disable()
-            self.p_control.reset({p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH)}, overwrite=False)
-
-        elif self.type_optn.get_obj() == RECOILLESS:
-            self.drop_gradient.set_by_obj(SOL_LAGRANGE)
-            self.drop_gradient.disable()
-            self.nozz_exp.enable()
-            self.nozz_eff.enable()
-            self.p_control.reset(
-                {p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)},
-                overwrite=False,
-            )
-
-    def _apply_mode(self, mode: str, gun_type: str):
-        states = {
-            self.v_tgt: False,
-            self.p_tgt: False,
-            self.opt: False,
-            self.lock_Lg: False,
-            self.min_web: False,
-            self.lg_max: False,
-            self.p_control: False,
-            self.drop_opt_tgt: False,
-            self.tbl_mm: True,
-            self.web_mm: True,
-        }
-        if mode == MODE_CONSTRAINED:
-            states.update(
-                {
-                    self.v_tgt: True,
-                    self.p_tgt: True,
-                    self.opt: True,
-                    self.lock_Lg: True,
-                    self.min_web: True,
-                    self.lg_max: True,
-                    self.p_control: True,
-                    self.tbl_mm: False,
-                    self.web_mm: False,
-                }
-            )
-        elif mode == MODE_LOCK_LG:
-            states.update(
-                {
-                    self.p_tgt: True,
-                    self.lock_Lg: True,
-                    self.min_web: True,
-                    self.lg_max: True,
-                    self.p_control: True,
-                    self.tbl_mm: True,
-                    self.web_mm: False,
-                }
-            )
-        elif mode == MODE_OPT:
-            states.update(
-                {
-                    self.v_tgt: True,
-                    self.p_tgt: True,
-                    self.opt: True,
-                    self.min_web: True,
-                    self.lg_max: True,
-                    self.p_control: True,
-                    self.drop_opt_tgt: True,
-                    self.tbl_mm: False,
-                    self.web_mm: False,
-                }
-            )
-
-        for widget, enabled in states.items():
-
-            if enabled:
-                widget.enable()
-            else:
-                widget.disable()
-
-        if mode in (MODE_CONSTRAINED, MODE_OPT) and gun_type == CONVENTIONAL:
-            self.max_iter.enable()
-        else:
-            self.max_iter.disable()
-
-    @lock_out
-    def on_calculate(self):
-        self.focus()
-        cfg = self.config
-        if cfg is None:
-            return
-        self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, cfg))
-        self.process.start()
-        self._inhibit_widgets()
-
     def get_value(self):
-        cfg: SimulationConfig | None = None
-
-        while not self.job_queue.empty():
-            cfg, self.gun, self.gun_result, self.guide_result = self.job_queue.get_nowait()
-
-        if cfg is None:
-            return
-
         try:
-            sigfig = int(-log10(cfg.tolerance)) + 1
-            if self.gun and cfg.constrained:
-                self.web_mm.set(round_sig(self.gun.geometry.web_thickness * 1e3, n=sigfig))
-                if not cfg.lock_length:
-                    self.tbl_mm.set(round_sig(self.gun.geometry.barrel_length * 1e3, n=sigfig))
-                self.cv_L.set(round_sig(self.gun.geometry.chamber_volume * 1e3, n=sigfig))
+            run_cfg: SimulationConfig | None = None
+
+            while not self.job_queue.empty():
+                run_cfg, self.gun, self.gun_result, self.guide_results = self.job_queue.get_nowait()
+
+            if run_cfg is None:
+                return
+
+            sigfig = int(-log10(run_cfg.tolerance)) + 1
+            if run_cfg.constrained:
+                if isinstance(self.gun, Gun) or isinstance(self.gun, Recoilless):
+                    self.web_mm.set(round_sig(self.gun.geometry.web_thickness * 1e3, n=sigfig))
+                    if not run_cfg.lock_length:
+                        self.tbl_mm.set(round_sig(self.gun.geometry.barrel_length * 1e3, n=sigfig))
+                    self.cv_L.set(round_sig(self.gun.geometry.chamber_volume * 1e3, n=sigfig))
+
+            self.info_frame.update_stats(gun=self.gun, gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
+            self.notebook_frame.table_frame.update_table(gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
+            self.notebook_frame.update_fig_plot()
+            self.notebook_frame.update_aux_plot()
+            self.notebook_frame.update_guide_graph()
 
         except Exception as e:
             self.handle_errors(e, level=logging.WARNING)
 
-        self.update_stats()
-        self.update_table()
-
-        self.notebook_frame.update_fig_plot()
-        self.notebook_frame.update_aux_plot()
-        self.notebook_frame.update_guide_graph()
-
-        self._reset_ui()
+        """Restore buttons and disinhibit widgets after a computation completes."""
+        self.calc_button.config(state="normal")
+        self.swap_button.config(state="normal")
+        for loc in self.localized_widgets:
+            try:
+                loc.disinhibit()
+            except AttributeError:
+                pass
         self.process = None
-
-    @handle_error_wrapper(Log.WARNING)
-    def update_table(self):
-        self.notebook_frame.table_frame.update_table(gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
-
-    @handle_error_wrapper(Log.WARNING)
-    def update_stats(self):
-        self.info_frame.update_stats(self.gun, self.gun_result, int(self.acc_exp.get()))
 
     def update_spec(self, *_):
         self.propellant_specs.config(state="normal")
@@ -1251,12 +1145,27 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         except Exception as e:
             self.prop = None
             self.notebook_frame.update_geom_plot()
-
             raise e
 
     def on_state_change(self, *_):
+
+        gun_type = self.type_optn.get_obj()
         self.notebook_frame.on_state_change(type_option=self.type_optn.get_obj())
-        self._apply_type_option()
+        if gun_type == CONVENTIONAL:
+            self.drop_gradient.enable()
+            self.nozz_exp.disable()
+            self.nozz_eff.disable()
+            self.p_control.reset({p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH)}, overwrite=False)
+
+        elif gun_type == RECOILLESS:
+            self.drop_gradient.set_by_obj(SOL_LAGRANGE)
+            self.drop_gradient.disable()
+            self.nozz_exp.enable()
+            self.nozz_eff.enable()
+            self.p_control.reset(
+                {p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)},
+                overwrite=False,
+            )
 
         mode = MODE_CONSTRAINED
         if not self.use_cons.get():
@@ -1265,7 +1174,71 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             mode = MODE_OPT
         if self.lock_Lg.get():
             mode = MODE_LOCK_LG
-        self._apply_mode(mode, self.type_optn.get_obj())
+
+        states = {
+            self.v_tgt: False,
+            self.p_tgt: False,
+            self.opt: False,
+            self.lock_Lg: False,
+            self.min_web: False,
+            self.lg_max: False,
+            self.p_control: False,
+            self.drop_opt_tgt: False,
+            self.tbl_mm: True,
+            self.web_mm: True,
+        }
+        if mode == MODE_CONSTRAINED:
+            states.update(
+                {
+                    self.v_tgt: True,
+                    self.p_tgt: True,
+                    self.opt: True,
+                    self.lock_Lg: True,
+                    self.min_web: True,
+                    self.lg_max: True,
+                    self.p_control: True,
+                    self.tbl_mm: False,
+                    self.web_mm: False,
+                }
+            )
+        elif mode == MODE_LOCK_LG:
+            states.update(
+                {
+                    self.p_tgt: True,
+                    self.lock_Lg: True,
+                    self.min_web: True,
+                    self.lg_max: True,
+                    self.p_control: True,
+                    self.tbl_mm: True,
+                    self.web_mm: False,
+                }
+            )
+        elif mode == MODE_OPT:
+            states.update(
+                {
+                    self.v_tgt: True,
+                    self.p_tgt: True,
+                    self.opt: True,
+                    self.min_web: True,
+                    self.lg_max: True,
+                    self.p_control: True,
+                    self.drop_opt_tgt: True,
+                    self.tbl_mm: False,
+                    self.web_mm: False,
+                }
+            )
+
+        for widget, enabled in states.items():
+
+            if enabled:
+                widget.enable()
+            else:
+                widget.disable()
+
+        if mode in (MODE_CONSTRAINED, MODE_OPT) and gun_type == CONVENTIONAL:
+            self.max_iter.enable()
+        else:
+            self.max_iter.disable()
 
         self._enable_group(
             self.use_aux_grain,
@@ -1311,7 +1284,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             raise ValueError("unknown save target.")
 
         with plt.rc_context(self.context):
-            fig.savefig(file_name, transparent=True, dpi=600)
+            fig.savefig(file_name, transparent=True, dpi=300)
 
         messagebox.showinfo(self.get_loc_str("sucTitle"), self.get_loc_str("savedLocMsg") + f" {file_name}")
 

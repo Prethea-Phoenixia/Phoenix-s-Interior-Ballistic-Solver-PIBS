@@ -3,11 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from .ballistics.material import Material
-from .ballistics.prop import Propellant
-
 from .ballistics.config import DesignConstraint, PropellantLoad, Solver, Structural
 from .ballistics.gun import GunGeometry
+from .ballistics.material import Material
+from .ballistics.prop import Propellant
 from .ballistics.recoilless import Nozzle
 
 
@@ -75,7 +74,6 @@ class SimulationConfig:
     logger: Any = field(default=None, repr=False)
 
 
-
 def sim_config_to_ballistics(cfg: SimulationConfig):
     geometry = GunGeometry(
         caliber=cfg.caliber,
@@ -97,11 +95,15 @@ def sim_config_to_ballistics(cfg: SimulationConfig):
         drag_coefficient=cfg.drag_coefficient,
     )
 
-    structural = Structural(
-        material=cfg.structural_material,
-        safety_factor=cfg.structural_safety_factor,
-        autofrettage=cfg.autofrettage,
-    ) if cfg.structural_material else None
+    structural = (
+        Structural(
+            material=cfg.structural_material,
+            safety_factor=cfg.structural_safety_factor,
+            autofrettage=cfg.autofrettage,
+        )
+        if cfg.structural_material
+        else None
+    )
 
     design = DesignConstraint(
         design_pressure=cfg.design_pressure,

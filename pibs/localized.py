@@ -53,6 +53,7 @@ Helpers:
 from __future__ import annotations
 
 import tkinter
+import tkinter.font
 import warnings
 from abc import ABC, abstractmethod
 from tkinter import BooleanVar, Event, Frame, Menu, StringVar, Tk, Toplevel, ttk
@@ -61,8 +62,8 @@ from typing import (
     Any,
     Callable,
     Literal,
-    Union,
     TypeVar,
+    Union,
 )
 
 from .misc import format_float_input
@@ -102,8 +103,8 @@ class LocalizedLabel:
         target_widget: ttk.Widget,
         loc_func: localize_function_type,
         label_key: str,
+        font: Font,
         tooltip_key: str = "",
-        font: Font | None = None,
     ):
         self.loc_func = loc_func
         self.label_key = label_key
@@ -222,8 +223,8 @@ class Loc2LineDisp(LocalizableWidget):
     def __init__(
         self,
         parent: ttk.Widget,
+        font: Font,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: Font | None = None,
         row: int = 0,
         col: int = 0,
         label_loc_key: str = "",
@@ -242,7 +243,13 @@ class Loc2LineDisp(LocalizableWidget):
         self.entry_widget = ttk.Entry(parent, textvariable=e, width=entry_width, state="disabled", justify=justify)
         self.entry_widget.grid(row=row + 1, column=0, sticky="nsew", padx=2, pady=2)
 
-        self._loc = LocalizedLabel(self.label_widget, loc_func, label_loc_key, tooltip_loc_key, font)
+        self._loc = LocalizedLabel(
+            target_widget=self.label_widget,
+            loc_func=loc_func,
+            label_key=label_loc_key,
+            tooltip_key=tooltip_loc_key,
+            font=font,
+        )
         self.default = default
 
     def localize(self, new_loc_key: str = "", new_tooltip_key: str = "") -> None:
@@ -268,8 +275,8 @@ class Loc3LineDisp(Loc2LineDisp):
     def __init__(
         self,
         parent: ttk.Widget,
+        font: Font,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: Font | None = None,
         row: int = 0,
         col: int = 0,
         label_loc_key: str = "",
@@ -324,8 +331,8 @@ class Loc2Input(ComputableWidget, Descriptive):
     def __init__(
         self,
         parent: ttk.Widget,
+        font: Font,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: Font | None = None,
         default: str = "",
         row: int = 0,
         col: int = 0,
@@ -366,7 +373,9 @@ class Loc2Input(ComputableWidget, Descriptive):
             nominal_state="normal",
         )
 
-        self._loc = LocalizedLabel(lb, loc_func, label_loc_key, tooltip_loc_key, font)
+        self._loc = LocalizedLabel(
+            target_widget=lb, loc_func=loc_func, label_key=label_loc_key, tooltip_key=tooltip_loc_key, font=font
+        )
 
         self.default = default
         self.label_widget = lb
@@ -409,8 +418,8 @@ class Loc3Input(Loc2Input):
     def __init__(
         self,
         parent: ttk.Widget,
+        font: Font,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: Font | None = None,
         row: int = 0,
         col: int = 0,
         label_loc_key: str = "",
@@ -469,12 +478,13 @@ class Loc3Input(Loc2Input):
 
 T = TypeVar("T")
 
+
 class LocDropdown(ComputableWidget, Descriptive):
     def __init__(
         self,
         parent: ttk.Widget,
+        font: tkinter.font.Font,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: Font | None = None,
         str_obj_dict: dict[str, T] | None = None,
         all_localized: list[LocalizableWidget] | None = None,
         desc_label_key: str = "",
@@ -503,7 +513,9 @@ class LocDropdown(ComputableWidget, Descriptive):
 
         self.widget = widget
         self.desc_label_key = desc_label_key
-        self._loc = LocalizedLabel(widget, loc_func, "", tooltip_loc_key, font)
+        self._loc = LocalizedLabel(
+            target_widget=widget, loc_func=loc_func, label_key="", tooltip_key=tooltip_loc_key, font=font
+        )
 
     def localize(self) -> None:
         index = self.widget["values"].index(self.var.get())
@@ -518,7 +530,7 @@ class LocDropdown(ComputableWidget, Descriptive):
     def get(self) -> str:
         return self.get_obj().__str__()
 
-    def get_obj(self) ->T:
+    def get_obj(self) -> T:
         return self.loc_str_obj_dict[self.var.get()]
 
     def set_by_str(self, string: str) -> None:
@@ -553,18 +565,19 @@ class LocLabelFrame(ttk.LabelFrame, Localizable):
     def __init__(
         self,
         *args: Any,
+        font: Font,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: Font | None = None,
         label_loc_key: str = "",
         tooltip_loc_key: str = "",
-        all_localized: list[LocalizableWidget] | None = None,
+        all_localized: list[Localizable] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, text=loc_func(label_loc_key), **kwargs)
         self.loc_key = label_loc_key
         self.loc_func = loc_func
-
-        self._loc = LocalizedLabel(self, loc_func, label_loc_key, tooltip_loc_key, font)
+        self._loc = LocalizedLabel(
+            target_widget=self, loc_func=loc_func, label_key=label_loc_key, tooltip_key=tooltip_loc_key, font=font
+        )
 
         if isinstance(all_localized, list):
             all_localized.append(self)
@@ -578,8 +591,8 @@ class LocLabelCheck(ComputableWidget, Descriptive):
     def __init__(
         self,
         parent: ttk.Widget,
+        font: Font,
         loc_func: localize_function_type = placeholder_loc_func,
-        font: Font | None = None,
         default: bool = True,
         skip_grid: bool = False,
         row: int = 0,
@@ -608,7 +621,13 @@ class LocLabelCheck(ComputableWidget, Descriptive):
 
         self.check_widget = check_widget
         self.desc_label_key = desc_label_key
-        self._loc = LocalizedLabel(check_widget, loc_func, label_loc_key, tooltip_loc_key, font)
+        self._loc = LocalizedLabel(
+            target_widget=check_widget,
+            loc_func=loc_func,
+            label_key=label_loc_key,
+            tooltip_key=tooltip_loc_key,
+            font=font,
+        )
 
     def localize(self, new_loc_key: str = "") -> None:
         self._loc.localize(new_loc_key)
@@ -718,10 +737,10 @@ class LocalizedFrame(Frame):
     def __init__(
         self,
         master: Tk | Toplevel | LocalizedFrame,
-        *args: Any,
-        font: Font | None = None,
+        font: Font,
         localization_dict: dict[str, dict[str, str]],
         default_lang: str,
+        *args: Any,
         menubar: Menu | None = None,
         lang_var: StringVar | None = None,
         **kwargs: Any,

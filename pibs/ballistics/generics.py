@@ -21,7 +21,7 @@ class GenericEntry:
     breech_pressure: float
     avg_pressure: float
     shot_pressure: float
-    temperature: float
+    temperature: float | None
 
 
 @dataclass
@@ -30,11 +30,8 @@ class GenericResult:
     table_data: list[GenericEntry]
     pressure_trace: list[PressureTraceEntry]
 
-    tube_mass: float = None
-    outline: list[OutlineEntry] = None
-    thermal_efficiency: float = None
-    ballistic_efficiency: float = None
-    piezo_efficiency: float = None
+    tube_mass: float | None = None
+    outline: list[OutlineEntry] | None = None
 
     def read_table_data(self, tag: Points) -> GenericEntry:
         for tableEntry in self.table_data:

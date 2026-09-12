@@ -12,8 +12,6 @@ from .config import SimulationConfig, sim_config_to_ballistics
 from .guidegraph import guide_graph
 
 
-
-
 def calculate(job_queue, log_queue, cfg: SimulationConfig):
     logger = logging.getLogger(__name__)
     logger.addHandler(QueueHandler(log_queue))

@@ -73,7 +73,7 @@ class TableFrame(LocalizedFrame):
                     f"{entry.breech_pressure * 1e-6:.{sigfig}g}",
                     f"{entry.avg_pressure * 1e-6:.{sigfig}g}",
                     f"{entry.shot_pressure * 1e-6:.{sigfig}g}",
-                    f"{entry.temperature:.{sigfig}g}",
+                    f"{entry.temperature:.{sigfig}g}" if entry.temperature else "----",
                 )
                 for entry in gun_result.table_data
             ]
@@ -92,7 +92,7 @@ class TableFrame(LocalizedFrame):
                     f"{entry.stag_pressure * 1e-6:.{sigfig}g}",
                     f"{entry.avg_pressure * 1e-6:.{sigfig}g}",
                     f"{entry.shot_pressure * 1e-6:.{sigfig}g}",
-                    f"{entry.temperature:.{sigfig}g}",
+                    f"{entry.temperature:.{sigfig}g}" if entry.temperature else "----",
                 )
                 for entry in gun_result.table_data
             ]
@@ -100,6 +100,7 @@ class TableFrame(LocalizedFrame):
         return table_data
 
     def update_table(self, gun_result: GunResult | RecoillessResult, acc_exp: int):
+
         self.tv.delete(*self.tv.get_children())
         if not gun_result:
             return
@@ -130,7 +131,7 @@ class TableFrame(LocalizedFrame):
         self.tv.tag_configure("error", font=self.font, foreground="dim gray")
 
         # we use a fixed width font so any char will do
-        assert self.font
+
         font_width, _ = self.font.measure("m"), self.font.metrics("linespace")
 
         win_width = self.tv.winfo_width()
