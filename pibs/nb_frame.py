@@ -9,7 +9,6 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from . import FONTNAME, FONTSIZE, THEMES
-from .ballistics import CONVENTIONAL, RECOILLESS
 from .ballistics.gun import Gun, GunResult
 from .ballistics.prop import Propellant
 from .config import SimulationConfig
@@ -268,19 +267,6 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
             )
         )
 
-        for check in (
-            *(self.plot_avg_p, self.plot_base_p, self.plot_breech_p, self.plot_stag_p, self.plot_stag_l, self.plot_vel),
-            *(self.plot_nozzle_v, self.plot_burnup, self.plot_eta),
-        ):
-            check.trace_add("write", lambda *_: self.plot_manager.update_main_plot())
-
-        for check in (self.trace_hull, self.trace_press):
-            check.trace_add("write", lambda *_: self.plot_manager.update_aux_plot())
-
-        for entry in (self.guide_plot_travel, self.guide_plot_volume, self.guide_plot_burnout):
-            entry.trace_add("write", lambda *_: self.plot_manager.update_guide_graph())
-        self.guide_chamber_ruler.trace_add("write", lambda *_: self.plot_manager.update_guide_graph())
-
         self.plot_manager = PlotManager(self)
 
     def use_theme(self):
@@ -348,25 +334,4 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         self.description.edit_reset()
 
     def on_state_change(self, type_option: str) -> None:
-
-        if type_option == CONVENTIONAL:
-
-            self.plot_nozzle_v.remove()
-            self.plot_breech_p.localize("plotBreechP")
-            self.plot_stag_p.remove()
-            self.plot_stag_l.remove()
-            self.plot_eta.remove()
-
-        elif type_option == RECOILLESS:
-
-            self.plot_nozzle_v.restore()
-            self.plot_breech_p.localize("plotNozzleP")
-            self.plot_stag_p.restore()
-            self.plot_stag_p.localize("plotStagP")
-            self.plot_stag_l.restore()
-            self.plot_stag_l.localize("plotStagL")
-            self.plot_eta.restore()
-            self.plot_eta.localize("plotEtaEsc")
-
-        else:
-            raise ValueError
+        self.plot_manager.on_state_change(type_option)

@@ -15,8 +15,18 @@
 
 ## Architecture
 
-- **Entry**: `run_pibs.py` → `pibs.interior_ballistics.main()` → `PIBS(Tk)` → `InteriorBallisticsFrame`
+- **Entry**: `run_pibs.py` → `pibs.pibs.main()` → `PIBS(Tk)` → `InteriorBallisticsFrame`
 - **UI layer**: `pibs/ib_frame.py`, `nb_frame.py`, `info_frame.py`, `tbl_frame.py` (tkinter + matplotlib)
+- **ModeManager** (`pibs/mode_manager.py`): Manages widget state based on gun type and simulation mode.
+  Called by `ib_frame.on_state_change()` to update enabled/disabled states of input widgets.
+  Reads mode state via frame getter methods (`get_gun_type()`, `is_constrained()`, etc.).
+- **PlotManager** (`pibs/plot_manager.py`): Handles all matplotlib rendering. The `context` property builds
+  the matplotlib rc_context on demand from current ttk theme colors. Each plot update method must wrap
+  plotting code in `plt.rc_context(self.context)` to apply theme/font settings. `draw_idle()`
+  must be called inside this context. Accesses frame data via properties (e.g., `self.frame.gun`).
+- **FileIOManager** (`pibs/file_io.py`): Handles file I/O operations (save, load, export). Uses the
+  getter/setter interface pattern to access frame data through dedicated methods (e.g., `has_data()`,
+  `get_save_data()`, `apply_loaded_data()`) rather than direct attribute access.
 - **Config**: `pibs/config.py` — `SimulationConfig` dataclass (all fields required, no defaults except `logger`). UI
   gathers values into this; dispatch passes it to ballistics core.
 - **Ballistics core**: `pibs/ballistics/` — `gun.py`, `recoilless.py`, `constrained*.py`, `config.py` (typed dataclasses
@@ -33,7 +43,8 @@
 - `Gun`/`Recoilless` own the full simulation pipeline (ODE setup, integration, peak finding, sampling, pressure traces).
   Splitting into separate `PressureCalculator`, `BurnModel`, `MotionSolver` classes would add indirection over
   inherently coupled state (`z`, `l_bar`, `v_bar`, `p_bar`) without real benefit for this scope.
-- `InteriorBallisticsFrame` (1400+ lines) is a tkinter God frame — framework limitation, not design oversight.
+- `InteriorBallisticsFrame` (~1000 lines) is a tkinter God frame — framework limitation, not design oversight.
+  Manager classes (ModeManager, PlotManager, FileIOManager) have been extracted to reduce complexity where possible.
 - Refactors should not break these classes apart "for purity." Tight coupling here tracks the physics, not accidental
   complexity.
 

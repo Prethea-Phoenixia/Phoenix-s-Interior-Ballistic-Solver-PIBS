@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import re
 import sys
@@ -9,8 +8,7 @@ from enum import Enum
 from logging.handlers import QueueListener
 from math import log10
 from multiprocessing import Process, Queue
-from pathlib import Path
-from tkinter import IntVar, Menu, StringVar, Text, filedialog, messagebox, ttk
+from tkinter import IntVar, Menu, StringVar, Text, messagebox, ttk
 from tkinter.font import Font
 from tkinter.ttk import Frame
 from typing import Literal
@@ -43,6 +41,7 @@ from .ballistics.prop import Composition, Geometry, Propellant, SimpleGeometry
 from .ballistics.recoilless import Recoilless
 from .config import SimulationConfig
 from .dispatch import calculate
+from .file_io import FileIOManager
 from .info_frame import InfoFrame
 from .localized import Descriptive, LocalizableWidget, LocalizedFrame, RowBuilder
 from .misc import (
@@ -114,6 +113,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.prop, self.gun, self.guide_results = None, None, None
 
         self.job_queue, self.log_queue = Queue(), Queue()
+        self.file_io = FileIOManager(self)
 
         data_menu = Menu(menubar)
         menubar.add_cascade(label=self.get_loc_str("dataLabel"), menu=data_menu)
@@ -134,17 +134,19 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         self.debug = IntVar(value=int(debug))
 
-        design_menu.add_command(label=self.get_loc_str("saveLabel"), command=self.save, accelerator="Ctrl+S")
-        self.root.bind("<Control-s>", lambda *_: self.save())
-        self.root.bind("<Control-S>", lambda *_: self.save())
+        design_menu.add_command(label=self.get_loc_str("saveLabel"), command=self.file_io.save, accelerator="Ctrl+S")
+        self.root.bind("<Control-s>", lambda *_: self.file_io.save())
+        self.root.bind("<Control-S>", lambda *_: self.file_io.save())
 
-        design_menu.add_command(label=self.get_loc_str("loadLabel"), command=self.load_gun, accelerator="Ctrl+L")
-        self.root.bind("<Control-l>", lambda *_: self.load_gun())
-        self.root.bind("<Control-L>", lambda *_: self.load_gun())
+        design_menu.add_command(
+            label=self.get_loc_str("loadLabel"), command=self.file_io.load_gun, accelerator="Ctrl+L"
+        )
+        self.root.bind("<Control-l>", lambda *_: self.file_io.load_gun())
+        self.root.bind("<Control-L>", lambda *_: self.file_io.load_gun())
 
         design_menu.add_command(
             label=self.get_loc_str("loadPresetLabel"),
-            command=lambda *_: self.load_gun(initial_dir=resolve_path("examples")),
+            command=lambda *_: self.file_io.load_gun(initial_dir=resolve_path("examples")),
         )
 
         design_menu.add_command(label=self.get_loc_str("resetLabel"), command=self.reset, accelerator="Ctrl+N")
@@ -155,13 +157,21 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.root.bind("<Control-R>", lambda *_: self.on_calculate())
         self.root.bind("<Control-r>", lambda *_: self.on_calculate())
 
-        data_menu.add_command(label=self.get_loc_str("exportMain"), command=lambda *_: self.export_graph(save="main"))
-        data_menu.add_command(label=self.get_loc_str("exportAux"), command=lambda *_: self.export_graph(save="aux"))
-        data_menu.add_command(label=self.get_loc_str("exportGeom"), command=lambda *_: self.export_graph(save="geom"))
-        data_menu.add_command(label=self.get_loc_str("exportGuide"), command=lambda *_: self.export_graph(save="guide"))
-        data_menu.add_command(label=self.get_loc_str("exportLabel"), command=self.export_table)
+        data_menu.add_command(
+            label=self.get_loc_str("exportMain"), command=lambda *_: self.file_io.export_graph(save="main")
+        )
+        data_menu.add_command(
+            label=self.get_loc_str("exportAux"), command=lambda *_: self.file_io.export_graph(save="aux")
+        )
+        data_menu.add_command(
+            label=self.get_loc_str("exportGeom"), command=lambda *_: self.file_io.export_graph(save="geom")
+        )
+        data_menu.add_command(
+            label=self.get_loc_str("exportGuide"), command=lambda *_: self.file_io.export_graph(save="guide")
+        )
+        data_menu.add_command(label=self.get_loc_str("exportLabel"), command=self.file_io.export_table)
 
-        data_menu.add_command(label=self.get_loc_str("reloadPropellant"), command=self.load_propellant)
+        data_menu.add_command(label=self.get_loc_str("reloadPropellant"), command=self.file_io.load_propellant)
 
         for theme_name in THEMES.keys():
             theme_menu.add_radiobutton(
@@ -769,73 +779,41 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             raise ValueError(self.get_loc_str("nameIssue"))
         return s
 
-    @lock_out
-    @handle_error_wrapper(level=Log.WARNING)
-    def save(self):
-        gun = self.gun
-        if gun is None:
-            messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("noDataMsg"))
-            return
+    # --- File I/O Interface Methods ---
 
-        file_name = filedialog.asksaveasfilename(
-            title=self.get_loc_str("saveLabel"),
-            filetypes=(("JSON file", "*.json"),),
-            defaultextension=".json",
-            initialfile=filenameize(self.get_normalized_name()),
-        )
+    def has_data(self) -> bool:
+        """Check if there's calculation data available."""
+        return self.gun is not None
 
-        if not file_name:
-            return
-
+    def get_save_data(self) -> dict:
+        """Get all data needed for saving."""
         loc_val_dict = {
             loc.get_descriptive(): loc.get()
             for loc in self.localized_widgets
             if isinstance(loc, Descriptive)
             if loc.get_descriptive()
         }
+        return {**loc_val_dict, "Description": self.notebook_frame.description.get(1.0, "end").strip("\n")}
 
-        kvs = {**loc_val_dict, "Description": self.notebook_frame.description.get(1.0, "end").strip("\n")}
-        with open(file_name, "w", encoding="utf-8") as file:
-            json.dump(kvs, file, indent="\t", ensure_ascii=False, sort_keys=True)
-
-        messagebox.showinfo(self.get_loc_str("sucTitle"), self.get_loc_str("savedLocMsg") + " {:}".format(file_name))
-
-    @lock_out
-    @handle_error_wrapper(level=Log.WARNING)
-    def load_gun(self, initial_dir: str | None = None, file_path: str | None = None):
-        file_name = file_path or filedialog.askopenfilename(
-            title=self.get_loc_str("loadLabel"),
-            filetypes=(("JSON File", "*.json"),),
-            defaultextension=".json",
-            initialdir=initial_dir,
-        )
-
-        if not file_name:
-            return
-
-        self.reset_entries()
-        self.name_var.set(Path(file_name).stem)
-
+    def apply_loaded_data(self, data: dict):
+        """Apply loaded data to the frame."""
         loc_dict = {
             loc.get_descriptive(): loc
             for loc in self.localized_widgets
             if isinstance(loc, Descriptive)
             if loc.get_descriptive()
         }
-        with open(file_name, "r", encoding="utf-8") as file:
-            file_dict = json.load(file)
 
-        for key, value in file_dict.items():
+        for key, value in data.items():
             try:  # load design settings (bool -> checkboxes, str -> dropdown menus) first
                 if isinstance(value, bool) or isinstance(value, str):
                     w = loc_dict[key]
                     if isinstance(w, LocalizableWidget):
                         w.set(value)
-
             except (KeyError, ValueError):
                 pass
 
-        for key, value in file_dict.items():
+        for key, value in data.items():
             try:  # then load the numeral values (int, float -> numeric entries)
                 if isinstance(value, float) or isinstance(value, int):
                     w = loc_dict[key]
@@ -844,18 +822,58 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             except (KeyError, ValueError):
                 pass
 
-        if DESCRIPTION in file_dict.keys():  # update description from file.
-            self.notebook_frame.set_description(file_dict[DESCRIPTION])
+        if DESCRIPTION in data:
+            self.notebook_frame.set_description(data[DESCRIPTION])
 
-        self.on_calculate()
+    def set_name(self, name: str):
+        """Set the design name."""
+        self.name_var.set(name)
 
-    @lock_out
-    @handle_error_wrapper(Log.WARNING)
-    def load_propellant(self):
-        file_name = filedialog.askopenfilename(
-            title=self.get_loc_str("loadLabel"), filetypes=(("Comma Separated Values File", "*.csv"),)
+    def set_propellant_options(self, file_path: str):
+        """Set propellant options from CSV file."""
+        self.drop_prop.reset(str_obj_dict=Composition.read_file(file_path))
+
+    def export_table_data(self):
+        """Export table data."""
+        self.notebook_frame.table_frame.export_table(
+            gun_result=self.gun_result,
+            acc_exp=int(self.acc_exp.get()),
+            normalized_filename=filenameize(self.get_normalized_name()),
         )
-        self.drop_prop.reset(str_obj_dict=Composition.read_file(file_name))
+
+    def get_figure(self, save_type: Literal["main", "aux", "geom", "guide"]):
+        """Get the matplotlib figure for export."""
+        if save_type == "main":
+            return self.notebook_frame.fig_canvas.figure
+        elif save_type == "aux":
+            return self.notebook_frame.aux_canvas.figure
+        elif save_type == "guide":
+            return self.notebook_frame.guide_canvas.figure
+        elif save_type == "geom":
+            return self.notebook_frame.geom_canvas.figure
+        return None
+
+    def get_export_context(self):
+        """Get matplotlib context for exports."""
+        return plt.rc_context(self.context)
+
+    # --- Mode State Getters ---
+
+    def get_gun_type(self) -> str:
+        """Get the selected gun type."""
+        return self.type_optn.get_obj()
+
+    def is_constrained(self) -> bool:
+        """Check if constrained mode is enabled."""
+        return bool(self.use_cons.get())
+
+    def is_optimization(self) -> bool:
+        """Check if optimization mode is enabled."""
+        return bool(self.opt.get())
+
+    def is_lock_length(self) -> bool:
+        """Check if lock length mode is enabled."""
+        return bool(self.lock_Lg.get())
 
     def reset_entries(self):
         for loc in self.localized_widgets:
@@ -863,15 +881,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         self.name_var.set(self.get_loc_str("newDesign"))
         self.notebook_frame.set_description("")
-
-    @lock_out
-    @handle_error_wrapper(Log.WARNING)
-    def export_table(self):
-        self.notebook_frame.table_frame.export_table(
-            gun_result=self.gun_result,
-            acc_exp=int(self.acc_exp.get()),
-            normalized_filename=filenameize(self.get_normalized_name()),
-        )
 
     @lock_out
     def change_lang(self):
@@ -908,9 +917,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     @property
     def config(self) -> SimulationConfig | None:
         try:
-            lock = bool(self.lock_Lg.get())
-            material = bool(self.use_material.get())
-
             if self.prop is None:
                 raise ValueError("Invalid propellant.")
 
@@ -921,11 +927,11 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             load_fraction = charge_mass / chamber_volume / self.prop.rho_p
 
             return SimulationConfig(
-                optimize=bool(self.opt.get()),
-                constrained=bool(self.use_cons.get()),
+                optimize=self.is_optimization(),
+                constrained=self.is_constrained(),
                 debug=bool(self.debug.get()),
-                lock_length=lock,
-                gun_type=self.type_optn.get_obj(),
+                lock_length=self.is_lock_length(),
+                gun_type=self.get_gun_type(),
                 domain=self.drop_domain.get_obj(),
                 solution_method=self.drop_gradient.get_obj(),
                 pressure_control_point=self.p_control.get_obj(),
@@ -954,7 +960,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                         density=float(self.material_density.get()),
                         yield_strength=float(self.material_yield.get()) * 1e6,
                     )
-                    if material
+                    if self.use_material.get()
                     else None
                 ),
                 structural_safety_factor=float(self.material_ssf.get()),
@@ -977,10 +983,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, self.config))
         self.process.start()
         for loc in self.localized_widgets:
-            try:
-                loc.inhibit()
-            except AttributeError:
-                pass
+            loc.inhibit()
 
         self.calc_button.config(state="disabled")
         self.swap_button.config(state="disabled")
@@ -1016,10 +1019,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.calc_button.config(state="normal")
         self.swap_button.config(state="normal")
         for loc in self.localized_widgets:
-            try:
-                loc.disinhibit()
-            except AttributeError:
-                pass
+            loc.disinhibit()
         self.process = None
 
     def update_spec(self, *_):
@@ -1147,31 +1147,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     def use_theme(self):
         super().use_theme()
         self.notebook_frame.use_theme()
-
-    @handle_error_wrapper(level=Log.WARNING)
-    def export_graph(self, save: Literal["main", "aux", "geom", "guide"]):
-        file_name = filedialog.asksaveasfilename(
-            title=self.get_loc_str("exportGraphLabel"),
-            filetypes=(("Portable Network Graphics", "*.png"),),
-            defaultextension=".png",
-            initialfile=filenameize(f"{self.get_normalized_name()}_{save}"),
-        )
-
-        if save == "main":
-            fig = self.notebook_frame.fig_canvas.figure
-        elif save == "aux":
-            fig = self.notebook_frame.aux_canvas.figure
-        elif save == "guide":
-            fig = self.notebook_frame.guide_canvas.figure
-        elif save == "geom":
-            fig = self.notebook_frame.geom_canvas.figure
-        else:
-            raise ValueError("unknown save target.")
-
-        with plt.rc_context(self.context):
-            fig.savefig(file_name, transparent=True, dpi=300)
-
-        messagebox.showinfo(self.get_loc_str("sucTitle"), self.get_loc_str("savedLocMsg") + f" {file_name}")
 
     @handle_error_wrapper(level=Log.WARNING)
     def swap(self):

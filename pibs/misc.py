@@ -390,6 +390,26 @@ def detect_darkmode_in_windows() -> bool:
     return False
 
 
+def setup_windows_dpi() -> None:
+    """Set process DPI awareness for Windows."""
+    if platform.system() != "Windows":
+        return
+    win_release = platform.release()
+    if win_release in ("8", "10", "11"):
+        windll.shcore.SetProcessDpiAwareness(1)
+    elif win_release in ("7", "Vista"):
+        windll.user32.SetProcessDPIAware()
+
+
+def get_windows_locale() -> str:
+    """Get the default Windows UI language code."""
+    if platform.system() != "Windows":
+        return ""
+    import locale
+
+    return locale.windows_locale[windll.kernel32.GetUserDefaultUILanguage()]
+
+
 if __name__ == "__main__":
     print(to_si(1e-4).strip())
     from math import pi

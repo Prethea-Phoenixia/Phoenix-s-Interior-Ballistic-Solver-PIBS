@@ -94,6 +94,12 @@ class Localizable(ABC):
     @abstractmethod
     def localize(self, *args: Any, **kwargs: Any) -> None: ...
 
+    def inhibit(self) -> None:
+        pass
+
+    def disinhibit(self) -> None:
+        pass
+
 
 class LocalizedLabel:
     """Manages a localized label text and optional tooltip on a target widget."""

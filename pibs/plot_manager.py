@@ -6,8 +6,9 @@ from typing import TYPE_CHECKING
 import matplotlib as mpl
 from labellines import labelLines
 from matplotlib import pyplot as plt
+from tkinter import ttk
 
-from . import FONTSIZE, THEMES
+from . import BOLDSIZE, FONTNAME, FONTSIZE, THEMES
 from .ballistics import CONVENTIONAL, DOMAIN_LEN, DOMAIN_TIME, RECOILLESS
 from .ballistics.recoilless import RecoillessTableEntry
 from .guidegraph import GuideResults
@@ -64,10 +65,93 @@ class PlotManager:
 
     def __init__(self, frame: NotebookFrame):
         self.frame = frame
+        self._setup_traces()
+
+    def _setup_traces(self):
+        """Set up trace bindings for plot checkboxes."""
+        f = self.frame
+
+        # Main plot checkboxes
+        main_checks = (
+            f.plot_avg_p,
+            f.plot_base_p,
+            f.plot_breech_p,
+            f.plot_stag_p,
+            f.plot_stag_l,
+            f.plot_vel,
+            f.plot_nozzle_v,
+            f.plot_burnup,
+            f.plot_eta,
+        )
+        for check in main_checks:
+            check.trace_add("write", lambda *_: self.update_main_plot())
+
+        # Aux plot checkboxes
+        for check in (f.trace_hull, f.trace_press):
+            check.trace_add("write", lambda *_: self.update_aux_plot())
+
+        # Guide graph checkboxes
+        for entry in (f.guide_plot_travel, f.guide_plot_volume, f.guide_plot_burnout, f.guide_chamber_ruler):
+            entry.trace_add("write", lambda *_: self.update_guide_graph())
+
+    def on_state_change(self, type_option: str) -> None:
+        """Update plot checkbox visibility based on gun type."""
+        from .ballistics import CONVENTIONAL, RECOILLESS
+
+        f = self.frame
+
+        if type_option == CONVENTIONAL:
+            f.plot_nozzle_v.remove()
+            f.plot_breech_p.localize("plotBreechP")
+            f.plot_stag_p.remove()
+            f.plot_stag_l.remove()
+            f.plot_eta.remove()
+
+        elif type_option == RECOILLESS:
+            f.plot_nozzle_v.restore()
+            f.plot_breech_p.localize("plotNozzleP")
+            f.plot_stag_p.restore()
+            f.plot_stag_p.localize("plotStagP")
+            f.plot_stag_l.restore()
+            f.plot_stag_l.localize("plotStagL")
+            f.plot_eta.restore()
+            f.plot_eta.localize("plotEtaEsc")
+
+        else:
+            raise ValueError
 
     @property
     def context(self):
-        return self.frame.context
+        """Build matplotlib context from current theme colors."""
+        style = ttk.Style(self.frame)
+        bgc = str(style.lookup("TEntry", "background"))
+        fgc = str(style.lookup("TEntry", "foreground"))
+        fbgc = str(style.lookup("TEntry", "fieldbackground")) or bgc
+
+        return {
+            "font.size": FONTSIZE,
+            "axes.titlesize": FONTSIZE,
+            "axes.labelsize": FONTSIZE,
+            "axes.titlelocation": "right",
+            "xtick.labelsize": FONTSIZE,
+            "ytick.labelsize": FONTSIZE,
+            "legend.fontsize": FONTSIZE,
+            "figure.titlesize": BOLDSIZE,
+            "lines.markersize": FONTSIZE / 4,
+            "lines.linewidth": 1,
+            "font.family": FONTNAME,
+            "axes.labelweight": "bold",
+            "xaxis.labellocation": "right",
+            "yaxis.labellocation": "top",
+            "figure.facecolor": bgc,
+            "figure.edgecolor": fgc,
+            "axes.edgecolor": fgc,
+            "axes.labelcolor": fgc,
+            "axes.facecolor": fbgc,
+            "text.color": fgc,
+            "xtick.color": fgc,
+            "ytick.color": fgc,
+        }
 
     @property
     def gun(self):

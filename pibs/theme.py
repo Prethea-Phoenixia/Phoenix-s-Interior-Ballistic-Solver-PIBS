@@ -16,23 +16,6 @@ class ThemedMixin(object):
         self.dpi = dpi
         self.force_update_on_theme_widget = []
 
-        self.context = {
-            "font.size": FONTSIZE,
-            "axes.titlesize": FONTSIZE,
-            "axes.labelsize": FONTSIZE,
-            "axes.titlelocation": "right",
-            "xtick.labelsize": FONTSIZE,
-            "ytick.labelsize": FONTSIZE,
-            "legend.fontsize": FONTSIZE,
-            "figure.titlesize": BOLDSIZE,
-            "lines.markersize": FONTSIZE / 4,
-            "lines.linewidth": 1,
-            "font.family": FONTNAME,
-            "axes.labelweight": "bold",
-            "xaxis.labellocation": "right",
-            "yaxis.labellocation": "top",
-        }
-
     def use_theme(self):
         style = ttk.Style(self)
         style.theme_use(self.theme_name_var.get())
@@ -55,16 +38,3 @@ class ThemedMixin(object):
         # some widgets also needs to be manually updated
         for widget in self.force_update_on_theme_widget:
             widget.config(background=fbgc, foreground=fgc, insertbackground=fgc)
-
-        self.context.update(
-            {
-                "figure.facecolor": bgc,
-                "figure.edgecolor": fgc,
-                "axes.edgecolor": fgc,
-                "axes.labelcolor": fgc,
-                "axes.facecolor": fbgc,
-                "text.color": fgc,
-                "xtick.color": fgc,
-                "ytick.color": fgc,
-            }
-        )

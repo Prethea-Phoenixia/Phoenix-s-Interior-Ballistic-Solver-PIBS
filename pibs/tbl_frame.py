@@ -99,10 +99,10 @@ class TableFrame(LocalizedFrame):
 
         return table_data
 
-    def update_table(self, gun_result: GunResult | RecoillessResult, acc_exp: int):
+    def update_table(self, gun_result: GunResult | RecoillessResult | None, acc_exp: int):
 
         self.tv.delete(*self.tv.get_children())
-        if not gun_result:
+        if gun_result is None:
             return
 
         loc_table_data = self.format_table(gun_result=gun_result, acc_exp=acc_exp)

@@ -37,14 +37,14 @@ class ModeManager:
     def get_mode_state(self) -> ModeState:
         """Determine current mode from UI state."""
         f = self.frame
-        gun_type = f.type_optn.get_obj()
+        gun_type = f.get_gun_type()
 
         mode = MODE_FREE
-        if f.use_cons.get():
+        if f.is_constrained():
             mode = MODE_CONSTRAINED
-        if f.opt.get():
+        if f.is_optimization():
             mode = MODE_OPT
-        if f.lock_Lg.get():
+        if f.is_lock_length():
             mode = MODE_LOCK_LG
 
         return ModeState(

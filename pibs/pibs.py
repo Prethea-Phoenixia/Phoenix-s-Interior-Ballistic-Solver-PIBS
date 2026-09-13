@@ -1,10 +1,5 @@
-import locale
 import logging
 import multiprocessing
-import platform
-
-if platform.system() == "Windows":
-    from ctypes import windll
 
 from tkinter import Menu, Tk
 from tkinter.font import Font
@@ -14,24 +9,24 @@ from matplotlib import font_manager
 
 from . import FONTNAME, FONTSIZE, __version__
 from .ib_frame import InteriorBallisticsFrame
-from .misc import STRING, detect_darkmode_in_windows, loadfont, resolve_path, unloadfont
+from .misc import (
+    STRING,
+    detect_darkmode_in_windows,
+    get_windows_locale,
+    loadfont,
+    resolve_path,
+    setup_windows_dpi,
+    unloadfont,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def grid_configure_recursive(widget, **kwargs):
-    stack = list(widget.winfo_children())
-    while stack:
-        descendent = stack.pop()
-        stack.extend(descendent.winfo_children())
-        descendent.grid_configure(**kwargs)
 
 
 class PIBS(Tk):
     def __init__(self, *args, loc: str, debug: bool, **kwargs):
         super().__init__(*args, **kwargs)
         # Only works on Windows:(
-        if platform.system() == "Windows":
+        if self._is_windows():
             super().iconbitmap(default=resolve_path("ui/logo.ico"))
         super().option_add("*tearOff", False)
 
@@ -69,6 +64,12 @@ class PIBS(Tk):
 
         self.bind("<F4>", lambda *_: self.toggle_fullscreen())
 
+    @staticmethod
+    def _is_windows() -> bool:
+        import platform
+
+        return platform.system() == "Windows"
+
     def toggle_fullscreen(self):
         self.wm_attributes("-fullscreen", self.is_fullscreen)
         self.is_fullscreen = not self.is_fullscreen
@@ -83,18 +84,8 @@ def main(loc: str = "", debug: bool = False):
     multiprocessing.freeze_support()
     logger.info("Initializing")
 
-    # this tells windows that our program will handle scaling ourselves
-    if platform.system() == "Windows":
-        win_release = platform.release()
-        if win_release in ("8", "10", "11"):
-            # noinspection PyUnresolvedReferences
-            windll.shcore.SetProcessDpiAwareness(1)
-        elif win_release in ("7", "Vista"):
-            # noinspection PyUnresolvedReferences
-            windll.user32.SetProcessDPIAware()
-
-        # noinspection PyUnresolvedReferences
-        loc: str = loc or locale.windows_locale[windll.kernel32.GetUserDefaultUILanguage()]
+    setup_windows_dpi()
+    loc = loc or get_windows_locale()
 
     loadfont(resolve_path("ui/SarasaFixedSC-Regular.ttf"), True, True)
     mpl.font_manager.fontManager.addfont(resolve_path("ui/SarasaFixedSC-Regular.ttf"))
