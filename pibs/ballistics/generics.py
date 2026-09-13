@@ -12,7 +12,7 @@ from . import Point
 
 @dataclass
 class GenericEntry:
-    tag: str
+    tag: Point
     time: float
     travel: float
     burnup: float
@@ -54,7 +54,7 @@ class GenericResult:
 
 @dataclass
 class PressureTraceEntry:
-    tag: str
+    tag: Point
     temperature: float | None
     pressure_trace: list[PressureProbePoint]
 
