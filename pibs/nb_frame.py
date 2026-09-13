@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-from . import FONTNAME, FONTSIZE, THEMES
+from . import FONTNAME, FONTSIZE, THEMES, Theme
+from .ballistics import GunType
 from .ballistics.gun import Gun, GunResult
 from .ballistics.prop import Propellant
 from .config import SimulationConfig
@@ -273,7 +274,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         super().use_theme()
         grays = (
             [f"gray{i}" for i in [90, 80, 70]]
-            if THEMES[self.theme_name_var.get()]["is_light"]
+            if THEMES[Theme(self.theme_name_var.get())]["is_light"]
             else [f"gray{i}" for i in [15, 25, 35]]
         )
 
@@ -333,5 +334,5 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         self.description.insert("end", description)
         self.description.edit_reset()
 
-    def on_state_change(self, type_option: str) -> None:
+    def on_state_change(self, type_option: GunType) -> None:
         self.plot_manager.on_state_change(type_option)

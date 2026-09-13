@@ -8,14 +8,8 @@ from typing import TYPE_CHECKING
 
 from . import (
     MAX_ITER,
-    POINT_PEAK_AVG,
-    POINT_PEAK_BREECH,
-    POINT_PEAK_SHOT,
-    SOL_LAGRANGE,
-    SOL_MAMONTOV,
-    SOL_PIDDUCK,
-    Points,
-    Solutions,
+    Point,
+    SolutionMethod,
 )
 from .config import DesignConstraint, GunGeometry, PropellantLoad, Solver
 from .constrained import Constrained
@@ -87,11 +81,11 @@ class ConstrainedGun(Constrained):
         """
 
         if any((labda_1 is None, labda_2 is None)):
-            if self.sol == SOL_LAGRANGE:
+            if self.sol == SolutionMethod.LAGRANGE:
                 labda_1, labda_2 = 1 / 2, 1 / 3
-            elif self.sol == SOL_PIDDUCK:
+            elif self.sol == SolutionMethod.PIDDUCK:
                 labda_1, labda_2 = pidduck(w / (self.phi_1 * self.m), self.theta + 1, self.tol)
-            elif self.sol == SOL_MAMONTOV:
+            elif self.sol == SolutionMethod.MAMONTOV:
                 labda_1, labda_2 = pidduck(w / (self.phi_1 * self.m), 1, self.tol)
             else:
                 raise ValueError("Unknown Solution")
@@ -115,7 +109,7 @@ class ConstrainedGun(Constrained):
             psi = self.f_psi_z(z)
             l_psi_bar = 1 - delta / self.rho_p - delta * (self.alpha - 1 / self.rho_p) * psi
             p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
-            if self.design.pressure_control == POINT_PEAK_AVG:
+            if self.design.pressure_control == Point.PEAK_AVG:
                 return p_bar
             else:
                 cc_prime = (1 / self.chi_k + l_bar) / (1 + l_bar)
@@ -125,9 +119,9 @@ class ConstrainedGun(Constrained):
                 factor_s = 1 + labda_2_prime * (w / (self.phi_1 * self.m))
                 factor_b = (self.phi_1 * self.m + labda_2_prime * w) / (self.phi_1 * self.m + labda_1_prime * w)
 
-                if self.design.pressure_control == POINT_PEAK_SHOT:
+                if self.design.pressure_control == Point.PEAK_SHOT:
                     return p_bar / factor_s
-                elif self.design.pressure_control == POINT_PEAK_BREECH:
+                elif self.design.pressure_control == Point.PEAK_BREECH:
                     return p_bar / factor_b
                 else:
                     raise ValueError(f"Unknown control {self.design.pressure_control}")

@@ -6,7 +6,7 @@ import math
 from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, Callable
 
-from . import MIN_BARR_VOLUME, MIN_PROJ_TRAVEL, JSONable, OptimizationTargets
+from . import JSONable, OptimizationTarget
 from .config import DesignConstraint, GunGeometry, PropellantLoad, Solver
 from .num import gss
 from .prop import DelegatesPropellant
@@ -190,7 +190,7 @@ class Constrained(DelegatesPropellant, JSONable):
         self,
         *,
         charge_mass_ratio: float,
-        opt_target: OptimizationTargets = MIN_BARR_VOLUME,
+        opt_target: OptimizationTarget = OptimizationTarget.MIN_BARR_VOLUME,
         **_,
     ) -> tuple[float, float, float]:
         """
@@ -203,9 +203,9 @@ class Constrained(DelegatesPropellant, JSONable):
         high = self.maximum_load_fraction(charge_mass_ratio)
         self.logger.info(f"Max Δ/ρ = {high:.3%}.")
 
-        if opt_target == MIN_PROJ_TRAVEL:
+        if opt_target == OptimizationTarget.MIN_PROJ_TRAVEL:
             _f_index = 1
-        elif opt_target == MIN_BARR_VOLUME:
+        elif opt_target == OptimizationTarget.MIN_BARR_VOLUME:
             _f_index = 2
         else:
             raise ValueError(f"Unknown target {opt_target}")

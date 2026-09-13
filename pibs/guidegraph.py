@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 import psutil
 from tqdm import tqdm
 
-from .ballistics import CONVENTIONAL, POINT_BURNOUT, POINT_EXIT, RECOILLESS
+from .ballistics import GunType, Point
 from .ballistics.constrained import Constrained
 from .ballistics.gun import Gun
 from .ballistics.recoilless import Recoilless
@@ -81,9 +81,9 @@ def f(
         gun_result = gun.integrate(step=0)
 
         try:
-            burnout = gun_result.read_table_data(POINT_BURNOUT).travel / length_gun
+            burnout = gun_result.read_table_data(Point.BURNOUT).travel / length_gun
         except ValueError:
-            burnout = 1 / gun_result.read_table_data(POINT_EXIT).burnup
+            burnout = 1 / gun_result.read_table_data(Point.EXIT).burnup
 
         volume = chamber_volume + length_gun * target.s
 
@@ -121,9 +121,9 @@ def guide_graph(
         smoothing=0.3,
     )
 
-    if gun_type == CONVENTIONAL:
+    if gun_type == GunType.CONVENTIONAL:
         gun_class = Gun
-    elif gun_type == RECOILLESS:
+    elif gun_type == GunType.RECOILLESS:
         gun_class = Recoilless
     else:
         raise ValueError("Unknown gun type")

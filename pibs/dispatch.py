@@ -3,7 +3,7 @@ import sys
 import traceback
 from logging.handlers import QueueHandler
 
-from .ballistics import CONVENTIONAL, RECOILLESS
+from .ballistics import GunType
 from .ballistics.cons_gun import ConstrainedGun
 from .ballistics.cons_rcl import ConstrainedRecoilless
 from .ballistics.gun import Gun
@@ -32,9 +32,9 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
         """
 
         if cfg.constrained:
-            if cfg.gun_type == CONVENTIONAL:
+            if cfg.gun_type == GunType.CONVENTIONAL:
                 constrained = ConstrainedGun(geometry=geo, load=load, design=design, solver=solver, logger=logger)
-            elif cfg.gun_type == RECOILLESS:
+            elif cfg.gun_type == GunType.RECOILLESS:
                 constrained = ConstrainedRecoilless(
                     geometry=geo, load=load, design=design, nozzle=nozzle, solver=solver, logger=logger
                 )
@@ -61,9 +61,9 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
             if not cfg.lock_length:
                 geo.barrel_length = l_g
 
-        if cfg.gun_type == CONVENTIONAL:
+        if cfg.gun_type == GunType.CONVENTIONAL:
             gun = Gun(geometry=geo, load=load, solver=solver, logger=logger)
-        elif cfg.gun_type == RECOILLESS:
+        elif cfg.gun_type == GunType.RECOILLESS:
             gun = Recoilless(geometry=geo, load=load, nozzle=nozzle, solver=solver, logger=logger)
         else:
             raise ValueError("unknown gun type")
@@ -77,9 +77,9 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
         if cfg.compute_guide:
             try:
                 logger.info("guidance diagram calculation started")
-                if cfg.gun_type == CONVENTIONAL:
+                if cfg.gun_type == GunType.CONVENTIONAL:
                     target = ConstrainedGun(geometry=geo, load=load, design=design, solver=solver, logger=logger)
-                elif cfg.gun_type == RECOILLESS:
+                elif cfg.gun_type == GunType.RECOILLESS:
                     target = ConstrainedRecoilless(
                         geometry=geo, load=load, design=design, nozzle=nozzle, solver=solver, logger=logger
                     )

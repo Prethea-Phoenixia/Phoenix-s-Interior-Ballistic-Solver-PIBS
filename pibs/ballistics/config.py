@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from . import VALID_PRESSURE_POINTS, VALID_SOLUTION_METHODS
+from . import VALID_PRESSURE_POINTS, VALID_SOLUTION_METHODS, Point, SolutionMethod
 
 if TYPE_CHECKING:
     from .material import Material
@@ -75,7 +75,7 @@ class DesignConstraint:
     design_velocity: float = 0.0
     min_web: float = 1e-6
     max_length: float = 1e3
-    pressure_control: str = "PEAK_BREECH_P"
+    pressure_control: Point = Point.PEAK_BREECH
 
     def __post_init__(self):
         _non_negative("design_pressure", self.design_pressure)
@@ -89,7 +89,7 @@ class DesignConstraint:
 class Solver:
     tolerance: float = 1e-5
     max_iterations: int = 10
-    solution_method: str = "SOL_PIDDUCK"
+    solution_method: SolutionMethod = SolutionMethod.PIDDUCK
     drag_coefficient: float = 0.0
 
     def __post_init__(self):

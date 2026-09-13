@@ -4,12 +4,7 @@ import json
 import logging
 from dataclasses import asdict
 
-from . import (
-    POINT_PEAK_AVG,
-    POINT_PEAK_BREECH,
-    POINT_PEAK_SHOT,
-    POINT_PEAK_STAG,
-)
+from . import Point
 from .config import DesignConstraint, GunGeometry, Nozzle, PropellantLoad, Solver
 from .constrained import Constrained
 from .num import dekker, gss, rkf
@@ -109,15 +104,15 @@ class ConstrainedRecoilless(Constrained):
             h_lim = 2 * self.phi_1 * self.m / (w * (1 - eta)) + 1
             h = h_lim if v_bar == 0 else min(h_lim, vb / (v_j * v_bar))
 
-            if self.design.pressure_control == POINT_PEAK_AVG:
+            if self.design.pressure_control == Point.PEAK_AVG:
                 return p_bar
             else:
                 p_s_bar = p_bar / (1 + w * (1 - eta) / (3 * self.phi_1 * self.m) * (1 - 0.5 * h))
-                if self.design.pressure_control == POINT_PEAK_SHOT:
+                if self.design.pressure_control == Point.PEAK_SHOT:
                     return p_s_bar
-                elif self.design.pressure_control == POINT_PEAK_STAG:
+                elif self.design.pressure_control == Point.PEAK_STAG:
                     return p_s_bar * (1 + w * (1 - eta) / (2 * self.phi_1 * self.m) * (1 + h) ** -1)
-                elif self.design.pressure_control == POINT_PEAK_BREECH:
+                elif self.design.pressure_control == Point.PEAK_BREECH:
                     if h == h_lim:
                         return 0.0
                     else:

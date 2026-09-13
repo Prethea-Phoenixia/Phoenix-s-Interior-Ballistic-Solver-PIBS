@@ -20,20 +20,17 @@ from . import (
     DESCRIPTION,
     FONTNAME,
     FONTSIZE,
-    THEMES,
+    FigureType,
+    Theme,
     log_formatter,
     root_logger,
 )
 from .ballistics import (
-    CONVENTIONAL,
-    DOMAIN_LEN,
-    DOMAIN_TIME,
-    MIN_BARR_VOLUME,
-    MIN_PROJ_TRAVEL,
-    RECOILLESS,
-    SOL_LAGRANGE,
-    SOL_MAMONTOV,
-    SOL_PIDDUCK,
+    Domain,
+    GunType,
+    OptimizationTarget,
+    Point,
+    SolutionMethod,
 )
 from .ballistics.gun import Gun
 from .ballistics.material import Material
@@ -158,24 +155,24 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.root.bind("<Control-r>", lambda *_: self.on_calculate())
 
         data_menu.add_command(
-            label=self.get_loc_str("exportMain"), command=lambda *_: self.file_io.export_graph(save="main")
+            label=self.get_loc_str("exportMain"), command=lambda *_: self.file_io.export_graph(save=FigureType.MAIN)
         )
         data_menu.add_command(
-            label=self.get_loc_str("exportAux"), command=lambda *_: self.file_io.export_graph(save="aux")
+            label=self.get_loc_str("exportAux"), command=lambda *_: self.file_io.export_graph(save=FigureType.AUX)
         )
         data_menu.add_command(
-            label=self.get_loc_str("exportGeom"), command=lambda *_: self.file_io.export_graph(save="geom")
+            label=self.get_loc_str("exportGeom"), command=lambda *_: self.file_io.export_graph(save=FigureType.GEOM)
         )
         data_menu.add_command(
-            label=self.get_loc_str("exportGuide"), command=lambda *_: self.file_io.export_graph(save="guide")
+            label=self.get_loc_str("exportGuide"), command=lambda *_: self.file_io.export_graph(save=FigureType.GUIDE)
         )
         data_menu.add_command(label=self.get_loc_str("exportLabel"), command=self.file_io.export_table)
 
         data_menu.add_command(label=self.get_loc_str("reloadPropellant"), command=self.file_io.load_propellant)
 
-        for theme_name in THEMES.keys():
+        for theme in Theme:
             theme_menu.add_radiobutton(
-                label=theme_name, variable=self.theme_name_var, value=theme_name, command=self.use_theme
+                label=theme.value, variable=self.theme_name_var, value=theme.value, command=self.use_theme
             )
 
         debug_menu.add_checkbutton(label=self.get_loc_str("enableLabel"), variable=self.debug, onvalue=1, offvalue=0)
@@ -217,7 +214,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         sb = RowBuilder(self, specs_frame)
         self.type_optn = sb.dropdown(
-            str_obj_dict={gun_type: gun_type for gun_type in (CONVENTIONAL, RECOILLESS)},
+            str_obj_dict={g.value: g for g in GunType},
             desc_label_key="typeLabel",
             grid_kwargs={"columnspan": 3},
         )
@@ -527,7 +524,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         self.drop_gradient = self.add_localized_dropdown(
             parent=solution_frame,
-            str_obj_dict={solution: solution for solution in (SOL_LAGRANGE, SOL_PIDDUCK, SOL_MAMONTOV)},
+            str_obj_dict={s.value: s for s in SolutionMethod},
             desc_label_key="solFrmLabel",
         )
         self.drop_gradient.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
@@ -570,7 +567,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         self.drop_opt_tgt = ccb.dropdown(
-            str_obj_dict={MIN_BARR_VOLUME: MIN_BARR_VOLUME, MIN_PROJ_TRAVEL: MIN_PROJ_TRAVEL},
+            str_obj_dict={o.value: o for o in OptimizationTarget},
             desc_label_key="optTgtLabel",
             grid_kwargs={"columnspan": 3},
         )
@@ -619,7 +616,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         sb = RowBuilder(self, sample_frm)
         self.drop_domain = sb.dropdown(
-            str_obj_dict={domain: domain for domain in (DOMAIN_TIME, DOMAIN_LEN)},
+            str_obj_dict={d.value: d for d in Domain},
             desc_label_key="sampleFrmLabel",
             grid_kwargs={"columnspan": 2},
         )
@@ -841,15 +838,15 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             normalized_filename=filenameize(self.get_normalized_name()),
         )
 
-    def get_figure(self, save_type: Literal["main", "aux", "geom", "guide"]):
+    def get_figure(self, save_type: FigureType):
         """Get the matplotlib figure for export."""
-        if save_type == "main":
+        if save_type == FigureType.MAIN:
             return self.notebook_frame.fig_canvas.figure
-        elif save_type == "aux":
+        elif save_type == FigureType.AUX:
             return self.notebook_frame.aux_canvas.figure
-        elif save_type == "guide":
+        elif save_type == FigureType.GUIDE:
             return self.notebook_frame.guide_canvas.figure
-        elif save_type == "geom":
+        elif save_type == FigureType.GEOM:
             return self.notebook_frame.geom_canvas.figure
         return None
 
@@ -859,7 +856,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
     # --- Mode State Getters ---
 
-    def get_gun_type(self) -> str:
+    def get_gun_type(self) -> GunType:
         """Get the selected gun type."""
         return self.type_optn.get_obj()
 

@@ -2,15 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .ballistics import (
-    CONVENTIONAL,
-    POINT_PEAK_AVG,
-    POINT_PEAK_BREECH,
-    POINT_PEAK_SHOT,
-    POINT_PEAK_STAG,
-    RECOILLESS,
-    SOL_LAGRANGE,
-)
+from .ballistics import GunType, Point, SolutionMethod
 
 MODE_FREE = "free"
 MODE_CONSTRAINED = "constrained"
@@ -22,7 +14,7 @@ MODE_OPT = "opt"
 class ModeState:
     """Represents the current UI mode and its constraints."""
 
-    gun_type: str
+    gun_type: GunType
     mode: str
     is_conventional: bool
     is_recoilless: bool
@@ -50,8 +42,8 @@ class ModeManager:
         return ModeState(
             gun_type=gun_type,
             mode=mode,
-            is_conventional=gun_type == CONVENTIONAL,
-            is_recoilless=gun_type == RECOILLESS,
+            is_conventional=gun_type == GunType.CONVENTIONAL,
+            is_recoilless=gun_type == GunType.RECOILLESS,
         )
 
     def apply_gun_type(self, state: ModeState):
@@ -63,17 +55,17 @@ class ModeManager:
             f.nozz_exp.disable()
             f.nozz_eff.disable()
             f.p_control.reset(
-                {p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH)},
+                {p.value: p for p in (Point.PEAK_AVG, Point.PEAK_SHOT, Point.PEAK_BREECH)},
                 overwrite=False,
             )
 
         elif state.is_recoilless:
-            f.drop_gradient.set_by_obj(SOL_LAGRANGE)
+            f.drop_gradient.set_by_obj(SolutionMethod.LAGRANGE)
             f.drop_gradient.disable()
             f.nozz_exp.enable()
             f.nozz_eff.enable()
             f.p_control.reset(
-                {p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)},
+                {p.value: p for p in (Point.PEAK_AVG, Point.PEAK_SHOT, Point.PEAK_STAG, Point.PEAK_BREECH)},
                 overwrite=False,
             )
 

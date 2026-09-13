@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from tkinter import filedialog, messagebox
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
+from . import FigureType
 from .misc import filenameize
 
 if TYPE_CHECKING:
@@ -80,7 +81,7 @@ class FileIOManager:
         frame = self.frame
         frame.export_table_data()
 
-    def export_graph(self, save: Literal["main", "aux", "geom", "guide"]):
+    def export_graph(self, save: FigureType):
         """Export plot as PNG."""
         frame = self.frame
 
@@ -88,7 +89,7 @@ class FileIOManager:
             title=frame.get_loc_str("exportGraphLabel"),
             filetypes=(("Portable Network Graphics", "*.png"),),
             defaultextension=".png",
-            initialfile=filenameize(f"{frame.get_normalized_name()}_{save}"),
+            initialfile=filenameize(f"{frame.get_normalized_name()}_{save.value}"),
         )
 
         if not file_name:

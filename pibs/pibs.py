@@ -1,6 +1,5 @@
 import logging
 import multiprocessing
-
 from tkinter import Menu, Tk
 from tkinter.font import Font
 

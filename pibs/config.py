@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .ballistics import Domain, GunType, OptimizationTarget, Point, SolutionMethod
 from .ballistics.config import DesignConstraint, PropellantLoad, Solver, Structural
 from .ballistics.gun import GunGeometry
 from .ballistics.material import Material
@@ -23,11 +24,11 @@ class SimulationConfig:
     constrained: bool
     debug: bool
     lock_length: bool
-    gun_type: str
-    domain: str
-    solution_method: str
-    pressure_control_point: str
-    optimization_target: str
+    gun_type: GunType
+    domain: Domain
+    solution_method: SolutionMethod
+    pressure_control_point: Point
+    optimization_target: OptimizationTarget
 
     # Geometry
     caliber: float

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from tkinter import StringVar, ttk
 
-from . import BOLDSIZE, FONTNAME, FONTSIZE
+from . import BOLDSIZE, FONTNAME, FONTSIZE, Theme
 
 
 class ThemedMixin(object):
@@ -12,7 +12,7 @@ class ThemedMixin(object):
         if isinstance(master, ThemedMixin):
             self.theme_name_var = master.theme_name_var
         else:
-            self.theme_name_var = StringVar(value="awdark" if os_dark else "awlight")
+            self.theme_name_var = StringVar(value=Theme.AWDARK.value if os_dark else Theme.AWLIGHT.value)
         self.dpi = dpi
         self.force_update_on_theme_widget = []
 

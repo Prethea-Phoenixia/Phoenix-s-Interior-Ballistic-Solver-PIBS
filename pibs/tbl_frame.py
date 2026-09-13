@@ -3,19 +3,7 @@ from __future__ import annotations
 import csv
 from tkinter import Frame, filedialog, messagebox, ttk
 
-from .ballistics import (
-    COMPUTE,
-    CONVENTIONAL,
-    POINT_BURNOUT,
-    POINT_EXIT,
-    POINT_FRACTURE,
-    POINT_PEAK_AVG,
-    POINT_PEAK_BREECH,
-    POINT_PEAK_SHOT,
-    POINT_PEAK_STAG,
-    POINT_START,
-    RECOILLESS,
-)
+from .ballistics import GunType, Point
 from .ballistics.gun import GunResult
 from .ballistics.recoilless import RecoillessResult
 from .localized import LocalizedFrame
@@ -108,24 +96,24 @@ class TableFrame(LocalizedFrame):
         loc_table_data = self.format_table(gun_result=gun_result, acc_exp=acc_exp)
 
         if isinstance(gun_result, GunResult):
-            column_list = self.get_loc_str("columnList")[CONVENTIONAL]
+            column_list = self.get_loc_str("columnList")[GunType.CONVENTIONAL.value]
         elif isinstance(gun_result, RecoillessResult):
-            column_list = self.get_loc_str("columnList")[RECOILLESS]
+            column_list = self.get_loc_str("columnList")[GunType.RECOILLESS.value]
         else:
             raise ValueError
 
         self.tv["columns"] = column_list
         self.tv["show"] = "headings"
 
-        self.tv.tag_configure(self.get_loc_str(POINT_PEAK_STAG), foreground="#2e8b57")
-        self.tv.tag_configure(self.get_loc_str(POINT_PEAK_AVG), foreground="#2ca02c")
-        self.tv.tag_configure(self.get_loc_str(POINT_PEAK_BREECH), foreground="orange")
-        self.tv.tag_configure(self.get_loc_str(POINT_PEAK_SHOT), foreground="yellow green")
-        self.tv.tag_configure(self.get_loc_str(POINT_BURNOUT), foreground="red")
-        self.tv.tag_configure(self.get_loc_str(POINT_FRACTURE), foreground="brown")
-        self.tv.tag_configure(self.get_loc_str(POINT_EXIT), foreground="steel blue")
-        self.tv.tag_configure(self.get_loc_str(POINT_START), foreground="steel blue")
-        self.tv.tag_configure(self.get_loc_str(COMPUTE), foreground="tan")
+        self.tv.tag_configure(self.get_loc_str(Point.PEAK_STAG.value), foreground="#2e8b57")
+        self.tv.tag_configure(self.get_loc_str(Point.PEAK_AVG.value), foreground="#2ca02c")
+        self.tv.tag_configure(self.get_loc_str(Point.PEAK_BREECH.value), foreground="orange")
+        self.tv.tag_configure(self.get_loc_str(Point.PEAK_SHOT.value), foreground="yellow green")
+        self.tv.tag_configure(self.get_loc_str(Point.BURNOUT.value), foreground="red")
+        self.tv.tag_configure(self.get_loc_str(Point.FRACTURE.value), foreground="brown")
+        self.tv.tag_configure(self.get_loc_str(Point.EXIT.value), foreground="steel blue")
+        self.tv.tag_configure(self.get_loc_str(Point.START.value), foreground="steel blue")
+        self.tv.tag_configure(self.get_loc_str(Point.COMPUTE.value), foreground="tan")
 
         self.tv.tag_configure("monospace", font=self.font)
         self.tv.tag_configure("error", font=self.font, foreground="dim gray")
@@ -157,9 +145,9 @@ class TableFrame(LocalizedFrame):
         )
 
         if isinstance(gun_result, GunResult):
-            gun_type = CONVENTIONAL
+            gun_type = GunType.CONVENTIONAL.value
         elif isinstance(gun_result, RecoillessResult):
-            gun_type = RECOILLESS
+            gun_type = GunType.RECOILLESS.value
         else:
             raise ValueError
 

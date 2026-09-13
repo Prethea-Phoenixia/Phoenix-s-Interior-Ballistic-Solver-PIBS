@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import math
+from tkinter import ttk
 from typing import TYPE_CHECKING
 
 import matplotlib as mpl
 from labellines import labelLines
 from matplotlib import pyplot as plt
-from tkinter import ttk
 
-from . import BOLDSIZE, FONTNAME, FONTSIZE, THEMES
-from .ballistics import CONVENTIONAL, DOMAIN_LEN, DOMAIN_TIME, RECOILLESS
+from . import BOLDSIZE, FONTNAME, FONTSIZE, THEMES, Theme
+from .ballistics import Domain, GunType
 from .ballistics.recoilless import RecoillessTableEntry
 from .guidegraph import GuideResults
 
@@ -94,20 +94,18 @@ class PlotManager:
         for entry in (f.guide_plot_travel, f.guide_plot_volume, f.guide_plot_burnout, f.guide_chamber_ruler):
             entry.trace_add("write", lambda *_: self.update_guide_graph())
 
-    def on_state_change(self, type_option: str) -> None:
+    def on_state_change(self, type_option: GunType) -> None:
         """Update plot checkbox visibility based on gun type."""
-        from .ballistics import CONVENTIONAL, RECOILLESS
-
         f = self.frame
 
-        if type_option == CONVENTIONAL:
+        if type_option == GunType.CONVENTIONAL:
             f.plot_nozzle_v.remove()
             f.plot_breech_p.localize("plotBreechP")
             f.plot_stag_p.remove()
             f.plot_stag_l.remove()
             f.plot_eta.remove()
 
-        elif type_option == RECOILLESS:
+        elif type_option == GunType.RECOILLESS:
             f.plot_nozzle_v.restore()
             f.plot_breech_p.localize("plotNozzleP")
             f.plot_stag_p.restore()
@@ -175,7 +173,7 @@ class PlotManager:
 
     @property
     def theme_cmap(self):
-        return mpl.colormaps[THEMES[self.frame.theme_name_var.get()]["cmap"]]
+        return mpl.colormaps[THEMES[Theme(self.frame.theme_name_var.get())]["cmap"]]
 
     def _setup_canvas(self, canvas):
         """Clear and prepare a canvas for plotting."""
@@ -219,13 +217,13 @@ class PlotManager:
                     ps = entry.shot_pressure
 
                     if tag == self.config.pressure_control_point:
-                        x_peak = (time * 1e3) if dom == DOMAIN_TIME else travel
+                        x_peak = (time * 1e3) if dom == Domain.TIME else travel
                         # noinspection PyTypeChecker
                         ax_p.spines.right.set_position(("data", x_peak))
 
-                    if dom == DOMAIN_TIME:
+                    if dom == Domain.TIME:
                         xs.append(time * 1000)
-                    elif dom == DOMAIN_LEN:
+                    elif dom == Domain.LEN:
                         xs.append(travel)
 
                     vs.append(v)
@@ -243,10 +241,12 @@ class PlotManager:
                         xs,
                         pbs,
                         c="xkcd:goldenrod",
-                        label=(self.frame.get_loc_str("figBreech" if gun_type == CONVENTIONAL else "figNozzleP")),
+                        label=(
+                            self.frame.get_loc_str("figBreech" if gun_type == GunType.CONVENTIONAL else "figNozzleP")
+                        ),
                     )
 
-                if gun_type == RECOILLESS:
+                if gun_type == GunType.RECOILLESS:
                     if self.frame.plot_stag_p.get():
                         ax_p.plot(xs, p0s, "seagreen", label=self.frame.get_loc_str("figStagnation"))
 
@@ -265,7 +265,7 @@ class PlotManager:
                 if self.frame.plot_base_p.get():
                     ax_p.plot(xs, pss, "yellowgreen", label=self.frame.get_loc_str("figShotBase"))
 
-                if gun_type == CONVENTIONAL or gun_type == RECOILLESS:
+                if gun_type in (GunType.CONVENTIONAL, GunType.RECOILLESS):
                     ax_p.axhline(float(p_tgt), c="tab:green", linestyle=":", label=self.frame.get_loc_str("figTgtP"))
 
                 if self.frame.plot_vel.get():
@@ -313,9 +313,9 @@ class PlotManager:
                 ax_v.set_ylabel("m/s")
                 ax_v.yaxis.label.set_color("tab:blue")
 
-                if dom == DOMAIN_TIME:
+                if dom == Domain.TIME:
                     ax.set_xlabel(self.frame.get_loc_str("figTimeDomain"))
-                elif dom == DOMAIN_LEN:
+                elif dom == Domain.LEN:
                     ax.set_xlabel(self.frame.get_loc_str("figLenDomain"))
 
             canvas.draw_idle()

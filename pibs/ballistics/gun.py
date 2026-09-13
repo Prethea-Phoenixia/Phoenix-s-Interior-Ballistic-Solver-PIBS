@@ -8,22 +8,9 @@ from math import log
 from typing import Callable, Literal
 
 from . import (
-    DOMAIN_TIME,
-    POINT_BURNOUT,
-    POINT_EXIT,
-    POINT_FRACTURE,
-    POINT_PEAK_AVG,
-    POINT_PEAK_BREECH,
-    POINT_PEAK_SHOT,
-    POINT_START,
-    SAMPLE,
-    SOL_LAGRANGE,
-    SOL_MAMONTOV,
-    SOL_PIDDUCK,
-    Domains,
-    GunPeakPoints,
-    Points,
-    Solutions,
+    Domain,
+    Point,
+    SolutionMethod,
 )
 from .base_gun import BaseGun
 from .config import GunGeometry, PropellantLoad, Solver, Structural
@@ -124,11 +111,11 @@ class Gun(BaseGun):
 
         self.sol = self.solver.solution_method
 
-        if self.sol == SOL_LAGRANGE:
+        if self.sol == SolutionMethod.LAGRANGE:
             self.labda_1, self.labda_2 = 1 / 2, 1 / 3
-        elif self.sol == SOL_PIDDUCK:
+        elif self.sol == SolutionMethod.PIDDUCK:
             self.labda_1, self.labda_2 = pidduck(self.w / (self.phi_1 * self.m), self.theta + 1, self.tol)
-        elif self.sol == SOL_MAMONTOV:
+        elif self.sol == SolutionMethod.MAMONTOV:
             self.labda_1, self.labda_2 = pidduck(self.w / (self.phi_1 * self.m), 1, self.tol)
         else:
             raise ValueError("Unknown Solution")
@@ -232,7 +219,7 @@ class Gun(BaseGun):
     def integrate(
         self,
         step: int = 33,
-        dom: Domains = DOMAIN_TIME,
+        dom: Domain = Domain.TIME,
     ) -> GunResult:
 
         bar_data = []
@@ -240,7 +227,7 @@ class Gun(BaseGun):
         l_g_bar = self.l_g / self.l_0
         z_0, z_b = self.z_0, self.z_b
 
-        self.append_bar_data(bar_data, tag=POINT_START, t_bar=0, l_bar=0, z=z_0, v_bar=0)
+        self.append_bar_data(bar_data, tag=Point.START, t_bar=0, l_bar=0, z=z_0, v_bar=0)
 
         p_bar_max = 1e9 / p_scale  # 1 GPa
 
@@ -270,7 +257,7 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
         is_burn_out_contained = not (aborted and l_bar_end >= l_g_bar)
 
         if is_burn_out_contained:
-            self.append_bar_data(bar_data, tag=POINT_BURNOUT, t_bar=t_bar_end, l_bar=l_bar_end, z=z_b, v_bar=v_bar_end)
+            self.append_bar_data(bar_data, tag=Point.BURNOUT, t_bar=t_bar_end, l_bar=l_bar_end, z=z_b, v_bar=v_bar_end)
             self.logger.info("integrated to burnout point.")
         else:
             self.logger.warning("shot exited barrel before burnout.")
@@ -284,30 +271,30 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
             rel_tol=self.tol,
         )
         # Populate exit point
-        self.append_bar_data(bar_data, tag=POINT_EXIT, t_bar=t_bar_exit, l_bar=l_g_bar, z=z_exit, v_bar=v_bar_exit)
+        self.append_bar_data(bar_data, tag=Point.EXIT, t_bar=t_bar_exit, l_bar=l_g_bar, z=z_exit, v_bar=v_bar_exit)
 
         # Populate fracture point entry at Z = 1
         if z_b > 1.0 and z_exit >= 1.0:
             t_bar_f, l_bar_f, v_bar_f = rkf(self.ode_z, (0, 0, 0), z_0, 1, rel_tol=self.tol)[1]
-            self.append_bar_data(bar_data, tag=POINT_FRACTURE, t_bar=t_bar_f, l_bar=l_bar_f, z=1, v_bar=v_bar_f)
+            self.append_bar_data(bar_data, tag=Point.FRACTURE, t_bar=t_bar_f, l_bar=l_bar_f, z=1, v_bar=v_bar_f)
 
-        def find_peak(g: Callable[[float], float], tag: GunPeakPoints) -> None:
+        def find_peak(g: Callable[[float], float], tag: Point) -> None:
             t_bar_p = 0.5 * sum(gss(g, 0, t_bar_exit, x_tol=t_bar_exit * self.tol, find_min=False))
             z_p, l_bar_p, v_bar_p = self.g(t_bar_p, tag, self.tol)[1]
             self.append_bar_data(bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p)
 
         # Find peak pressure in time domain
-        for peak in [POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH]:
+        for peak in [Point.PEAK_AVG, Point.PEAK_SHOT, Point.PEAK_BREECH]:
             find_peak(lambda _t_bar: self.g(_t_bar, peak, z_0)[0], peak)
 
         # Sampling
-        if dom == DOMAIN_TIME:
+        if dom == Domain.TIME:
             z_j, l_bar_j, v_bar_j, t_bar_j = z_0, 0, 0, 0
         else:  # length domain ODE requires starting from some point
             t_bar_j, (z_j, l_bar_j, v_bar_j), _ = rkf(self.ode_t, (z_0, 0, 0), 0, 0.5 * t_bar_exit, rel_tol=self.tol)
 
         for j in range(step):
-            if dom == DOMAIN_TIME:
+            if dom == Domain.TIME:
                 t_bar_k = t_bar_exit / (step + 1) * (j + 1)
                 z_j, l_bar_j, v_bar_j = rkf(self.ode_t, (z_j, l_bar_j, v_bar_j), t_bar_j, t_bar_k, rel_tol=self.tol)[1]
                 t_bar_j = t_bar_k
@@ -316,7 +303,7 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
                 t_bar_j, z_j, v_bar_j = rkf(self.ode_l, (t_bar_j, z_j, v_bar_j), l_bar_j, l_bar_k, rel_tol=self.tol)[1]
                 l_bar_j = l_bar_k
 
-            self.append_bar_data(bar_data, tag=SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j)
+            self.append_bar_data(bar_data, tag=Point.SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j)
 
         self.logger.info(f"sampled for {step} points.")
 
@@ -373,16 +360,16 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
     ) -> None:
         bar_data.append((tag, t_bar, l_bar, z, v_bar, self.f_p_bar(z, l_bar, v_bar)))
 
-    def g(self, t_bar: float, tag: GunPeakPoints, tol: float) -> tuple[float, tuple[float, float, float]]:
+    def g(self, t_bar: float, tag: Point, tol: float) -> tuple[float, tuple[float, float, float]]:
         z, l_bar, v_bar = rkf(self.ode_t, (self.z_0, 0, 0), 0, t_bar, rel_tol=tol)[1]
         p_bar = self.f_p_bar(z, l_bar, v_bar)
-        if tag == POINT_PEAK_AVG:
+        if tag == Point.PEAK_AVG:
             return p_bar, (z, l_bar, v_bar)
         else:
             ps_bar, pb_bar = self.to_ps_pb(l_bar * self.l_0, p_bar)
-            if tag == POINT_PEAK_SHOT:
+            if tag == Point.PEAK_SHOT:
                 return ps_bar, (z, l_bar, v_bar)
-            elif tag == POINT_PEAK_BREECH:
+            elif tag == Point.PEAK_BREECH:
                 return pb_bar, (z, l_bar, v_bar)
 
         raise ValueError(f"tag {tag} not handled.")

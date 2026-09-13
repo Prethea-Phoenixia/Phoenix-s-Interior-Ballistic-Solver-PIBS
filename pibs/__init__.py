@@ -3,6 +3,7 @@ __version__ = "0.5.5"
 
 import logging
 import sys
+from enum import Enum
 
 DESCRIPTION = "Description"
 FONTNAME = "Sarasa Fixed SC"
@@ -10,9 +11,21 @@ FONTSIZE = 9
 BOLDSIZE = 9
 
 
+class FigureType(str, Enum):
+    MAIN = "main"
+    AUX = "aux"
+    GEOM = "geom"
+    GUIDE = "guide"
+
+
+class Theme(str, Enum):
+    AWDARK = "awdark"
+    AWLIGHT = "awlight"
+
+
 THEMES = {
-    "awlight": {"cmap": "afmhot_r", "is_light": True},
-    "awdark": {"cmap": "afmhot", "is_light": False},
+    Theme.AWLIGHT: {"cmap": "afmhot_r", "is_light": True},
+    Theme.AWDARK: {"cmap": "afmhot", "is_light": False},
 }
 
 

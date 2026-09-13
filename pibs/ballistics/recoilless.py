@@ -7,19 +7,8 @@ from math import inf, pi, tan
 from typing import Callable
 
 from . import (
-    DOMAIN_TIME,
-    POINT_BURNOUT,
-    POINT_EXIT,
-    POINT_FRACTURE,
-    POINT_PEAK_AVG,
-    POINT_PEAK_BREECH,
-    POINT_PEAK_SHOT,
-    POINT_PEAK_STAG,
-    POINT_START,
-    SAMPLE,
-    Domains,
-    Points,
-    RecoillessPeakPoints,
+    Domain,
+    Point,
 )
 from .base_gun import BaseGun
 from .config import GunGeometry, Nozzle, PropellantLoad, Solver, Structural
@@ -159,7 +148,7 @@ class Recoilless(BaseGun):
         self,
         step: int = 33,
         tol: float | None = None,
-        dom: Domains = DOMAIN_TIME,
+        dom: Domain = Domain.TIME,
     ) -> RecoillessResult:
         tol = tol if tol is not None else self.tol
 
@@ -169,7 +158,7 @@ class Recoilless(BaseGun):
         l_g_bar = self.l_g / self.l_0
         z_0, z_b = self.z_0, self.z_b
 
-        self.append_bar_data(bar_data, tag=POINT_START, t_bar=0, l_bar=0, z=z_0, v_bar=0, eta=0, tau=1)
+        self.append_bar_data(bar_data, tag=Point.START, t_bar=0, l_bar=0, z=z_0, v_bar=0, eta=0, tau=1)
 
         # Phase 1: Integrate to burnout or exit
         p_bar_max = 1e9 / p_scale  # 1 GPa
@@ -202,7 +191,7 @@ class Recoilless(BaseGun):
         if is_burn_out_contained:
             self.append_bar_data(
                 bar_data,
-                tag=POINT_BURNOUT,
+                tag=Point.BURNOUT,
                 t_bar=t_bar_end,
                 l_bar=l_bar_end,
                 z=z_b,
@@ -220,7 +209,7 @@ class Recoilless(BaseGun):
         )
         self.append_bar_data(
             bar_data,
-            tag=POINT_EXIT,
+            tag=Point.EXIT,
             t_bar=t_bar_exit,
             l_bar=l_g_bar,
             z=z_exit,
@@ -234,7 +223,7 @@ class Recoilless(BaseGun):
             t_bar_f, l_bar_f, v_bar_f, eta_f, tau_f = rkf(self.ode_z, (0, 0, 0, 0, 1), z_0, 1, rel_tol=tol)[1]
             self.append_bar_data(
                 bar_data,
-                tag=POINT_FRACTURE,
+                tag=Point.FRACTURE,
                 t_bar=t_bar_f,
                 l_bar=l_bar_f,
                 z=1.0,
@@ -244,18 +233,18 @@ class Recoilless(BaseGun):
             )
 
         # Peak finding
-        def find_peak(g: Callable[[float], float], tag: RecoillessPeakPoints) -> None:
+        def find_peak(g: Callable[[float], float], tag: Point) -> None:
             t_bar_p = 0.5 * sum(gss(g, 0, t_bar_exit, x_tol=t_bar_exit * tol, find_min=False))
             z_p, l_bar_p, v_bar_p, eta_p, tau_p = self.g(t_bar_p, tag, tol)[1]
             self.append_bar_data(
                 bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p, eta=eta_p, tau=tau_p
             )
 
-        for peak in [POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH, POINT_PEAK_STAG]:
+        for peak in [Point.PEAK_AVG, Point.PEAK_SHOT, Point.PEAK_BREECH, Point.PEAK_STAG]:
             find_peak(lambda _t_bar: self.g(_t_bar, peak, tol)[0], peak)
 
         # Sampling
-        if dom == DOMAIN_TIME:
+        if dom == Domain.TIME:
             z_j, l_bar_j, v_bar_j, t_bar_j, eta_j, tau_j = z_0, 0.0, 0.0, 0.0, 0.0, 1.0
         else:  # length domain ODE requires starting from some point
             t_bar_j, (z_j, l_bar_j, v_bar_j, eta_j, tau_j), _ = rkf(
@@ -263,7 +252,7 @@ class Recoilless(BaseGun):
             )
 
         for j in range(step):
-            if dom == DOMAIN_TIME:
+            if dom == Domain.TIME:
                 t_bar_k = t_bar_exit / (step + 1) * (j + 1)
                 z_j, l_bar_j, v_bar_j, eta_j, tau_j = rkf(
                     self.ode_t, (z_j, l_bar_j, v_bar_j, eta_j, tau_j), t_bar_j, t_bar_k, rel_tol=tol
@@ -277,7 +266,7 @@ class Recoilless(BaseGun):
                 l_bar_j = l_bar_k
 
             self.append_bar_data(
-                bar_data, tag=SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j, eta=eta_j, tau=tau_j
+                bar_data, tag=Point.SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j, eta=eta_j, tau=tau_j
             )
 
         self.logger.info(f"sampled for {step} points.")
@@ -329,13 +318,11 @@ class Recoilless(BaseGun):
         data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda e: e[0].time))
         return RecoillessResult(self, data, p_trace)
 
-    def g(
-        self, t: float, tag: RecoillessPeakPoints, tol: float
-    ) -> tuple[float, tuple[float, float, float, float, float]]:
+    def g(self, t: float, tag: Point, tol: float) -> tuple[float, tuple[float, float, float, float, float]]:
         z, l_bar, v_bar, eta, tau = rkf(self.ode_t, (self.z_0, 0, 0, 0, 1), 0, t, rel_tol=tol)[1]
         p_bar = self.f_p_bar(z, l_bar, eta, tau)
 
-        if tag == POINT_PEAK_AVG:
+        if tag == Point.PEAK_AVG:
             return p_bar, (z, l_bar, v_bar, eta, tau)
 
         ps, p0, pb, _, _ = self.to_ps_p0_pb_vb_stag(
@@ -345,11 +332,11 @@ class Recoilless(BaseGun):
         ps_bar = ps / (self.f * self.delta)
         p0_bar = p0 / (self.f * self.delta)
         pb_bar = pb / (self.f * self.delta)
-        if tag == POINT_PEAK_BREECH:
+        if tag == Point.PEAK_BREECH:
             return pb_bar, (z, l_bar, v_bar, eta, tau)
-        elif tag == POINT_PEAK_STAG:
+        elif tag == Point.PEAK_STAG:
             return p0_bar, (z, l_bar, v_bar, eta, tau)
-        elif tag == POINT_PEAK_SHOT:
+        elif tag == Point.PEAK_SHOT:
             return ps_bar, (z, l_bar, v_bar, eta, tau)
         else:
             raise ValueError("tag not handled.")
@@ -371,7 +358,7 @@ class Recoilless(BaseGun):
     def append_bar_data(
         self,
         bar_data: list[tuple[str, float, float, float, float, float, float, float]],
-        tag: Points,
+        tag: Point,
         t_bar: float,
         l_bar: float,
         z: float,

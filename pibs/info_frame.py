@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .ballistics import POINT_BURNOUT, POINT_EXIT, POINT_PEAK_AVG, POINT_PEAK_BREECH, POINT_PEAK_SHOT
+from .ballistics import Point
 from .ballistics.gun import Gun, GunResult
 from .ballistics.recoilless import Recoilless, RecoillessResult
 from .localized import LocalizedFrame, RowBuilder
@@ -59,23 +59,23 @@ class InfoFrame(LocalizedFrame):
             )
         )
         self.ammo.set(to_si(gun.l_c, unit="m"))
-        ps = gun_result.read_table_data(POINT_PEAK_SHOT).shot_pressure
+        ps = gun_result.read_table_data(Point.PEAK_SHOT).shot_pressure
         self.pa.set(to_si(ps * gun.s / gun.m, unit="m/s²"))
 
         self.gm.set(format_mass(gun_result.tube_mass) if gun_result.tube_mass else "N/A")
 
-        peak_average_entry = gun_result.read_table_data(POINT_PEAK_AVG)
-        peak_breech_entry = gun_result.read_table_data(POINT_PEAK_BREECH)
+        peak_average_entry = gun_result.read_table_data(Point.PEAK_AVG)
+        peak_breech_entry = gun_result.read_table_data(Point.PEAK_BREECH)
         self.pp.set(
             (
                 f"{to_si(peak_average_entry.avg_pressure, unit='Pa')}" + self.get_loc_str("mean"),
                 f"{to_si(peak_breech_entry.breech_pressure, unit='Pa')}" + self.get_loc_str("breech"),
             )
         )
-        muzzle_entry = gun_result.read_table_data(POINT_EXIT)
+        muzzle_entry = gun_result.read_table_data(Point.EXIT)
         self.mv.set(to_si(muzzle_entry.velocity, unit="m/s"))
         try:
-            burnout_entry = gun_result.read_table_data(POINT_BURNOUT)
+            burnout_entry = gun_result.read_table_data(Point.BURNOUT)
             self.bop.set(f"{burnout_entry.travel / gun.l_g * 1e2:.2f} %")
         except ValueError:
             self.bop.set(self.get_loc_str("uncontained"))
