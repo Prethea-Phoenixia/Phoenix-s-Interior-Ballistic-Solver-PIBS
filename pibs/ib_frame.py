@@ -1005,9 +1005,9 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
             self.info_frame.update_stats(gun=self.gun, gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
             self.notebook_frame.table_frame.update_table(gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
-            self.notebook_frame.update_fig_plot()
-            self.notebook_frame.update_aux_plot()
-            self.notebook_frame.update_guide_graph()
+            self.notebook_frame.plot_manager.update_main_plot()
+            self.notebook_frame.plot_manager.update_aux_plot()
+            self.notebook_frame.plot_manager.update_guide_graph()
 
         except Exception as e:
             self.handle_errors(e, level=logging.WARNING)
@@ -1134,10 +1134,10 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 ),
                 force_fudge=float(self.force_fudge.get()) * 1e-2,
             )
-            self.notebook_frame.update_geom_plot()
+            self.notebook_frame.plot_manager.update_geom_plot()
         except Exception as e:
             self.prop = None
-            self.notebook_frame.update_geom_plot()
+            self.notebook_frame.plot_manager.update_geom_plot()
             raise e
 
     def on_state_change(self, *_):
