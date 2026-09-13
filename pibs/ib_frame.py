@@ -32,10 +32,6 @@ from .ballistics import (
     DOMAIN_TIME,
     MIN_BARR_VOLUME,
     MIN_PROJ_TRAVEL,
-    POINT_PEAK_AVG,
-    POINT_PEAK_BREECH,
-    POINT_PEAK_SHOT,
-    POINT_PEAK_STAG,
     RECOILLESS,
     SOL_LAGRANGE,
     SOL_MAMONTOV,
@@ -56,6 +52,7 @@ from .misc import (
     round_sig,
     to_si,
 )
+from .mode_manager import ModeManager
 from .nb_frame import NotebookFrame
 from .theme import ThemedMixin
 from .tip import create_tool_tip
@@ -66,12 +63,6 @@ logger = logging.getLogger(__name__)
 class Log(Enum):
     ERROR = logging.ERROR
     WARNING = logging.WARNING
-
-
-MODE_FREE = "free"
-MODE_CONSTRAINED = "constrained"
-MODE_LOCK_LG = "lock_lg"
-MODE_OPT = "opt"
 
 
 class TextHandler(logging.Handler):
@@ -691,6 +682,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
         self.notebook_frame.grid(row=1, column=1, sticky="nsew", padx=0, pady=0)
 
+        self.mode_manager = ModeManager(self)
+
         root.protocol("WM_DELETE_WINDOW", self.quit)
         self.use_theme()
         self.t_lid = None
@@ -1148,115 +1141,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             raise e
 
     def on_state_change(self, *_):
-
-        gun_type = self.type_optn.get_obj()
-        self.notebook_frame.on_state_change(type_option=self.type_optn.get_obj())
-        if gun_type == CONVENTIONAL:
-            self.drop_gradient.enable()
-            self.nozz_exp.disable()
-            self.nozz_eff.disable()
-            self.p_control.reset({p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_BREECH)}, overwrite=False)
-
-        elif gun_type == RECOILLESS:
-            self.drop_gradient.set_by_obj(SOL_LAGRANGE)
-            self.drop_gradient.disable()
-            self.nozz_exp.enable()
-            self.nozz_eff.enable()
-            self.p_control.reset(
-                {p: p for p in (POINT_PEAK_AVG, POINT_PEAK_SHOT, POINT_PEAK_STAG, POINT_PEAK_BREECH)},
-                overwrite=False,
-            )
-
-        mode = MODE_CONSTRAINED
-        if not self.use_cons.get():
-            mode = MODE_FREE
-        if self.opt.get():
-            mode = MODE_OPT
-        if self.lock_Lg.get():
-            mode = MODE_LOCK_LG
-
-        states = {
-            self.v_tgt: False,
-            self.p_tgt: False,
-            self.opt: False,
-            self.lock_Lg: False,
-            self.min_web: False,
-            self.lg_max: False,
-            self.p_control: False,
-            self.drop_opt_tgt: False,
-            self.tbl_mm: True,
-            self.web_mm: True,
-        }
-        if mode == MODE_CONSTRAINED:
-            states.update(
-                {
-                    self.v_tgt: True,
-                    self.p_tgt: True,
-                    self.opt: True,
-                    self.lock_Lg: True,
-                    self.min_web: True,
-                    self.lg_max: True,
-                    self.p_control: True,
-                    self.tbl_mm: False,
-                    self.web_mm: False,
-                }
-            )
-        elif mode == MODE_LOCK_LG:
-            states.update(
-                {
-                    self.p_tgt: True,
-                    self.lock_Lg: True,
-                    self.min_web: True,
-                    self.lg_max: True,
-                    self.p_control: True,
-                    self.tbl_mm: True,
-                    self.web_mm: False,
-                }
-            )
-        elif mode == MODE_OPT:
-            states.update(
-                {
-                    self.v_tgt: True,
-                    self.p_tgt: True,
-                    self.opt: True,
-                    self.min_web: True,
-                    self.lg_max: True,
-                    self.p_control: True,
-                    self.drop_opt_tgt: True,
-                    self.tbl_mm: False,
-                    self.web_mm: False,
-                }
-            )
-
-        for widget, enabled in states.items():
-
-            if enabled:
-                widget.enable()
-            else:
-                widget.disable()
-
-        if mode in (MODE_CONSTRAINED, MODE_OPT) and gun_type == CONVENTIONAL:
-            self.max_iter.enable()
-        else:
-            self.max_iter.disable()
-
-        self._enable_group(
-            self.use_aux_grain,
-            self.aux_grain_r1,
-            self.aux_grain_r2,
-            self.aux_web_ratio,
-            self.aux_mass_ratio,
-            self.aux_geom,
-        )
-        self._enable_group(
-            self.use_material, self.material_yield, self.material_density, self.material_ssf, self.material_is_af
-        )
-        self._enable_group(self.use_combustible, self.combustible_mass_kg, self.combustible_force_kJ__kg)
-
-    @staticmethod
-    def _enable_group(control, *widgets):
-        for w in widgets:
-            w.enable() if control.get() else w.disable()
+        self.mode_manager.update()
 
     @lock_out
     def use_theme(self):
