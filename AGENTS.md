@@ -76,6 +76,8 @@
 - `RowBuilder` is the single source of truth for row placement — don't mix direct `.grid()` calls with
   RowBuilder-managed widgets.
 - For checkboxes used as LabelFrame headers: use `widget.as_labelwidget()` instead of `.place()`.
+- `Localizable` base class provides no-op `inhibit()`/`disinhibit()` methods; widgets that need locking
+  during computation override these (see `ComputableWidget`).
 
 ## Documentation Policy
 
