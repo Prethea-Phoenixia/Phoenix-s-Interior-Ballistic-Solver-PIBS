@@ -103,7 +103,7 @@ def f(
 def guide_graph(
     *,
     target: Constrained,
-    gun_type: str,
+    gun_type: GunType,
     min_cmr: float,
     max_cmr: float,
     step_cmr: float,
