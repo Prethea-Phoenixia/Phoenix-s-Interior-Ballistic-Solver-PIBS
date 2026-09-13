@@ -29,6 +29,9 @@
   `get_save_data()`, `apply_loaded_data()`) rather than direct attribute access.
 - **Config**: `pibs/config.py` — `SimulationConfig` dataclass (all fields required, no defaults except `logger`). UI
   gathers values into this; dispatch passes it to ballistics core.
+- **Enums**: `pibs/__init__.py` (UI enums: `FigureType`, `Theme`) and `pibs/ballistics/__init__.py`
+  (domain enums: `GunType`, `Domain`, `SolutionMethod`, `Point`, `OptimizationTarget`). All use `str` mixin
+  for seamless tkinter/JSON integration.
 - **Ballistics core**: `pibs/ballistics/` — `gun.py`, `recoilless.py`, `constrained*.py`, `config.py` (typed dataclasses
   with `__post_init__` validation: `GunGeometry`, `PropellantLoad`, `Solver`, etc.), `num/` (RK45/UMF integrators),
   `prop/` (propellant models)
@@ -55,8 +58,8 @@
 - Invalid values surface as `ValueError` at `dispatch.sim_config_to_ballistics()` — caught by the existing error
   handling infrastructure.
 - This ensures consistent validation across all entry points (GUI, CLI, API, tests).
-- Valid value collections (`VALID_SOLUTION_METHODS`, `VALID_PRESSURE_POINTS`, etc.) are defined in
-  `ballistics/__init__.py` alongside their `Literal` type aliases.
+- Valid value collections (`VALID_SOLUTION_METHODS`, `VALID_PRESSURE_POINTS`, etc.) are derived from their
+  respective Enum classes in `ballistics/__init__.py`.
 
 ## Save / Load
 
