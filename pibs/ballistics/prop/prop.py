@@ -519,10 +519,8 @@ class DelegatesPropellant:
     def z_b(self) -> float:
         return self.propellant.z_b
 
-    @wraps(Propellant.f_psi_z)
     def f_psi_z(self, *args, **kwargs):
         return self.propellant.f_psi_z(*args, **kwargs)
 
-    @wraps(Propellant.f_sigma_z)
     def f_sigma_z(self, *args, **kwargs):
         return self.propellant.f_sigma_z(*args, **kwargs)

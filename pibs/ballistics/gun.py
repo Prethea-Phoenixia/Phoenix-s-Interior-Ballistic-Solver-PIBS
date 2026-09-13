@@ -232,10 +232,8 @@ class Gun(BaseGun):
     def integrate(
         self,
         step: int = 33,
-        tol: float | None = None,
         dom: Domains = DOMAIN_TIME,
     ) -> GunResult:
-        tol = tol if tol is not None else self.tol
 
         bar_data = []
         t_scale, p_scale = self.l_0 / self.v_j, self.f * self.delta
@@ -256,7 +254,7 @@ class Gun(BaseGun):
             (0, 0, 0),
             z_0,
             z_b,
-            rel_tol=tol,
+            rel_tol=self.tol,
             abort_func=abort_condition,
         )
 
@@ -283,19 +281,19 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
             (t_bar_end, z_end, v_bar_end),
             l_bar_end,
             l_g_bar,
-            rel_tol=tol,
+            rel_tol=self.tol,
         )
         # Populate exit point
         self.append_bar_data(bar_data, tag=POINT_EXIT, t_bar=t_bar_exit, l_bar=l_g_bar, z=z_exit, v_bar=v_bar_exit)
 
         # Populate fracture point entry at Z = 1
         if z_b > 1.0 and z_exit >= 1.0:
-            t_bar_f, l_bar_f, v_bar_f = rkf(self.ode_z, (0, 0, 0), z_0, 1, rel_tol=tol)[1]
+            t_bar_f, l_bar_f, v_bar_f = rkf(self.ode_z, (0, 0, 0), z_0, 1, rel_tol=self.tol)[1]
             self.append_bar_data(bar_data, tag=POINT_FRACTURE, t_bar=t_bar_f, l_bar=l_bar_f, z=1, v_bar=v_bar_f)
 
         def find_peak(g: Callable[[float], float], tag: GunPeakPoints) -> None:
-            t_bar_p = 0.5 * sum(gss(g, 0, t_bar_exit, x_tol=t_bar_exit * tol, find_min=False))
-            z_p, l_bar_p, v_bar_p = self.g(t_bar_p, tag, tol)[1]
+            t_bar_p = 0.5 * sum(gss(g, 0, t_bar_exit, x_tol=t_bar_exit * self.tol, find_min=False))
+            z_p, l_bar_p, v_bar_p = self.g(t_bar_p, tag, self.tol)[1]
             self.append_bar_data(bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p)
 
         # Find peak pressure in time domain
@@ -306,16 +304,16 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
         if dom == DOMAIN_TIME:
             z_j, l_bar_j, v_bar_j, t_bar_j = z_0, 0, 0, 0
         else:  # length domain ODE requires starting from some point
-            t_bar_j, (z_j, l_bar_j, v_bar_j), _ = rkf(self.ode_t, (z_0, 0, 0), 0, 0.5 * t_bar_exit, rel_tol=tol)
+            t_bar_j, (z_j, l_bar_j, v_bar_j), _ = rkf(self.ode_t, (z_0, 0, 0), 0, 0.5 * t_bar_exit, rel_tol=self.tol)
 
         for j in range(step):
             if dom == DOMAIN_TIME:
                 t_bar_k = t_bar_exit / (step + 1) * (j + 1)
-                z_j, l_bar_j, v_bar_j = rkf(self.ode_t, (z_j, l_bar_j, v_bar_j), t_bar_j, t_bar_k, rel_tol=tol)[1]
+                z_j, l_bar_j, v_bar_j = rkf(self.ode_t, (z_j, l_bar_j, v_bar_j), t_bar_j, t_bar_k, rel_tol=self.tol)[1]
                 t_bar_j = t_bar_k
             else:
                 l_bar_k = l_g_bar / (step + 1) * (j + 1)
-                t_bar_j, z_j, v_bar_j = rkf(self.ode_l, (t_bar_j, z_j, v_bar_j), l_bar_j, l_bar_k, rel_tol=tol)[1]
+                t_bar_j, z_j, v_bar_j = rkf(self.ode_l, (t_bar_j, z_j, v_bar_j), l_bar_j, l_bar_k, rel_tol=self.tol)[1]
                 l_bar_j = l_bar_k
 
             self.append_bar_data(bar_data, tag=SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j)

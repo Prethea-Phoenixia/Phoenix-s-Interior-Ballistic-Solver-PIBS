@@ -56,7 +56,7 @@ class GenericResult:
 @dataclass
 class PressureTraceEntry:
     tag: str
-    temperature: float
+    temperature: float | None
     pressure_trace: list[PressureProbePoint]
 
 
