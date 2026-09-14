@@ -43,6 +43,9 @@ def rkf(
     accepted step, while the (p+1)-th order solution is used only for the local
     truncation error estimate that drives the adaptive step size control.
 
+    This implementation uses pre-allocated arrays and in-place mutations for
+    improved performance.
+
     Arguments:
         d_func     : d/dx|x = dFunc(x, (y1, y2, y3...))
         ini_val    : initial values for (y1, y2, y3...)
@@ -77,12 +80,21 @@ def rkf(
         record = []
 
     abs_tol = max(abs(abs_tol), sys.float_info.epsilon)
-    x, y_this = x_0, ini_val
+    x, y_this = x_0, list(ini_val)
 
     beta = 0.84  # "safety" factor
     h = x_1 - x_0  # initial step size
 
-    all_k: list[list[float]] = [list() for _ in range(len(betas))]
+    n = len(y_this)
+    n_stages = len(betas)
+
+    # Pre-allocate arrays once
+    all_k = [[0.0] * n for _ in range(n_stages)]
+    y_next = [0.0] * n
+    y_next_hat = [0.0] * n
+    yi = [0.0] * n
+    ki = [0.0] * n
+    truncation_errors = [0.0] * n
 
     if h == 0:
         return x, y_this, False
@@ -94,16 +106,26 @@ def rkf(
             h = x_1 - x  # this for handling the step size very close to x_1
 
         try:
-            # initialize the next estimate, which is p-th order
-            y_next = [y for y in y_this]
-            # initialize the error estimate, which is (p+1)-th order
-            y_next_hat = [y for y in y_this]
+            # Initialize the next estimates
+            for j in range(n):
+                y_next[j] = y_this[j]
+                y_next_hat[j] = y_this[j]
 
-            for i, (bi, asi) in enumerate(zip(betas, alphas)):
+            for i in range(n_stages):
+                bi = betas[i]
+                asi = alphas[i]
                 xi = x + asi * h  # x to use for calling dfunc
-                yi = [y for y in y_this]  # initialize the current y vector
-                for bij, kj in zip(bi[:i], all_k):
-                    yi = [y + k * bij for y, k in zip(yi, kj)]
+
+                # Initialize yi from y_this
+                for j in range(n):
+                    yi[j] = y_this[j]
+
+                # Add contributions from previous stages
+                for j in range(n):
+                    yi_j = yi[j]
+                    for k_idx in range(i):
+                        yi_j += all_k[k_idx][j] * bi[k_idx]
+                    yi[j] = yi_j
 
                 # after the loop, yi is the new y we can call dFunc with.
                 di = d_func(xi, yi)
@@ -111,21 +133,26 @@ def rkf(
                 ki   = h   *   di
                 vector scalar  vector
                 """
-                ki = [h * d for d in di]
-                all_k[i] = ki
+
+                # Compute ki = h * di
+                for j in range(n):
+                    ki[j] = h * di[j]
+                    all_k[i][j] = ki[j]
 
                 ci = cs[i]
                 ci_hat = c_hats[i]
 
                 # these two calculations propagate the values to each component
-                y_next = [y + k * ci for y, k in zip(y_next, ki)]
-                y_next_hat = [y + k * ci_hat for y, k in zip(y_next_hat, ki)]
+                for j in range(n):
+                    y_next[j] += ki[j] * ci
+                    y_next_hat[j] += ki[j] * ci_hat
 
             """
             truncation error is generated from the difference of the p-th and
             (p+1)-th order estimators.
             """
-            truncation_errors = [y - y_hat for y, y_hat in zip(y_next, y_next_hat)]
+            for j in range(n):
+                truncation_errors[j] = y_next[j] - y_next_hat[j]
 
         except (
             ValueError,  # catch complex numbers being supplied to functions, etc
@@ -143,12 +170,18 @@ def rkf(
             continue
 
         max_relative_error = sys.float_info.epsilon  # initialize R
-        for te, y1, y2 in zip(truncation_errors, y_this, y_next):
+        for j in range(n):
+            te = truncation_errors[j]
+            y1 = y_this[j]
+            y2 = y_next[j]
             ry = abs(te) / max((rel_tol * min(abs(y1), abs(y2))), abs_tol)
-            max_relative_error = max(max_relative_error, ry)
+            if ry > max_relative_error:
+                max_relative_error = ry
 
         if max_relative_error < 1:  # error is acceptable
-            x, y_this = x + h, y_next
+            x = x + h
+            for j in range(n):
+                y_this[j] = y_next[j]
 
             if abort_func is not None and abort_func(x, y_this, record):
                 if debug:
