@@ -115,12 +115,10 @@ def guide_graph(
     tqdm_logger = TqdmLogger(logger)
     tqdm_kwargs = dict(
         file=tqdm_logger,
-        ascii=False,
-        mininterval=0, maxinterval=0, miniters=1,
-        # miniters=1,
-        ncols=40,
-        bar_format="{percentage:5.1f}%",
-        smoothing=0.3,
+        ascii=True,
+        ncols=20,
+        bar_format="|{bar}|{percentage:5.0f}%",
+        smoothing=0,
     )
 
     if gun_type == GunType.CONVENTIONAL:

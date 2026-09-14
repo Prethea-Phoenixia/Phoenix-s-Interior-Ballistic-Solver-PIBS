@@ -201,6 +201,7 @@ def resolve_path(path: str) -> str:
     else:
         # Normal development mode. Use os.getcwd() or __file__ as appropriate in your case...
         resolved_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), path))
+        print(resolved_path)
 
     return resolved_path
 
