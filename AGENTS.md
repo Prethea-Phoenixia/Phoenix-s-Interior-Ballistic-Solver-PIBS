@@ -98,6 +98,67 @@
 - Before committing a refactor that touches ballistics code (`gun.py`, `recoilless.py`, `constrained*.py`), compare
   against the previous version to ensure no technical docs were lost.
 
+## Logging Architecture
+
+Three-tier logging setup spanning the GUI process, dispatch subprocess, and pool children:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ MAIN PROCESS (GUI)                                                              │
+│                                                                                 │
+│  pibs logger (INFO, propagate=False)                                            │
+│  ├── StreamHandler(sys.stderr)  ──────────────────────► Terminal                │
+│  └── TextHandler(Tk Text widget) ─────────────────────► GUI Log Panel           │
+│                                                                                 │
+│  pibs.ib_frame logger ──propagate──► pibs logger                                │
+│                                                                                 │
+│  QueueListener(log_queue, text_handler)                                          │
+│  └── reads log_queue ────────────────────────────────► TextHandler ─► GUI Log   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+         ▲ log_queue
+         │
+         │ QueueHandler
+         │
+┌────────┴────────────────────────────────────────────────────────────────────────┐
+│ DISPATCH SUBPROCESS (multiprocessing.Process)                                    │
+│                                                                                 │
+│  pibs logger (INFO, propagate=False)                                            │
+│  └── StreamHandler(sys.stderr)  ──────────────────────► Terminal                │
+│                                                                                 │
+│  pibs.dispatch logger (INFO)                                                     │
+│  ├── QueueHandler(log_queue) ───────────────────────► log_queue ─► GUI Log      │
+│  └── propagate ──► pibs logger ──► StreamHandler ──► Terminal                   │
+│                                                                                 │
+│  pibs.ballistics.* loggers ──propagate──► pibs.dispatch ──► (handlers above)    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+         │ multiprocessing.Pool
+         │
+         │ (initializer=_pool_init)
+         │
+┌────────┴────────────────────────────────────────────────────────────────────────┐
+│ POOL CHILD PROCESSES (guide graph parallel workers)                              │
+│                                                                                 │
+│  pibs logger (CRITICAL, propagate=False, no handlers)  ← _pool_init()           │
+│  └── all child loggers effectively silenced                                     │
+│                                                                                 │
+│  Rationale: child processes run the same ballistics code; their logs would       │
+│  duplicate the dispatch process output and clutter the terminal.                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key points:**
+
+- `pibs/__init__.py` sets up the `pibs` logger with a `StreamHandler` at import time (runs in ALL processes).
+- `ib_frame.py` adds a `TextHandler` to the `pibs` logger and starts a `QueueListener` that feeds
+  subprocess logs into the GUI log panel.
+- `dispatch.py` adds a `QueueHandler` to the `pibs.dispatch` logger so subprocess logs reach the GUI.
+  Ballistics loggers (`pibs.ballistics.*`) propagate up to `pibs.dispatch`, so they're captured too.
+- `guidegraph.py:_pool_init()` silences the `pibs` logger in pool children (level=CRITICAL, no handlers,
+  no propagation) to prevent duplicate/unformatted output.
+- **Gotcha**: Python's `logging.lastResort` handler writes unformatted messages to stderr when no handlers
+  are found in the hierarchy. Setting `pibs` level to CRITICAL prevents records from reaching it; merely
+  clearing handlers is insufficient.
+
 ## Packaging
 
 - PyInstaller via `generate_executable.py`; spec file generated in root.

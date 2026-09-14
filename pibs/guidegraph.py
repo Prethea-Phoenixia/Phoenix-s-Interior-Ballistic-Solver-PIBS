@@ -14,6 +14,14 @@ from .ballistics.gun import Gun
 from .ballistics.recoilless import Recoilless
 
 
+def _pool_init():
+    # Disable logging in child processes to avoid duplicate terminal output
+    pibs_logger = logging.getLogger("pibs")
+    pibs_logger.setLevel(logging.CRITICAL)
+    pibs_logger.handlers.clear()
+    pibs_logger.propagate = False
+
+
 class TqdmLogger:
     def __init__(self, logger: logging.Logger):
         self.logger = logger
@@ -48,6 +56,7 @@ def f(
     load_fraction: float,
     charge_mass_ratio: float,
     solve_cache: dict[tuple[float, float], tuple[float, float]],
+    logger: logging.Logger,
 ) -> GuideResultLine | None:
     charge_mass = target.m * charge_mass_ratio
     load_density = load_fraction * target.propellant.rho_p
@@ -71,12 +80,14 @@ def f(
                 load=load,
                 nozzle=nozzle,
                 solver=target.solver,
+                logger=logger,
             )
         else:
             gun = gun_class(
                 geometry=geo,
                 load=load,
                 solver=target.solver,
+                logger=logger,
             )
 
         gun_result = gun.integrate(step=0)
@@ -133,7 +144,7 @@ def guide_graph(
     processes = psutil.cpu_count(logical=False) or 1
     logger.info(f"dispatching {processes} processes for max load fractions")
 
-    with multiprocessing.Pool(processes=processes) as pool:
+    with multiprocessing.Pool(processes=processes, initializer=_pool_init) as pool:
         proposed_lfs = [i * step_lf for i in range(math.ceil(1 / step_lf))]
         iterable = tuple((cmr, proposed_lfs) for cmr in charge_mass_ratios)
         validated_lfs = pool.starmap(
@@ -150,11 +161,11 @@ def guide_graph(
 
     logger.info(f"dispatching {processes} processes for guidance diagram")
 
-    with multiprocessing.Pool(processes=processes) as pool:
+    with multiprocessing.Pool(processes=processes, initializer=_pool_init) as pool:
         results = pool.starmap(
             func=f,
             iterable=tqdm(
-                [(target, gun_class, lf, cmr, solve_cache) for (target, gun_class, lf, cmr) in parameters],
+                [(target, gun_class, lf, cmr, solve_cache, logger) for (target, gun_class, lf, cmr) in parameters],
                 total=len(parameters),
                 **tqdm_kwargs,
             ),
