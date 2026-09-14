@@ -116,7 +116,8 @@ def guide_graph(
     tqdm_kwargs = dict(
         file=tqdm_logger,
         ascii=False,
-        miniters=1,
+        mininterval=0, maxinterval=0, miniters=1,
+        # miniters=1,
         ncols=40,
         bar_format="{percentage:5.1f}%",
         smoothing=0.3,
