@@ -174,17 +174,18 @@ class Constrained(DelegatesPropellant, JSONable):
             self.get_f(charge_mass_ratio), start=self.minimum_load_fraction, stop=1 - self.tol, tol=self.tol
         )
 
-    def validate_load_fraction(self, charge_mass_ratio: float, proposed_lfs: list[float]) -> list[float]:
+    def validate_load_fraction(self, charge_mass_ratio: float, proposed_lfs: list[float]) -> dict[float, tuple[float, float, float]]:
         # construct the load fraction ladder:
         f = self.get_f(charge_mass_ratio)
         proposed_lfs = [lf for lf in proposed_lfs if lf > self.minimum_load_fraction]
-        for i in range(len(proposed_lfs)):
+        results = {}
+        for lf in proposed_lfs:
             try:
-                f(proposed_lfs[i])
+                results[lf] = f(lf)
             except ValueError:
-                return proposed_lfs[:i]
+                break
 
-        return proposed_lfs
+        return results
 
     def find_min_v(
         self,

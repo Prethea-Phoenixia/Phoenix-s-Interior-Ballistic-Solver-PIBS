@@ -47,11 +47,12 @@ def f(
     gun_class,
     load_fraction: float,
     charge_mass_ratio: float,
+    solve_cache: dict[tuple[float, float], tuple[float, float]],
 ) -> GuideResultLine | None:
     charge_mass = target.m * charge_mass_ratio
     load_density = load_fraction * target.propellant.rho_p
     try:
-        half_web, length_gun = target.solve(load_fraction=load_fraction, charge_mass_ratio=charge_mass_ratio)
+        half_web, length_gun = solve_cache[(load_fraction, charge_mass_ratio)]
 
         chamber_volume = charge_mass / load_density
 
@@ -142,16 +143,22 @@ def guide_graph(
         )
 
     parameters = []
-    for charge_mass_ratio, lfs in zip(charge_mass_ratios, validated_lfs):
-        for load_fraction in lfs:
+    solve_cache = {}
+    for charge_mass_ratio, lf_results in zip(charge_mass_ratios, validated_lfs):
+        for load_fraction, (e_1, l_g, _) in lf_results.items():
             parameters.append((target, gun_class, load_fraction, charge_mass_ratio))
+            solve_cache[(load_fraction, charge_mass_ratio)] = (e_1, l_g)
 
     logger.info(f"Dispatching {processes} processes for constructing guidance diagram.")
 
     with multiprocessing.Pool(processes=processes) as pool:
         results = pool.starmap(
             func=f,
-            iterable=tqdm(parameters, total=len(parameters), **tqdm_kwargs),
+            iterable=tqdm(
+                [(target, gun_class, lf, cmr, solve_cache) for (target, gun_class, lf, cmr) in parameters],
+                total=len(parameters),
+                **tqdm_kwargs,
+            ),
         )
 
     # return [result for result in results if result[2]]
