@@ -16,7 +16,7 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
     logger = logging.getLogger(__name__)
     logger.addHandler(QueueHandler(log_queue))
     logger.setLevel(logging.INFO)
-    logger.info("calculation started.")
+    logger.info("calculation started")
     gun, gun_result, guide_results = None, None, None
     try:
         cfg.logger = logger
@@ -95,16 +95,16 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
                     step_lf=cfg.guide_step_lf,
                     logger=logger,
                 )
-                logger.info("guidance diagram calculation concluded.")
+                logger.info("guidance diagram calculation concluded")
             except Exception:
                 logger.error("exception while calculating guidance diagram:")
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
-        logger.info("calculation concluded.")
+        logger.info("calculation concluded")
 
     except Exception:
-        logger.error("exception while calculating:")
+        logger.error("exception while calculating")
         exc_type, exc_value, exc_traceback = sys.exc_info()
         logger.error("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
     finally:

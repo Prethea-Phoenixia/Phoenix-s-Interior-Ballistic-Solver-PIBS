@@ -305,6 +305,6 @@ class ConstrainedRecoilless(Constrained):
             )
 
         self.logger.info(
-            f"ω/m = {charge_mass_ratio:.2f}, Δ/ρ = {load_fraction:.2f} -> e_1 = {e_1_solved * 1e3:.2f} mm, l_g = {l_g * 1e3:.0f} mm"
+            f"ω/m={charge_mass_ratio:.2f}, Δ/ρ={load_fraction:.2f} -> e_1={e_1_solved * 1e3:.2f} mm, l_g={l_g * 1e3:.0f} mm"
         )
         return e_1_solved, l_bar_g * l_0

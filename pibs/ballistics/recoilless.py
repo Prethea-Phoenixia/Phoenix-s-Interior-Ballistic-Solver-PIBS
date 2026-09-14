@@ -199,9 +199,9 @@ class Recoilless(BaseGun):
                 eta=eta_end,
                 tau=tau_end,
             )
-            self.logger.info("integrated to burnout point.")
+            self.logger.info("integrated to burnout point")
         else:
-            self.logger.warning("shot exited barrel before burnout.")
+            self.logger.warning("shot exited barrel before burnout")
 
         # Integrate to actual exit point
         l_bar_exit, (t_bar_exit, z_exit, v_bar_exit, eta_exit, tau_exit), _ = rkf(
@@ -269,7 +269,7 @@ class Recoilless(BaseGun):
                 bar_data, tag=Point.SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j, eta=eta_j, tau=tau_j
             )
 
-        self.logger.info(f"sampled for {step} points.")
+        self.logger.info(f"sampled {step} points")
 
         # Data processing
         data, p_trace = [], []
@@ -572,7 +572,7 @@ class Recoilless(BaseGun):
         recoilless_result.outline = hull
         recoilless_result.tube_mass = tube_mass + nozzle_mass
 
-        self.logger.info("conducted structural calculation.")
+        self.logger.info("structural calculation done")
 
     @staticmethod
     def get_ar(gamma: float, pr: float) -> float:

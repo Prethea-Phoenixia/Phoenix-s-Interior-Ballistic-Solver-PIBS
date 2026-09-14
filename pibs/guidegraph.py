@@ -131,7 +131,7 @@ def guide_graph(
     charge_mass_ratios = [i * step_cmr for i in range(math.ceil(min_cmr / step_cmr), math.ceil(max_cmr / step_cmr))]
 
     processes = psutil.cpu_count(logical=False) or 1
-    logger.info(f"Dispatching {processes} processes for finding maximum load fractions.")
+    logger.info(f"dispatching {processes} processes for max load fractions")
 
     with multiprocessing.Pool(processes=processes) as pool:
         proposed_lfs = [i * step_lf for i in range(math.ceil(1 / step_lf))]
@@ -148,7 +148,7 @@ def guide_graph(
             parameters.append((target, gun_class, load_fraction, charge_mass_ratio))
             solve_cache[(load_fraction, charge_mass_ratio)] = (e_1, l_g)
 
-    logger.info(f"Dispatching {processes} processes for constructing guidance diagram.")
+    logger.info(f"dispatching {processes} processes for guidance diagram")
 
     with multiprocessing.Pool(processes=processes) as pool:
         results = pool.starmap(

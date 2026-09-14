@@ -174,7 +174,9 @@ class Constrained(DelegatesPropellant, JSONable):
             self.get_f(charge_mass_ratio), start=self.minimum_load_fraction, stop=1 - self.tol, tol=self.tol
         )
 
-    def validate_load_fraction(self, charge_mass_ratio: float, proposed_lfs: list[float]) -> dict[float, tuple[float, float, float]]:
+    def validate_load_fraction(
+        self, charge_mass_ratio: float, proposed_lfs: list[float]
+    ) -> dict[float, tuple[float, float, float]]:
         # construct the load fraction ladder:
         f = self.get_f(charge_mass_ratio)
         proposed_lfs = [lf for lf in proposed_lfs if lf > self.minimum_load_fraction]
@@ -197,12 +199,12 @@ class Constrained(DelegatesPropellant, JSONable):
         """
         find the minimum volume solution.
         """
-        self.logger.info("Optimizing under constraints.")
+        self.logger.info("optimizing under constraints")
         low = self.minimum_load_fraction
-        self.logger.info(f"Min Δ/ρ = {low:.3%}.")
+        self.logger.info(f"min Δ/ρ = {low:.3%}")
 
         high = self.maximum_load_fraction(charge_mass_ratio)
-        self.logger.info(f"Max Δ/ρ = {high:.3%}.")
+        self.logger.info(f"max Δ/ρ = {high:.3%}")
 
         if opt_target == OptimizationTarget.MIN_PROJ_TRAVEL:
             _f_index = 1
@@ -213,12 +215,12 @@ class Constrained(DelegatesPropellant, JSONable):
 
         _f: Callable[[float], tuple[float, float, float]] = self.get_f(charge_mass_ratio)
 
-        self.logger.info(f"Solution constrained to Δ/ρ : {low:.3%} - {high:.3%}")
+        self.logger.info(f"Δ/ρ range: {low:.3%} - {high:.3%}")
         lf_low, lf_high = gss(
             lambda load_fraction: _f(load_fraction)[_f_index], low, high, x_tol=self.tol, find_min=True
         )
         lf = 0.5 * (lf_high + lf_low)
         e_1 = _f(lf)[0]
         l_g = _f(lf)[1]
-        self.logger.info(f"Optimal Δ/ρ = {lf :.2f}")
+        self.logger.info(f"optimal Δ/ρ = {lf:.2f}")
         return lf, e_1, l_g

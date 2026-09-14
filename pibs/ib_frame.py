@@ -4,7 +4,6 @@ import logging
 import re
 import sys
 import traceback
-from enum import Enum
 from logging.handlers import QueueListener
 from math import log10
 from multiprocessing import Process, Queue
@@ -52,11 +51,6 @@ from .theme import ThemedMixin
 from .tip import create_tool_tip
 
 logger = logging.getLogger(__name__)
-
-
-class Log(Enum):
-    ERROR = logging.ERROR
-    WARNING = logging.WARNING
 
 
 class TextHandler(logging.Handler):
@@ -695,23 +689,23 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         text_handler = TextHandler(self.notebook_frame.error_text)
         root_logger.addHandler(text_handler)
-        logger.info("text handler attached to root logger.")
+        logger.info("text handler attached")
 
         self.listener = QueueListener(self.log_queue, text_handler)
         self.listener.start()
 
-        logger.info("text handler attached to subprocess log queue listener.")
+        logger.info("subprocess log listener started")
         self.timed_loop()
         self.after_idle(self.reset)
 
     @staticmethod
-    def handle_error_wrapper(level: Literal[Log.ERROR, Log.WARNING]):
+    def handle_error_wrapper(level: int):
         def decorator(func):
             def handled_func(self, *args, **kwargs):
                 try:
                     return func(self, *args, **kwargs)
                 except Exception as e:
-                    self.handle_errors(e, level.value)
+                    self.handle_errors(e, level)
 
             return handled_func
 
@@ -1089,7 +1083,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 r1.localize("pdtarcLabel", "pdtarcText")
                 r2.localize("ltarcLabel", "ltarcText")
 
-    @handle_error_wrapper(Log.WARNING)
+    @handle_error_wrapper(logging.WARNING)
     def propellant_callback(self, *_):
         """
         updates the propellant object on write to the ratio entry fields
@@ -1127,7 +1121,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         super().use_theme()
         self.notebook_frame.use_theme()
 
-    @handle_error_wrapper(level=Log.WARNING)
+    @handle_error_wrapper(level=logging.WARNING)
     def swap(self):
         ## this swaps the primary and auxiliary charge.
         sigfig = int(self.acc_exp.get()) + 1

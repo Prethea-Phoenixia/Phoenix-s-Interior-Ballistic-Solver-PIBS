@@ -67,7 +67,7 @@ def rkf(
         betas       : stage coefficients of the Runge Kutta algorithm
         cs          : weights of the p-th order (committed) solution
         c_hats      : weights of the (p+1)-th order (error estimate) solution
-        logger      :
+        logger      : optional, logger for debug output
 
     Returns:
         x_1, (y1, y2, y3...)|x = x_1, abort
@@ -243,7 +243,7 @@ def rkf45(
 
         record     : optional, if supplied will record all committed steps
         debug      : optional, enables additional debug printing when passed.
-        logger     :
+        logger     : optional, logger for debug output
 
     Returns:
         x_1, (y1, y2, y3...)|x=x_1

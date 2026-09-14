@@ -201,7 +201,7 @@ def resolve_path(path: str) -> str:
     else:
         # Normal development mode. Use os.getcwd() or __file__ as appropriate in your case...
         resolved_path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), path))
-        print(resolved_path)
+        logger.debug(resolved_path)
 
     return resolved_path
 
@@ -242,14 +242,14 @@ def loadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool:
 
         flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
         num_fonts_added = add_font_resource_ex(byref(pathbuf), flags, 0)
-        logger.info(f"Windows: Loaded font {fontpath} (private={private}, enumerable={enumerable})")
+        logger.debug(f"loaded font {fontpath} (private={private}, enumerable={enumerable})")
         return bool(num_fonts_added)
     else:
         font_dir = get_font_dir()
         if font_dir is None:
             return False
         shutil.copy2(fontpath, font_dir)
-        logger.info(f"Linux: Copied font {fontpath} to {font_dir}")
+        logger.debug(f"copied font {fontpath} to {font_dir}")
         return True
 
 
@@ -272,7 +272,7 @@ def unloadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool
             raise TypeError("fontpath must be a str or unicode")
 
         flags = (FR_PRIVATE if private else 0) | (FR_NOT_ENUM if not enumerable else 0)
-        logger.info(f"Windows: Unloaded font {fontpath} (private={private}, enumerable={enumerable})")
+        logger.debug(f"unloaded font {fontpath} (private={private}, enumerable={enumerable})")
         return bool(remove_font_resource_ex(byref(pathbuf), flags, 0))
     else:
         font_dir = get_font_dir()
@@ -281,7 +281,7 @@ def unloadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool
         dest_path = font_dir / Path(fontpath).name
         if dest_path.exists():
             dest_path.unlink()
-        logger.info(f"Linux: Removed font {fontpath} from {font_dir}")
+        logger.debug(f"removed font {fontpath} from {font_dir}")
         return True
 
 

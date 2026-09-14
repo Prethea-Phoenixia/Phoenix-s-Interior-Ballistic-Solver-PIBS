@@ -258,9 +258,9 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
 
         if is_burn_out_contained:
             self.append_bar_data(bar_data, tag=Point.BURNOUT, t_bar=t_bar_end, l_bar=l_bar_end, z=z_b, v_bar=v_bar_end)
-            self.logger.info("integrated to burnout point.")
+            self.logger.info("integrated to burnout point")
         else:
-            self.logger.warning("shot exited barrel before burnout.")
+            self.logger.warning("shot exited barrel before burnout")
 
         # integrate to actual exit point for both cases
         l_bar_exit, (t_bar_exit, z_exit, v_bar_exit), _ = rkf(
@@ -305,7 +305,7 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
 
             self.append_bar_data(bar_data, tag=Point.SAMPLE, t_bar=t_bar_j, l_bar=l_bar_j, z=z_j, v_bar=v_bar_j)
 
-        self.logger.info(f"sampled for {step} points.")
+        self.logger.info(f"sampled {step} points")
 
         # Data processing
         data = []
@@ -497,4 +497,4 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
         gun_result.outline = hull
         gun_result.tube_mass = v * structural_material.density
 
-        self.logger.info("conducted structural calculation.")
+        self.logger.info("structural calculation done")

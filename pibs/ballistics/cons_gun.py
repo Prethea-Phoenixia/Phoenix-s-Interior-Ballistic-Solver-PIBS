@@ -295,6 +295,6 @@ class ConstrainedGun(Constrained):
             )
         else:
             self.logger.info(
-                f"ω/m = {charge_mass_ratio:.2f}, Δ/ρ = {load_fraction:.2f} -> e_1 = {e_1_solved * 1e3:.2f} mm, l_g = {l_g * 1e3:.0f} mm ({it+1} iterations)"
+                f"ω/m={charge_mass_ratio:.2f}, Δ/ρ={load_fraction:.2f} -> e_1={e_1_solved * 1e3:.2f} mm, l_g={l_g * 1e3:.0f} mm ({it+1} iters)"
             )
             return e_1_solved, l_g

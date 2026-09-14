@@ -81,7 +81,7 @@ class PIBS(Tk):
 
 def main(loc: str = "", debug: bool = False):
     multiprocessing.freeze_support()
-    logger.info("Initializing")
+    logger.info("initializing")
 
     setup_windows_dpi()
     loc = loc or get_windows_locale()
