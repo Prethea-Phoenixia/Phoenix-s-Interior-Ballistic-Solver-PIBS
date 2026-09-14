@@ -836,18 +836,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             normalized_filename=filenameize(self.get_normalized_name()),
         )
 
-    def get_figure(self, save_type: FigureType):
-        """Get the matplotlib figure for export."""
-        if save_type == FigureType.MAIN:
-            return self.notebook_frame.fig_canvas.figure
-        elif save_type == FigureType.AUX:
-            return self.notebook_frame.aux_canvas.figure
-        elif save_type == FigureType.GUIDE:
-            return self.notebook_frame.guide_canvas.figure
-        elif save_type == FigureType.GEOM:
-            return self.notebook_frame.geom_canvas.figure
-        return None
-
     # --- Mode State Getters ---
 
     def get_gun_type(self) -> GunType:
