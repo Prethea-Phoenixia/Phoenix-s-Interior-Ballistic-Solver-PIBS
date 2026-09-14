@@ -13,75 +13,36 @@
 - Pre-commit hook (`pre-commit`) also runs `sort_localization.py` and `generate_executable.py`, but isort/PyInstaller
   are often not in PATH; black is the only reliable step.
 
-## Architecture
-
-- **Entry**: `run_pibs.py` → `pibs.pibs.main()` → `PIBS(Tk)` → `InteriorBallisticsFrame`
-- **UI layer**: `pibs/ib_frame.py`, `nb_frame.py`, `info_frame.py`, `tbl_frame.py` (tkinter + matplotlib)
-- **ModeManager** (`pibs/mode_manager.py`): Manages widget state based on gun type and simulation mode.
-  Called by `ib_frame.on_state_change()` to update enabled/disabled states of input widgets.
-  Reads mode state via frame getter methods (`get_gun_type()`, `is_constrained()`, etc.).
-- **PlotManager** (`pibs/plot_manager.py`): Handles all matplotlib rendering and figure export. The `context` property builds
-  the matplotlib rc_context on demand from current ttk theme colors. Each plot update method must wrap
-  plotting code in `plt.rc_context(self.context)` to apply theme/font settings. `draw_idle()`
-  must be called inside this context. Also provides `get_figure(save_type)` and `export_figure(save_type, file_name)`
-  for PNG export. Accesses frame data via properties (e.g., `self.frame.gun`).
-- **FileIOManager** (`pibs/file_io.py`): Handles file I/O operations (save, load, export). Uses the
-  getter/setter interface pattern to access frame data through dedicated methods (e.g., `has_data()`,
-  `get_save_data()`, `apply_loaded_data()`) rather than direct attribute access.
-- **Config**: `pibs/config.py` — `SimulationConfig` dataclass (all fields required, no defaults except `logger`). UI
-  gathers values into this; dispatch passes it to ballistics core.
-- **Enums**: `pibs/__init__.py` (UI enums: `FigureType`, `Theme`) and `pibs/ballistics/__init__.py`
-  (domain enums: `GunType`, `Domain`, `SolutionMethod`, `Point`, `OptimizationTarget`). All use `str` mixin
-  for seamless tkinter/JSON integration.
-- **Ballistics core**: `pibs/ballistics/` — `gun.py`, `recoilless.py`, `constrained*.py`, `config.py` (typed dataclasses
-  with `__post_init__` validation: `GunGeometry`, `PropellantLoad`, `Solver`, etc.), `num/` (RK45/UMF integrators),
-  `prop/` (propellant models)
-- **Dispatch**: `pibs/dispatch.py` — `calculate()` and `guide()` run in separate processes; `sim_config_to_ballistics()`
-  converts `SimulationConfig` to ballistics objects (triggers validation).
-- **Resources**: loaded via `resolve_path()` from `pibs/misc.py` — handles both dev mode and frozen PyInstaller builds.
-
-## Considered Design Decisions
+## Design Decisions
 
 **"God objects" in ballistics core are intentional, not technical debt.**
 
 - `Gun`/`Recoilless` own the full simulation pipeline (ODE setup, integration, peak finding, sampling, pressure traces).
-  Splitting into separate `PressureCalculator`, `BurnModel`, `MotionSolver` classes would add indirection over
-  inherently coupled state (`z`, `l_bar`, `v_bar`, `p_bar`) without real benefit for this scope.
+  Splitting into separate classes would add indirection over inherently coupled state without real benefit.
 - `InteriorBallisticsFrame` (~1000 lines) is a tkinter God frame — framework limitation, not design oversight.
-  Manager classes (ModeManager, PlotManager, FileIOManager) have been extracted to reduce complexity where possible.
-- Refactors should not break these classes apart "for purity." Tight coupling here tracks the physics, not accidental
-  complexity.
+- Refactors should not break these classes apart "for purity." Tight coupling here tracks the physics.
 
 **Input validation lives in the domain layer, not the UI.**
 
-- Ballistics config dataclasses use `__post_init__` to validate constraints (positive values, ranges, membership).
+- Ballistics config dataclasses use `__post_init__` to validate constraints.
 - The UI performs only **normalization** (empty→0.0, str→float via focus-out formatters), not constraint checking.
-- Invalid values surface as `ValueError` at `dispatch.sim_config_to_ballistics()` — caught by the existing error
-  handling infrastructure.
-- This ensures consistent validation across all entry points (GUI, CLI, API, tests).
-- Valid value collections (`VALID_SOLUTION_METHODS`, `VALID_PRESSURE_POINTS`, etc.) are derived from their
-  respective Enum classes in `ballistics/__init__.py`.
+- Invalid values surface as `ValueError` at `dispatch.sim_config_to_ballistics()` — caught by existing error handling.
 
-## Save / Load
+## Conventions
+
+**Save / Load**
 
 - Save files use **widget descriptive strings** as JSON keys (from `loc.get_descriptive()`), NOT magic keys.
-- Load matches JSON keys to widgets via `loc_dict`; no round-trip through `SimulationConfig`.
 
-## Localization
+**Localization**
 
-- File: `pibs/ui/localization.json`
-- After editing keys, run: `.venv\Scripts\python.exe sort_localization.py` (sorts keys for consistency)
+- After editing keys in `pibs/ui/localization.json`, run: `.venv\Scripts\python.exe sort_localization.py`
 
-## UI Widget Conventions
+**UI Widgets**
 
-- `pibs/localized.py` defines all localized widgets and `RowBuilder`.
-- Widgets do **not** self-grid in `__init__`; they are placed via a `place(row, col, ...)` method called by
-  `RowBuilder`.
-- `RowBuilder` is the single source of truth for row placement — don't mix direct `.grid()` calls with
-  RowBuilder-managed widgets.
+- Widgets do **not** self-grid in `__init__`; they are placed via a `place(row, col, ...)` method called by `RowBuilder`.
+- `RowBuilder` is the single source of truth for row placement — don't mix direct `.grid()` calls.
 - For checkboxes used as LabelFrame headers: use `widget.as_labelwidget()` instead of `.place()`.
-- `Localizable` base class provides no-op `inhibit()`/`disinhibit()` methods; widgets that need locking
-  during computation override these (see `ComputableWidget`).
 
 ## Documentation Policy
 
@@ -98,68 +59,17 @@
 - Before committing a refactor that touches ballistics code (`gun.py`, `recoilless.py`, `constrained*.py`), compare
   against the previous version to ensure no technical docs were lost.
 
-## Logging Architecture
+## Gotchas
 
-Three-tier logging setup spanning the GUI process, dispatch subprocess, and pool children:
+**Logging**: Python's `logging.lastResort` handler writes unformatted messages to stderr when no handlers are found.
+In pool children, setting the `pibs` logger level to CRITICAL is required — merely clearing handlers is insufficient.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│ MAIN PROCESS (GUI)                                                              │
-│                                                                                 │
-│  pibs logger (INFO, propagate=False)                                            │
-│  ├── StreamHandler(sys.stderr)  ──────────────────────► Terminal                │
-│  └── TextHandler(Tk Text widget) ─────────────────────► GUI Log Panel           │
-│                                                                                 │
-│  pibs.ib_frame logger ──propagate──► pibs logger                                │
-│                                                                                 │
-│  QueueListener(log_queue, text_handler)                                          │
-│  └── reads log_queue ────────────────────────────────► TextHandler ─► GUI Log   │
-└─────────────────────────────────────────────────────────────────────────────────┘
-         ▲ log_queue
-         │
-         │ QueueHandler
-         │
-┌────────┴────────────────────────────────────────────────────────────────────────┐
-│ DISPATCH SUBPROCESS (multiprocessing.Process)                                    │
-│                                                                                 │
-│  pibs logger (INFO, propagate=False)                                            │
-│  └── StreamHandler(sys.stderr)  ──────────────────────► Terminal                │
-│                                                                                 │
-│  pibs.dispatch logger (INFO)                                                     │
-│  ├── QueueHandler(log_queue) ───────────────────────► log_queue ─► GUI Log      │
-│  └── propagate ──► pibs logger ──► StreamHandler ──► Terminal                   │
-│                                                                                 │
-│  pibs.ballistics.* loggers ──propagate──► pibs.dispatch ──► (handlers above)    │
-└─────────────────────────────────────────────────────────────────────────────────┘
-         │ multiprocessing.Pool
-         │
-         │ (initializer=_pool_init)
-         │
-┌────────┴────────────────────────────────────────────────────────────────────────┐
-│ POOL CHILD PROCESSES (guide graph parallel workers)                              │
-│                                                                                 │
-│  pibs logger (CRITICAL, propagate=False, no handlers)  ← _pool_init()           │
-│  └── all child loggers effectively silenced                                     │
-│                                                                                 │
-│  Rationale: child processes run the same ballistics code; their logs would       │
-│  duplicate the dispatch process output and clutter the terminal.                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
+**PlotManager**: Each plot update method must wrap plotting code in `plt.rc_context(self.context)` to apply theme/font
+settings. `draw_idle()` must be called inside this context.
 
-**Key points:**
-
-- `pibs/__init__.py` sets up the `pibs` logger with a `StreamHandler` at import time (runs in ALL processes).
-- `ib_frame.py` adds a `TextHandler` to the `pibs` logger and starts a `QueueListener` that feeds
-  subprocess logs into the GUI log panel.
-- `dispatch.py` adds a `QueueHandler` to the `pibs.dispatch` logger so subprocess logs reach the GUI.
-  Ballistics loggers (`pibs.ballistics.*`) propagate up to `pibs.dispatch`, so they're captured too.
-- `guidegraph.py:_pool_init()` silences the `pibs` logger in pool children (level=CRITICAL, no handlers,
-  no propagation) to prevent duplicate/unformatted output.
-- **Gotcha**: Python's `logging.lastResort` handler writes unformatted messages to stderr when no handlers
-  are found in the hierarchy. Setting `pibs` level to CRITICAL prevents records from reaching it; merely
-  clearing handlers is insufficient.
+**Resources**: Always use `resolve_path()` from `pibs/misc.py` for resource access — handles both dev mode and frozen
+PyInstaller builds.
 
 ## Packaging
 
 - PyInstaller via `generate_executable.py`; spec file generated in root.
-- Resources bundled via `--add-data` flags; always use `resolve_path()` for resource access.
