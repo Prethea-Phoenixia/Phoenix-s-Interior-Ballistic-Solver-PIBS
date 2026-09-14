@@ -138,7 +138,6 @@ class PlotManager:
             "lines.markersize": FONTSIZE / 4,
             "lines.linewidth": 1,
             "font.family": FONTNAME,
-            "axes.labelweight": "bold",
             "xaxis.labellocation": "right",
             "yaxis.labellocation": "top",
             "figure.facecolor": bgc,
