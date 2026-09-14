@@ -14,7 +14,7 @@ from .base_gun import BaseGun
 from .config import GunGeometry, Nozzle, PropellantLoad, Solver, Structural
 from .gun import GenericEntry, GenericResult, OutlineEntry, PressureProbePoint, PressureTraceEntry
 from .material import Material
-from .num import dekker, gss, rkf
+from .num import dekker, find_last_le, gss, rkf
 
 
 @dataclass
@@ -168,6 +168,8 @@ class Recoilless(BaseGun):
             p_bar = self.f_p_bar(z, l_bar, eta, tau)
             return l_bar > l_g_bar or p_bar > p_bar_max  # or p_bar < 0
 
+        z_record = [(z_0, (0, 0, 0, 0, 1))]
+
         z_end, (t_bar_end, l_bar_end, v_bar_end, eta_end, tau_end), aborted = rkf(
             self.ode_z,
             (0, 0, 0, 0, 1),
@@ -175,6 +177,7 @@ class Recoilless(BaseGun):
             z_b,
             rel_tol=tol,
             abort_func=abort_condition,
+            record=z_record,
         )
 
         # Check for excessive pressure
@@ -233,15 +236,47 @@ class Recoilless(BaseGun):
             )
 
         # Peak finding
-        def find_peak(g: Callable[[float], float], tag: Point) -> None:
-            t_bar_p = 0.5 * sum(gss(g, 0, t_bar_exit, x_tol=t_bar_exit * tol, find_min=False))
-            z_p, l_bar_p, v_bar_p, eta_p, tau_p = self.g(t_bar_p, tag, tol)[1]
+        def func_p_z(z: float, tag: Point) -> tuple[float, tuple[float, float, float, float, float]]:
+            i = find_last_le(z_record, z)
+            x = z_record[i][0]
+            ys = z_record[i][1]
+
+            r = []
+            t_bar, l_bar, v_bar, eta, tau = rkf(self.ode_z, ys, x, z, rel_tol=tol, record=r)[1]
+            xs_set = {v[0] for v in z_record}
+            z_record.extend(v for v in r if v[0] not in xs_set)
+            z_record.sort()
+
+            p_bar = self.f_p_bar(z, l_bar, eta, tau)
+
+            if tag == Point.PEAK_AVG:
+                return p_bar, (z, t_bar, l_bar, v_bar, eta, tau)
+
+            ps, p0, pb, _, _ = self.to_ps_p0_pb_vb_stag(
+                l_bar * self.l_0, v_bar * self.v_j, p_bar * self.f * self.delta, tau, eta
+            )
+
+            ps_bar = ps / (self.f * self.delta)
+            p0_bar = p0 / (self.f * self.delta)
+            pb_bar = pb / (self.f * self.delta)
+            if tag == Point.PEAK_BREECH:
+                return pb_bar, (z, t_bar, l_bar, v_bar, eta, tau)
+            elif tag == Point.PEAK_STAG:
+                return p0_bar, (z, t_bar, l_bar, v_bar, eta, tau)
+            elif tag == Point.PEAK_SHOT:
+                return ps_bar, (z, t_bar, l_bar, v_bar, eta, tau)
+            else:
+                raise ValueError("tag not handled.")
+
+        def find_peak(tag: Point) -> None:
+            z_p = 0.5 * sum(gss(lambda z: func_p_z(z, tag)[0], z_0, z_end, x_tol=tol, find_min=False))
+            _, (z_p, t_bar_p, l_bar_p, v_bar_p, eta_p, tau_p) = func_p_z(z_p, tag)
             self.append_bar_data(
                 bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p, eta=eta_p, tau=tau_p
             )
 
         for peak in [Point.PEAK_AVG, Point.PEAK_SHOT, Point.PEAK_BREECH, Point.PEAK_STAG]:
-            find_peak(lambda _t_bar: self.g(_t_bar, peak, tol)[0], peak)
+            find_peak(peak)
 
         # Sampling
         if dom == Domain.TIME:
@@ -317,29 +352,6 @@ class Recoilless(BaseGun):
 
         data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda e: e[0].time))
         return RecoillessResult(self, data, p_trace)
-
-    def g(self, t: float, tag: Point, tol: float) -> tuple[float, tuple[float, float, float, float, float]]:
-        z, l_bar, v_bar, eta, tau = rkf(self.ode_t, (self.z_0, 0, 0, 0, 1), 0, t, rel_tol=tol)[1]
-        p_bar = self.f_p_bar(z, l_bar, eta, tau)
-
-        if tag == Point.PEAK_AVG:
-            return p_bar, (z, l_bar, v_bar, eta, tau)
-
-        ps, p0, pb, _, _ = self.to_ps_p0_pb_vb_stag(
-            l_bar * self.l_0, v_bar * self.v_j, p_bar * self.f * self.delta, tau, eta
-        )
-
-        ps_bar = ps / (self.f * self.delta)
-        p0_bar = p0 / (self.f * self.delta)
-        pb_bar = pb / (self.f * self.delta)
-        if tag == Point.PEAK_BREECH:
-            return pb_bar, (z, l_bar, v_bar, eta, tau)
-        elif tag == Point.PEAK_STAG:
-            return p0_bar, (z, l_bar, v_bar, eta, tau)
-        elif tag == Point.PEAK_SHOT:
-            return ps_bar, (z, l_bar, v_bar, eta, tau)
-        else:
-            raise ValueError("tag not handled.")
 
     def abort_z(
         self,

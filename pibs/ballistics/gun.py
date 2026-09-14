@@ -22,7 +22,7 @@ from .generics import (
     PressureTraceEntry,
 )
 from .material import Material
-from .num import dekker, gss, integrate, rkf
+from .num import dekker, find_last_le, gss, integrate, rkf
 
 
 @dataclass
@@ -236,6 +236,8 @@ class Gun(BaseGun):
             p_bar = self.f_p_bar(z, l_bar, v_bar)
             return l_bar > l_g_bar or p_bar > p_bar_max
 
+        z_record = [(z_0, (0, 0, 0))]
+
         z_end, (t_bar_end, l_bar_end, v_bar_end), aborted = rkf(
             self.ode_z,
             (0, 0, 0),
@@ -243,6 +245,7 @@ class Gun(BaseGun):
             z_b,
             rel_tol=self.tol,
             abort_func=abort_condition,
+            record=z_record,
         )
 
         # check if integration exited due to excess pressure
@@ -278,14 +281,36 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
             t_bar_f, l_bar_f, v_bar_f = rkf(self.ode_z, (0, 0, 0), z_0, 1, rel_tol=self.tol)[1]
             self.append_bar_data(bar_data, tag=Point.FRACTURE, t_bar=t_bar_f, l_bar=l_bar_f, z=1, v_bar=v_bar_f)
 
-        def find_peak(g: Callable[[float], float], tag: Point) -> None:
-            t_bar_p = 0.5 * sum(gss(g, 0, t_bar_exit, x_tol=t_bar_exit * self.tol, find_min=False))
-            z_p, l_bar_p, v_bar_p = self.g(t_bar_p, tag, self.tol)[1]
+        def func_p_z(z: float, tag: Point) -> tuple[float, tuple[float, float, float]]:
+            i = find_last_le(z_record, z)
+            x = z_record[i][0]
+            ys = z_record[i][1]
+
+            r = []
+            t_bar, l_bar, v_bar = rkf(self.ode_z, ys, x, z, rel_tol=self.tol, record=r)[1]
+            xs_set = {v[0] for v in z_record}
+            z_record.extend(v for v in r if v[0] not in xs_set)
+            z_record.sort()
+
+            p_bar = self.f_p_bar(z, l_bar, v_bar)
+            if tag == Point.PEAK_AVG:
+                return p_bar, (z, t_bar, l_bar, v_bar)
+            else:
+                ps_bar, pb_bar = self.to_ps_pb(l_bar * self.l_0, p_bar)
+                if tag == Point.PEAK_SHOT:
+                    return ps_bar, (z, t_bar, l_bar, v_bar)
+                elif tag == Point.PEAK_BREECH:
+                    return pb_bar, (z, t_bar, l_bar, v_bar)
+            raise ValueError(f"tag {tag} not handled.")
+
+        def find_peak(tag: Point) -> None:
+            z_p = 0.5 * sum(gss(lambda z: func_p_z(z, tag)[0], z_0, z_end, x_tol=self.tol, find_min=False))
+            _, (z_p, t_bar_p, l_bar_p, v_bar_p) = func_p_z(z_p, tag)
             self.append_bar_data(bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p)
 
-        # Find peak pressure in time domain
+        # Find peak pressure in burnup domain
         for peak in [Point.PEAK_AVG, Point.PEAK_SHOT, Point.PEAK_BREECH]:
-            find_peak(lambda _t_bar: self.g(_t_bar, peak, z_0)[0], peak)
+            find_peak(peak)
 
         # Sampling
         if dom == Domain.TIME:
@@ -359,20 +384,6 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
         v_bar: float,
     ) -> None:
         bar_data.append((tag, t_bar, l_bar, z, v_bar, self.f_p_bar(z, l_bar, v_bar)))
-
-    def g(self, t_bar: float, tag: Point, tol: float) -> tuple[float, tuple[float, float, float]]:
-        z, l_bar, v_bar = rkf(self.ode_t, (self.z_0, 0, 0), 0, t_bar, rel_tol=tol)[1]
-        p_bar = self.f_p_bar(z, l_bar, v_bar)
-        if tag == Point.PEAK_AVG:
-            return p_bar, (z, l_bar, v_bar)
-        else:
-            ps_bar, pb_bar = self.to_ps_pb(l_bar * self.l_0, p_bar)
-            if tag == Point.PEAK_SHOT:
-                return ps_bar, (z, l_bar, v_bar)
-            elif tag == Point.PEAK_BREECH:
-                return pb_bar, (z, l_bar, v_bar)
-
-        raise ValueError(f"tag {tag} not handled.")
 
     def abort_z(self, z: float, tlv: tuple[float, float, float], _, p_bar_max: float, l_g_bar: float) -> bool:
         t_bar, l_bar, v_bar = tlv
