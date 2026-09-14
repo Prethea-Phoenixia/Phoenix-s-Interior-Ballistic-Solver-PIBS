@@ -8,7 +8,7 @@ import matplotlib as mpl
 from labellines import labelLines
 from matplotlib import pyplot as plt
 
-from . import BOLDSIZE, FONTNAME, FONTSIZE, THEMES, Theme
+from . import BOLDSIZE, FONTNAME, FONTSIZE, THEMES, FigureType, Theme
 from .ballistics import Domain, GunType
 from .ballistics.recoilless import RecoillessTableEntry
 from .guidegraph import GuideResults
@@ -537,3 +537,26 @@ class PlotManager:
         self.update_aux_plot()
         self.update_geom_plot()
         self.update_guide_graph()
+
+    def get_figure(self, save_type: FigureType):
+        """Get the matplotlib figure for the specified type."""
+        if save_type == FigureType.MAIN:
+            return self.frame.fig_canvas.figure
+        elif save_type == FigureType.AUX:
+            return self.frame.aux_canvas.figure
+        elif save_type == FigureType.GUIDE:
+            return self.frame.guide_canvas.figure
+        elif save_type == FigureType.GEOM:
+            return self.frame.geom_canvas.figure
+        return None
+
+    def export_figure(self, save_type: FigureType, file_name: str):
+        """Export a figure as PNG with proper matplotlib context."""
+        fig = self.get_figure(save_type)
+        if fig is None:
+            return False
+
+        with plt.rc_context(self.context):
+            fig.savefig(file_name, transparent=True, dpi=300)
+
+        return True

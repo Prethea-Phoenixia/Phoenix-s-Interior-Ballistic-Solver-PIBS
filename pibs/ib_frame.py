@@ -13,8 +13,6 @@ from tkinter.font import Font
 from tkinter.ttk import Frame
 from typing import Literal
 
-import matplotlib.pyplot as plt
-
 from . import (
     BOLDSIZE,
     DESCRIPTION,
@@ -849,10 +847,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         elif save_type == FigureType.GEOM:
             return self.notebook_frame.geom_canvas.figure
         return None
-
-    def get_export_context(self):
-        """Get matplotlib context for exports."""
-        return plt.rc_context(self.context)
 
     # --- Mode State Getters ---
 

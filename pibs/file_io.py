@@ -95,11 +95,5 @@ class FileIOManager:
         if not file_name:
             return
 
-        fig = frame.get_figure(save)
-        if fig is None:
-            return
-
-        with frame.get_export_context():
-            fig.savefig(file_name, transparent=True, dpi=300)
-
-        messagebox.showinfo(frame.get_loc_str("sucTitle"), frame.get_loc_str("savedLocMsg") + f" {file_name}")
+        if frame.notebook_frame.plot_manager.export_figure(save, file_name):
+            messagebox.showinfo(frame.get_loc_str("sucTitle"), frame.get_loc_str("savedLocMsg") + f" {file_name}")
