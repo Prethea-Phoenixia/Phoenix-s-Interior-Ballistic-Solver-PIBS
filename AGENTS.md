@@ -20,10 +20,11 @@
 - **ModeManager** (`pibs/mode_manager.py`): Manages widget state based on gun type and simulation mode.
   Called by `ib_frame.on_state_change()` to update enabled/disabled states of input widgets.
   Reads mode state via frame getter methods (`get_gun_type()`, `is_constrained()`, etc.).
-- **PlotManager** (`pibs/plot_manager.py`): Handles all matplotlib rendering. The `context` property builds
+- **PlotManager** (`pibs/plot_manager.py`): Handles all matplotlib rendering and figure export. The `context` property builds
   the matplotlib rc_context on demand from current ttk theme colors. Each plot update method must wrap
   plotting code in `plt.rc_context(self.context)` to apply theme/font settings. `draw_idle()`
-  must be called inside this context. Accesses frame data via properties (e.g., `self.frame.gun`).
+  must be called inside this context. Also provides `get_figure(save_type)` and `export_figure(save_type, file_name)`
+  for PNG export. Accesses frame data via properties (e.g., `self.frame.gun`).
 - **FileIOManager** (`pibs/file_io.py`): Handles file I/O operations (save, load, export). Uses the
   getter/setter interface pattern to access frame data through dedicated methods (e.g., `has_data()`,
   `get_save_data()`, `apply_loaded_data()`) rather than direct attribute access.
