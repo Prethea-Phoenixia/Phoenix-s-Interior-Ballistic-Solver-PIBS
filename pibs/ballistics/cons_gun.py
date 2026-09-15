@@ -14,7 +14,7 @@ from . import (
 from .config import DesignConstraint, GunGeometry, PropellantLoad, Solver
 from .constrained import Constrained
 from .gun import pidduck
-from .num import dekker, find_last_le, gss, rkf
+from .num import dekker, find_last_le, gss, merge_sorted_records, rkf
 
 if TYPE_CHECKING:
     from .prop import Propellant
@@ -193,9 +193,7 @@ class ConstrainedGun(Constrained):
 
                 r = []
                 t_bar, l_bar, v_bar = rkf(d_func=ode_z, ini_val=ys, x_0=x, x_1=z, rel_tol=self.tol, record=r)[1]
-                xs_set = {v[0] for v in record}
-                record.extend(v for v in r if v[0] not in xs_set)
-                record.sort()
+                merge_sorted_records(record, r)
                 return func_p_control_bar(z, l_bar, v_bar) - p_bar_d, z, t_bar, l_bar, v_bar
 
             z_p = 0.5 * sum(gss(lambda z: func_p_z(z)[0], z_j, z_k, x_tol=self.tol, find_min=False))

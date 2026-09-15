@@ -14,7 +14,7 @@ from .base_gun import BaseGun
 from .config import GunGeometry, Nozzle, PropellantLoad, Solver, Structural
 from .gun import GenericEntry, GenericResult, OutlineEntry, PressureProbePoint, PressureTraceEntry
 from .material import Material
-from .num import dekker, find_last_le, gss, rkf
+from .num import dekker, find_last_le, gss, merge_sorted_records, rkf
 
 
 @dataclass
@@ -243,9 +243,7 @@ class Recoilless(BaseGun):
 
             r = []
             t_bar, l_bar, v_bar, eta, tau = rkf(self.ode_z, ys, x, z, rel_tol=tol, record=r)[1]
-            xs_set = {v[0] for v in z_record}
-            z_record.extend(v for v in r if v[0] not in xs_set)
-            z_record.sort()
+            merge_sorted_records(z_record, r)
 
             p_bar = self.f_p_bar(z, l_bar, eta, tau)
 

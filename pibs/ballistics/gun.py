@@ -22,7 +22,7 @@ from .generics import (
     PressureTraceEntry,
 )
 from .material import Material
-from .num import dekker, find_last_le, gss, integrate, rkf
+from .num import dekker, find_last_le, gss, integrate, merge_sorted_records, rkf
 
 
 @dataclass
@@ -325,9 +325,7 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
 
             r = []
             t_bar, l_bar, v_bar = rkf(self.ode_z, ys, x, z, rel_tol=self.tol, record=r)[1]
-            xs_set = {v[0] for v in z_record}
-            z_record.extend(v for v in r if v[0] not in xs_set)
-            z_record.sort()
+            merge_sorted_records(z_record, r)
 
             p_bar = self.f_p_bar(z, l_bar, v_bar)
             if tag == Point.PEAK_AVG:
