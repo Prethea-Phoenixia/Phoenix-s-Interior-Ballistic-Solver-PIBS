@@ -39,7 +39,7 @@ Python作为解释性语言，并不适于直接用于数值计算。内弹道�
 
 ### 开发版本
 在本地Python环境运行代码，或对代码进行再开发：
-* 安装[Python运行环境](https://www.python.org/downloads/) (版本要求:>=3.9)。
+* 安装[Python 3运行环境](https://www.python.org/downloads/)。
 * 用Git将代码仓库克隆到本地
 * 创建虚拟环境(避免污染本地Python环境) `python -m venv .venv`
 * 激活虚拟环境

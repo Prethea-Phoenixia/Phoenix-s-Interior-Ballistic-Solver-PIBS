@@ -32,7 +32,7 @@ For Windows, a single-file executable is provided. This package the Python runti
 
 ### For Development:
 
-- Install Python (>=3.9)
+- Install Python 3
 - Setup the virtual environment:`python -m venv .venv`
 - Activate the virtual environment venv 
   - on Windows: `.venv\Scripts\activate.bat`
@@ -43,8 +43,7 @@ For Windows, a single-file executable is provided. This package the Python runti
       
 
 ## Contribution
-Your contribution is welcomed! Please feel free to raise issues or propose pull requests regarding features or problems encountered. To get started, see the [community documentation](CONTRIBUTING.md)
-
+Your contribution is welcomed! Please feel free to raise issues or propose pull requests regarding features or problems encountered.
 
 ## Resources Used
 * tcl/tk themes used include "awdark" & "awlight" from awthemes: https://wiki.tcl-lang.org/page/awthemes
