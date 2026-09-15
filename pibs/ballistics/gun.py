@@ -95,6 +95,43 @@ def pidduck(wpm: float, k: float, tol: float) -> tuple[float, float]:
 
 
 class Gun(BaseGun):
+    """
+    load density            Δ := ω / V₀
+    asymptotic velocity:    vⱼ := [2 f ω / (θ φ m)]^0.5
+
+    the reduced system:
+    reduced length:         l̄  := l / l₀ where l₀ := V₀ / S
+    reduced pressure:       p̄ := p / (f Δ)
+    reduced time:           t̄ := t vⱼ / l₀
+    reduced velocity:       v̄ := v / vⱼ
+
+    the ODE system (2-72):
+
+    dψ/dt =
+        χ(1 + 2λZ + 3μZ²) √(θ/(2B)) · p̄^n,          when Z < 1
+        (χ_s/Z_k)(1 + 2λ_s·Z/Z_k) √(θ/(2B)) · p̄^n,   when 1 ≤ Z < Z_k
+        0,                                           when Z ≥ Z_k
+
+    dZ/dt =
+        √(θ/(2B)) · p̄^n,    when Z < Z_k
+        0,                   when Z ≥ Z_k
+
+    dl̄/dt̄ = v̄
+
+    dv̄/dt̄ = (θ/2) · p̄
+
+    dp̄/dt = [l₀ / ((l̄ + l̄_φ) · vⱼ)] · [1 + Δ(α - 1/ρ) · p̄] · (dψ/dt)
+             - [(1 + θ) / (l̄ + l̄_φ)] · p̄ · v̄
+
+    auxiliary definitions:
+    l̄φ = 1 - Δ/ρₚ - Δ(α - 1/ρₚ) · ψ
+    B    = [S² · eᵢ² / (f · ω · φ · m · uᵢ²)] · (fΔ)^(2(1-n))
+
+    Note: for typographical purposes, ω has been laid out as w in code, and sometimes l̄ is rendered as λ, spelled as
+        "labda" due to Python keyword lambda.
+
+    """
+
     def __init__(
         self,
         geometry: GunGeometry,
@@ -193,7 +230,7 @@ class Gun(BaseGun):
 
         if psi:
             r = self.f / self.temp_v
-            l_psi = self.l_0 * (1 - self.delta / self.rho_p - self.delta * (self.alpha * -1 / self.rho_p) * psi)
+            l_psi = self.l_0 * (1 - self.delta / self.rho_p - self.delta * (self.alpha - 1 / self.rho_p) * psi)
             return self.s * p * (l + l_psi) / (self.w * psi * r)
         else:
             return self.temp_v

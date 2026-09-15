@@ -953,47 +953,51 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     @lock_out
     def on_calculate(self):
         self.focus()
-        self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, self.config))
-        self.process.start()
-        for loc in self.localized_widgets:
-            loc.inhibit()
 
-        self.calc_button.config(state="disabled")
-        self.swap_button.config(state="disabled")
+        cfg = self.config
+        if not cfg:
+            return
+        else:
+            self.process = Process(target=calculate, args=(self.job_queue, self.log_queue, cfg))
+            self.process.start()
+            for loc in self.localized_widgets:
+                loc.inhibit()
+
+            self.calc_button.config(state="disabled")
+            self.swap_button.config(state="disabled")
 
     def get_value(self):
-        try:
-            run_cfg: SimulationConfig | None = None
+        if self.job_queue.empty():
+            return
+        else:
+            try:
+                while not self.job_queue.empty():
+                    run_cfg, self.gun, self.gun_result, self.guide_results = self.job_queue.get_nowait()
 
-            while not self.job_queue.empty():
-                run_cfg, self.gun, self.gun_result, self.guide_results = self.job_queue.get_nowait()
+                sigfig = int(-log10(run_cfg.tolerance)) + 1
+                if run_cfg.constrained:
+                    if isinstance(self.gun, Gun) or isinstance(self.gun, Recoilless):
+                        self.web_mm.set(round_sig(self.gun.geometry.web_thickness * 1e3, n=sigfig))
+                        if not run_cfg.lock_length:
+                            self.tbl_mm.set(round_sig(self.gun.geometry.barrel_length * 1e3, n=sigfig))
+                        self.cv_L.set(round_sig(self.gun.geometry.chamber_volume * 1e3, n=sigfig))
 
-            if run_cfg is None:
-                return
+                self.info_frame.update_stats(gun=self.gun, gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
+                self.notebook_frame.table_frame.update_table(gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
+                self.notebook_frame.plot_manager.update_main_plot()
+                self.notebook_frame.plot_manager.update_aux_plot()
+                self.notebook_frame.plot_manager.update_guide_graph()
 
-            sigfig = int(-log10(run_cfg.tolerance)) + 1
-            if run_cfg.constrained:
-                if isinstance(self.gun, Gun) or isinstance(self.gun, Recoilless):
-                    self.web_mm.set(round_sig(self.gun.geometry.web_thickness * 1e3, n=sigfig))
-                    if not run_cfg.lock_length:
-                        self.tbl_mm.set(round_sig(self.gun.geometry.barrel_length * 1e3, n=sigfig))
-                    self.cv_L.set(round_sig(self.gun.geometry.chamber_volume * 1e3, n=sigfig))
+            except Exception as e:
+                self.handle_errors(e, level=logging.WARNING)
 
-            self.info_frame.update_stats(gun=self.gun, gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
-            self.notebook_frame.table_frame.update_table(gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
-            self.notebook_frame.plot_manager.update_main_plot()
-            self.notebook_frame.plot_manager.update_aux_plot()
-            self.notebook_frame.plot_manager.update_guide_graph()
-
-        except Exception as e:
-            self.handle_errors(e, level=logging.WARNING)
-
-        """Restore buttons and disinhibit widgets after a computation completes."""
-        self.calc_button.config(state="normal")
-        self.swap_button.config(state="normal")
-        for loc in self.localized_widgets:
-            loc.disinhibit()
-        self.process = None
+            finally:
+                """Restore buttons and disinhibit widgets after a computation completes."""
+                self.calc_button.config(state="normal")
+                self.swap_button.config(state="normal")
+                for loc in self.localized_widgets:
+                    loc.disinhibit()
+                self.process = None
 
     def update_spec(self, *_):
         self.propellant_specs.config(state="normal")

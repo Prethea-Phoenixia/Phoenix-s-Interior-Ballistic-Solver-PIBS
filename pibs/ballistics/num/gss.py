@@ -30,7 +30,7 @@ def gss(
     if h < x_tol:
         return a, b
 
-    n = int(math.ceil(math.log(x_tol / h) / math.log(invphi))) - 1
+    n = int(math.ceil(math.log(x_tol / h) / math.log(invphi))) 
 
     c, d = a + invphi2 * h, a + invphi * h
     yc, yd = f(c), f(d)

@@ -281,7 +281,6 @@ class PlotManager:
                         (0.2 * xs[-1] + 0.8 * x_peak, xs[-1]),
                         (0, xs[-1]),
                         (x_peak, 0.2 * xs[-1] + 0.8 * x_peak),
-                        (0, x_peak),
                     ),
                 ):
                     labelLines(lines, align=True, xvals=xvals)
