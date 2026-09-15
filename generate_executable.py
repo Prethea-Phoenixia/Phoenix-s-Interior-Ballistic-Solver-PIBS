@@ -17,7 +17,7 @@ def generate_executables(mult_file: bool = False):
         "--windowed",
         "--icon=pibs/ui/logo.ico",
         "--name=" + name,
-        "--debug=all",
+        "--optimize", "2",
         "--noupx",
         f"--add-data=pibs/ballistics/resource{sep}ballistics/resource/",
         f"--add-data=pibs/ui{sep}ui/",
@@ -29,8 +29,8 @@ def generate_executables(mult_file: bool = False):
     with open(name + ".spec", "r") as f:
         content = f.readlines()
 
-    with open(name + ".spec", "w") as f:
-        f.writelines(content)
+    # Enable archive compression (noarchive=False)
+    content = [line.replace("noarchive=True", "noarchive=False") for line in content]
 
     i = content.index("pyz = PYZ(a.pure)\n")
 
