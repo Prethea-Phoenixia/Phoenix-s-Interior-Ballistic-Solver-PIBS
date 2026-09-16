@@ -17,7 +17,7 @@ class ThemedMixin(object):
         self.force_update_on_theme_widget = []
 
     def use_theme(self):
-        style = ttk.Style(self)
+        style = ttk.Style()
         style.theme_use(self.theme_name_var.get())
 
         """ensure that the treeview rows are roughly the same height

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import json
 import logging
 import math
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from math import log
-from typing import Callable, Literal
 
 from . import (
     Domain,
@@ -13,7 +11,7 @@ from . import (
     SolutionMethod,
 )
 from .base_gun import BaseGun
-from .config import GunGeometry, PropellantLoad, Solver, Structural
+from .config import GunConfig, PropellantLoad, SolverConfig, StructuralConfig
 from .generics import (
     GenericEntry,
     GenericResult,
@@ -21,7 +19,6 @@ from .generics import (
     PressureProbePoint,
     PressureTraceEntry,
 )
-from .material import Material
 from .num import dekker, find_last_le, gss, integrate, merge_sorted_records, rkf
 
 
@@ -134,13 +131,13 @@ class Gun(BaseGun):
 
     def __init__(
         self,
-        geometry: GunGeometry,
+        gcfg: GunConfig,
         load: PropellantLoad,
-        solver: Solver | None = None,
+        solver: SolverConfig,
         logger: logging.Logger | None = None,
     ):
         super().__init__(
-            geometry=geometry,
+            gcfg=gcfg,
             load=load,
             solver=solver,
             logger=logger,
@@ -173,12 +170,6 @@ class Gun(BaseGun):
         )
 
         self.v_j = (2 * self.f * self.w / (self.theta * self.phi * self.m)) ** 0.5
-
-    def to_json(self) -> str:
-        return json.dumps(
-            {**json.loads(super().to_json()), "sol": self.sol},
-            ensure_ascii=False,
-        )
 
     def f_p_bar(self, z: float, l_bar: float, v_bar: float) -> float:
         psi = self.f_psi_z(z)
@@ -268,10 +259,10 @@ class Gun(BaseGun):
 
         p_bar_max = 1e9 / p_scale  # 1 GPa
 
-        def abort_condition(z, tlv, _):
-            t_bar, l_bar, v_bar = tlv
-            p_bar = self.f_p_bar(z, l_bar, v_bar)
-            return l_bar > l_g_bar or p_bar > p_bar_max
+        def abort_condition(_z, tlv, _):
+            _t_bar, _l_bar, _v_bar = tlv
+            _p_bar = self.f_p_bar(_z, _l_bar, _v_bar)
+            return _l_bar > l_g_bar or _p_bar > p_bar_max
 
         z_record = [(z_0, (0, 0, 0))]
 
@@ -318,28 +309,28 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
             t_bar_f, l_bar_f, v_bar_f = rkf(self.ode_z, (0, 0, 0), z_0, 1, rel_tol=self.tol)[1]
             self.append_bar_data(bar_data, tag=Point.FRACTURE, t_bar=t_bar_f, l_bar=l_bar_f, z=1, v_bar=v_bar_f)
 
-        def func_p_z(z: float, tag: Point) -> tuple[float, tuple[float, float, float]]:
-            i = find_last_le(z_record, z)
-            x = z_record[i][0]
-            ys = z_record[i][1]
+        def func_p_z(_z: float, tag: Point) -> tuple[float, tuple[float, float, float, float]]:
+            _i = find_last_le(z_record, _z)
+            _x = z_record[_i][0]
+            ys = z_record[_i][1]
 
             r = []
-            t_bar, l_bar, v_bar = rkf(self.ode_z, ys, x, z, rel_tol=self.tol, record=r)[1]
+            _t_bar, _l_bar, _v_bar = rkf(self.ode_z, ys, _x, _z, rel_tol=self.tol, record=r)[1]
             merge_sorted_records(z_record, r)
 
-            p_bar = self.f_p_bar(z, l_bar, v_bar)
+            _p_bar = self.f_p_bar(_z, _l_bar, _v_bar)
             if tag == Point.PEAK_AVG:
-                return p_bar, (z, t_bar, l_bar, v_bar)
+                return _p_bar, (_z, _t_bar, _l_bar, _v_bar)
             else:
-                ps_bar, pb_bar = self.to_ps_pb(l_bar * self.l_0, p_bar)
+                ps_bar, pb_bar = self.to_ps_pb(_l_bar * self.l_0, _p_bar)
                 if tag == Point.PEAK_SHOT:
-                    return ps_bar, (z, t_bar, l_bar, v_bar)
+                    return ps_bar, (_z, _t_bar, _l_bar, _v_bar)
                 elif tag == Point.PEAK_BREECH:
-                    return pb_bar, (z, t_bar, l_bar, v_bar)
+                    return pb_bar, (_z, _t_bar, _l_bar, _v_bar)
             raise ValueError(f"tag {tag} not handled.")
 
         def find_peak(tag: Point) -> None:
-            z_p = 0.5 * sum(gss(lambda z: func_p_z(z, tag)[0], z_0, z_end, x_tol=self.tol, find_min=False))
+            z_p = 0.5 * sum(gss(lambda _z: func_p_z(_z, tag)[0], z_0, z_end, x_tol=self.tol, find_min=False))
             _, (z_p, t_bar_p, l_bar_p, v_bar_p) = func_p_z(z_p, tag)
             self.append_bar_data(bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p)
 
@@ -474,17 +465,18 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
     def structure(
         self,
         gun_result: GunResult,
-        structural: Structural,
+        structural: StructuralConfig | None,
         step: int = 33,
         tol: float | None = None,
     ) -> None:
         tol = tol if tol is not None else self.tol
         step = max(step, 1)
 
-        structural_material = structural.material
-        if structural_material is None:
-            raise ValueError("No structural material provided")
+        if structural is None:
+            self.logger.info("Structure calculation skipped, no material specified.")
+            return
 
+        structural_material = structural.material
         structural_safety_factor = structural.safety_factor
 
         r_b = 0.5 * self.caliber

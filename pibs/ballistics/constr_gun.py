@@ -1,37 +1,27 @@
 from __future__ import annotations
 
-import json
 import logging
-from dataclasses import asdict
 from math import log
-from typing import TYPE_CHECKING
 
-from . import (
-    MAX_ITER,
-    Point,
-    SolutionMethod,
-)
-from .config import DesignConstraint, GunGeometry, PropellantLoad, Solver
-from .constrained import Constrained
+from . import Point, SolutionMethod
+from .config import DesignConstraint, GunConfig, PropellantLoad, SolverConfig
+from .constr import Constrained
 from .gun import pidduck
 from .num import dekker, find_last_le, gss, merge_sorted_records, rkf
-
-if TYPE_CHECKING:
-    from .prop import Propellant
 
 
 class ConstrainedGun(Constrained):
 
     def __init__(
         self,
-        geometry: GunGeometry,
+        gcfg: GunConfig,
         load: PropellantLoad,
         design: DesignConstraint,
-        solver: Solver | None = None,
+        solver: SolverConfig,
         logger: logging.Logger | None = None,
     ):
         super().__init__(
-            geometry=geometry,
+            gcfg=gcfg,
             load=load,
             design=design,
             solver=solver,
@@ -41,20 +31,13 @@ class ConstrainedGun(Constrained):
         self.sol = self.solver.solution_method
         self.max_iterations = self.solver.max_iterations
 
-    def to_json(self) -> str:
-        return json.dumps(
-            {**json.loads(super().to_json()), "sol": self.sol},
-            ensure_ascii=False,
-        )
-
     @Constrained.validate_solve_inputs
     def solve(
         self,
-        *,
         load_fraction: float,
         charge_mass_ratio: float,
-        length_gun: float | None = None,
         known_bore: bool = False,
+        length_gun: float | None = None,
         labda_1: float | None = None,
         labda_2: float | None = None,
         cc: float | None = None,
@@ -73,8 +56,6 @@ class ConstrainedGun(Constrained):
 
         if cc is None:
             cc = 1 - (1 - 1 / self.chi_k) * log(l_bar_g_0 + 1) / l_bar_g_0
-
-        assert cc is not None
 
         """
         张小兵，金志明（2014），《枪炮内弹道学》，北京理工大学出版社，pp 70 (1-128)
@@ -205,7 +186,6 @@ class ConstrainedGun(Constrained):
         next_probe_web = probe_web
 
         while dp_bar_probe * next_dp_bar_probe > 0:
-
             probe_web = next_probe_web
             dp_bar_probe = next_dp_bar_probe
 
@@ -251,8 +231,8 @@ class ConstrainedGun(Constrained):
         try:
             v_bar_g, (t_bar_g, z_g, l_bar_g), _ = rkf(
                 d_func=ode_v,
-                ini_val=(t_bar_i, z_i, l_bar_i),
-                x_0=v_bar_i,
+                ini_val=v_t_z_l_record[-1][1],
+                x_0=v_t_z_l_record[-1][0],
                 x_1=v_bar_d,
                 rel_tol=self.tol,
                 abort_func=abort_v,
@@ -262,7 +242,7 @@ class ConstrainedGun(Constrained):
             v_bar_m, (t_bar_m, z_m, l_bar_m) = v_t_z_l_record[-1]
             p_max = func_p_control_bar(z_m, l_bar_m, v_bar_m) * self.f * delta
             v_max = v_bar_m * v_j
-            l_max = l_bar_m * l_0
+            l_max: float = l_bar_m * l_0
             raise ValueError(
                 "Integration appears to be approaching asymptote, "
                 + f"last calculated to v = {v_max:.4g} m/s, x = {l_max:.4g} m, p = {p_max * 1e-6:.4g} MPa. "
@@ -272,7 +252,8 @@ class ConstrainedGun(Constrained):
         p_bar_g = func_p_control_bar(z_g, l_bar_g, v_bar_g)
 
         v_g = v_bar_g * v_j
-        l_g = l_bar_g * l_0
+        l_g: float = l_bar_g * l_0
+
         p_g = p_bar_g * self.f * delta
         if l_bar_g > l_bar_d:
             raise ValueError(

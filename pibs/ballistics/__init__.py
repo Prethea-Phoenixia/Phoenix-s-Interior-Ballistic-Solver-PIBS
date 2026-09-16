@@ -62,16 +62,5 @@ RECOILLESS_PEAK_POINTS = (
 VALID_OPT_TARGETS = tuple(o.value for o in OptimizationTarget)
 VALID_GUN_TYPES = tuple(g.value for g in GunType)
 
-MAX_ITER = 10
-
 
 T = TypeVar("T")
-
-
-class JSONable:
-    def to_json(self) -> str:
-        raise NotImplementedError
-
-    @classmethod
-    def from_json(cls: T, json_dict: dict) -> T:
-        raise NotImplementedError

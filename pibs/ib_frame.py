@@ -10,27 +10,11 @@ from multiprocessing import Process, Queue
 from tkinter import IntVar, Menu, StringVar, Text, messagebox, ttk
 from tkinter.font import Font
 from tkinter.ttk import Frame
-from typing import Literal
 
-from . import (
-    BOLDSIZE,
-    DESCRIPTION,
-    FONTNAME,
-    FONTSIZE,
-    FigureType,
-    Theme,
-    log_formatter,
-    root_logger,
-)
-from .ballistics import (
-    Domain,
-    GunType,
-    OptimizationTarget,
-    Point,
-    SolutionMethod,
-)
+from . import BOLDSIZE, DESCRIPTION, FONTNAME, FONTSIZE, FigureType, Theme, log_formatter, root_logger
+from .ballistics import Domain, GunType, OptimizationTarget, SolutionMethod
+from .ballistics.config import Material
 from .ballistics.gun import Gun
-from .ballistics.material import Material
 from .ballistics.prop import Composition, Geometry, Propellant, SimpleGeometry
 from .ballistics.recoilless import Recoilless
 from .config import SimulationConfig
@@ -38,13 +22,7 @@ from .dispatch import calculate
 from .file_io import FileIOManager
 from .info_frame import InfoFrame
 from .localized import Descriptive, LocalizableWidget, LocalizedFrame, RowBuilder
-from .misc import (
-    filenameize,
-    format_int_input,
-    resolve_path,
-    round_sig,
-    to_si,
-)
+from .misc import filenameize, format_int_input, resolve_path, round_sig, to_si
 from .mode_manager import ModeManager
 from .nb_frame import NotebookFrame
 from .theme import ThemedMixin
@@ -897,7 +875,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             charge_mass = float(self.chg_kg.get())
             caliber = float(self.cal_mm.get()) * 1e-3
             gun_length = float(self.tbl_mm.get()) * 1e-3
-            load_fraction = charge_mass / chamber_volume / self.prop.rho_p
 
             return SimulationConfig(
                 optimize=self.is_optimization(),
@@ -920,7 +897,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 propellant=self.prop,
                 charge_mass=charge_mass,
                 charge_mass_ratio=charge_mass / float(self.sht_kg.get()),
-                load_fraction=load_fraction,
                 start_pressure=float(self.stp_MPa.get()) * 1e6,
                 design_pressure=float(self.p_tgt.get()) * 1e6,
                 design_velocity=float(self.v_tgt.get()),
@@ -967,37 +943,37 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             self.swap_button.config(state="disabled")
 
     def get_value(self):
+
         if self.job_queue.empty():
             return
-        else:
-            try:
-                while not self.job_queue.empty():
-                    run_cfg, self.gun, self.gun_result, self.guide_results = self.job_queue.get_nowait()
+        try:
+            while not self.job_queue.empty():
+                run_cfg, self.gun, self.gun_result, self.guide_results = self.job_queue.get_nowait()
 
-                sigfig = int(-log10(run_cfg.tolerance)) + 1
-                if run_cfg.constrained:
-                    if isinstance(self.gun, Gun) or isinstance(self.gun, Recoilless):
-                        self.web_mm.set(round_sig(self.gun.geometry.web_thickness * 1e3, n=sigfig))
-                        if not run_cfg.lock_length:
-                            self.tbl_mm.set(round_sig(self.gun.geometry.barrel_length * 1e3, n=sigfig))
-                        self.cv_L.set(round_sig(self.gun.geometry.chamber_volume * 1e3, n=sigfig))
+            sigfig = int(-log10(run_cfg.tolerance)) + 1
+            if run_cfg.constrained:
+                if isinstance(self.gun, Gun) or isinstance(self.gun, Recoilless):
+                    self.web_mm.set(round_sig(self.gun.gcfg.web_thickness * 1e3, n=sigfig))
+                    if not run_cfg.lock_length:
+                        self.tbl_mm.set(round_sig(self.gun.gcfg.barrel_length * 1e3, n=sigfig))
+                    self.cv_L.set(round_sig(self.gun.gcfg.chamber_volume * 1e3, n=sigfig))
 
-                self.info_frame.update_stats(gun=self.gun, gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
-                self.notebook_frame.table_frame.update_table(gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
-                self.notebook_frame.plot_manager.update_main_plot()
-                self.notebook_frame.plot_manager.update_aux_plot()
-                self.notebook_frame.plot_manager.update_guide_graph()
+            self.info_frame.update_stats(gun=self.gun, gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
+            self.notebook_frame.table_frame.update_table(gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
+            self.notebook_frame.plot_manager.update_main_plot()
+            self.notebook_frame.plot_manager.update_aux_plot()
+            self.notebook_frame.plot_manager.update_guide_graph()
 
-            except Exception as e:
-                self.handle_errors(e, level=logging.WARNING)
+        except Exception as e:
+            self.handle_errors(e, level=logging.WARNING)
 
-            finally:
-                """Restore buttons and disinhibit widgets after a computation completes."""
-                self.calc_button.config(state="normal")
-                self.swap_button.config(state="normal")
-                for loc in self.localized_widgets:
-                    loc.disinhibit()
-                self.process = None
+        finally:
+            """Restore buttons and disinhibit widgets after a computation completes."""
+            self.calc_button.config(state="normal")
+            self.swap_button.config(state="normal")
+            for loc in self.localized_widgets:
+                loc.disinhibit()
+            self.process = None
 
     def update_spec(self, *_):
         self.propellant_specs.config(state="normal")

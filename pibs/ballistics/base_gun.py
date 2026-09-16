@@ -1,44 +1,37 @@
 from __future__ import annotations
 
-import json
 import logging
 import math
-from dataclasses import asdict
-from typing import TYPE_CHECKING
 
-from . import JSONable
-from .config import GunGeometry, PropellantLoad, Solver
+from .config import GunConfig, PropellantLoad, SolverConfig
 from .num import dekker
 from .prop import DelegatesPropellant
 
-if TYPE_CHECKING:
-    from .prop import Propellant
 
-
-class BaseGun(DelegatesPropellant, JSONable):
+class BaseGun(DelegatesPropellant):
     def __init__(
         self,
-        geometry: GunGeometry,
+        gcfg: GunConfig,
         load: PropellantLoad,
-        solver: Solver | None = None,
+        solver: SolverConfig,
         logger: logging.Logger | None = None,
     ):
         self.logger = logger if logger else logging.getLogger(__name__)
         super().__init__(propellant=load.propellant)
 
-        self.geometry = geometry
+        self.gcfg = gcfg
         self.load = load
-        self.solver = solver if solver else Solver()
+        self.solver = solver
 
-        self.caliber = geometry.caliber
-        self.e_1 = 0.5 * geometry.web_thickness
+        self.caliber = gcfg.caliber
+        self.e_1 = 0.5 * gcfg.web_thickness
         self.s = (0.5 * self.caliber) ** 2 * math.pi
-        self.m = geometry.shot_mass
+        self.m = gcfg.shot_mass
         self.w = load.charge_mass
-        self.vol_0 = geometry.chamber_volume
+        self.vol_0 = gcfg.chamber_volume
         self.p_0 = load.start_pressure
-        self.l_g = geometry.barrel_length
-        self.chi_k = geometry.chambrage
+        self.l_g = gcfg.barrel_length
+        self.chi_k = gcfg.chambrage
         self.l_0 = self.vol_0 / self.s
         self.l_c = self.l_0 / self.chi_k
         self.delta = self.w / self.vol_0
@@ -67,35 +60,6 @@ class BaseGun(DelegatesPropellant, JSONable):
             / (self.f * self.phi * self.w * self.m * self.u_1**2)
             * (self.f * self.delta) ** (2 * (1 - self.n))
         )
-
-    def to_json(self) -> str:
-        return json.dumps(
-            {
-                "geometry": asdict(self.geometry),
-                "load": {
-                    "charge_mass": self.w,
-                    "start_pressure": self.p_0,
-                    "propellant": json.loads(self.propellant.to_json()),
-                },
-                "solver": asdict(self.solver),
-            },
-            ensure_ascii=False,
-        )
-
-    @classmethod
-    def from_json(cls, json_dict: dict) -> BaseGun:
-        from .prop import Propellant
-
-        geometry = GunGeometry(**json_dict["geometry"])
-        load_data = json_dict["load"]
-        load = PropellantLoad(
-            propellant=Propellant.from_json(load_data["propellant"]),
-            charge_mass=load_data["charge_mass"],
-            start_pressure=load_data["start_pressure"],
-        )
-        solver = Solver(**json_dict.get("solver", {}))
-
-        return cls(geometry=geometry, load=load, solver=solver)
 
     @staticmethod
     def barrel_monoblock(

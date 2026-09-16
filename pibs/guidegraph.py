@@ -9,7 +9,7 @@ import psutil
 from tqdm import tqdm
 
 from .ballistics import GunType, Point
-from .ballistics.constrained import Constrained
+from .ballistics.constr import Constrained
 from .ballistics.gun import Gun
 from .ballistics.recoilless import Recoilless
 
@@ -65,8 +65,8 @@ def f(
 
         chamber_volume = charge_mass / load_density
 
-        geo = replace(
-            target.geometry,
+        gcfg = replace(
+            target.gcfg,
             web_thickness=2 * half_web,
             barrel_length=length_gun,
             chamber_volume=chamber_volume,
@@ -76,7 +76,7 @@ def f(
         nozzle = getattr(target, "nozzle", None)
         if nozzle is not None:
             gun = gun_class(
-                geometry=geo,
+                gcfg=gcfg,
                 load=load,
                 nozzle=nozzle,
                 solver=target.solver,
@@ -84,7 +84,7 @@ def f(
             )
         else:
             gun = gun_class(
-                geometry=geo,
+                gcfg=gcfg,
                 load=load,
                 solver=target.solver,
                 logger=logger,
@@ -170,7 +170,5 @@ def guide_graph(
                 **tqdm_kwargs,
             ),
         )
-
-    # return [result for result in results if result[2]]
 
     return GuideResults(lines=[result for result in results if result is not None])

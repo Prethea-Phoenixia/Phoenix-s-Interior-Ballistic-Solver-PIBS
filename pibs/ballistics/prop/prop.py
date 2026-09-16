@@ -8,37 +8,17 @@ GEOMETRIES:
 from __future__ import annotations
 
 import csv
-import json
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumType
-from functools import wraps
 from math import pi
 
-from .. import JSONable
 
-
-class Geometry(ABC, JSONable):
+class Geometry(ABC):
     all_geometries: list[Geometry] = []
 
     def __init__(self, desc: str):
         self.desc = desc
         Geometry.all_geometries.append(self)
-
-    @classmethod
-    def from_json(cls, json_dict: dict) -> Geometry:
-        desc = json_dict["desc"]
-        for geometry in Geometry.all_geometries:
-            if geometry.desc == desc:
-                return geometry
-        raise ValueError(f"unknown desc: {desc}")
-
-    def to_json(self) -> str:
-        return json.dumps(
-            {
-                "desc": self.desc,
-            },
-            ensure_ascii=False,
-        )
 
     @abstractmethod
     def get_form_function_coefficients(self, r1: float, r2: float) -> tuple[float, float, float, float, float, float]:
@@ -211,26 +191,6 @@ class Composition:
     def __str__(self):
         return self.name
 
-    def to_json(self) -> str:
-        return json.dumps(
-            {
-                "name": self.name,
-                "desc": self.desc,
-                "force": self.f,
-                "covolume": self.alpha,
-                "density": self.rho_p,
-                "reduced_adiabatic_index": self.theta,
-                "burn_rate_coefficient": self.u_1,
-                "pressure_exponent": self.n,
-                "adiabatic_flame_temperature": self.temp_v,
-            },
-            ensure_ascii=False,
-        )
-
-    @classmethod
-    def from_json(cls, json_dict: dict) -> Composition:
-        return cls(**json_dict)
-
     @staticmethod
     def read_file(file_name: str):
         compositions = []
@@ -292,7 +252,7 @@ class Composition:
         return name_composition_dict
 
 
-class Propellant(JSONable):
+class Propellant:
     def __init__(
         self,
         composition: Composition,
@@ -375,37 +335,6 @@ class Propellant(JSONable):
 
         if self.mass_ratio > 0 and z_b2 > self.z_b / self.web_ratio:
             raise ValueError("Auxiliary grains must complete combustion in advance of the primary grains.")
-
-    def to_json(self) -> str:
-        return json.dumps(
-            {
-                "composition": json.loads(self.composition.to_json()),
-                "main_geom": json.loads(self.geometry.to_json()),
-                "main_r1": self.main_r1,
-                "main_r2": self.main_r2,
-                "aux_geom": json.loads(self.aux_geom.to_json()),
-                "aux_r1": self.aux_r1,
-                "aux_r2": self.aux_r2,
-                "web_ratio": self.web_ratio,
-                "mass_ratio": self.mass_ratio,
-                "combustible_fraction": self.combustible_fraction,
-                "combustible_force": self.combustible_force,
-                "force_fudge": self.force_fudge,
-            },
-            ensure_ascii=False,
-        )
-
-    @classmethod
-    def from_json(cls, json_dict: dict) -> Propellant:
-        deserialized_dict = {}
-        for key, value in json_dict.items():
-            if key in ("composition",):
-                value = Composition.from_json(value)
-            if key in ("main_geom", "aux_geom"):
-                value = Geometry.from_json(value)
-            deserialized_dict[key] = value
-
-        return cls(**deserialized_dict)
 
     @property
     def f(self) -> float:

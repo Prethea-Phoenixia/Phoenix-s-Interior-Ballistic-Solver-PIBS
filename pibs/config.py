@@ -4,11 +4,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .ballistics import Domain, GunType, OptimizationTarget, Point, SolutionMethod
-from .ballistics.config import DesignConstraint, PropellantLoad, Solver, Structural
-from .ballistics.gun import GunGeometry
-from .ballistics.material import Material
+from .ballistics.config import DesignConstraint, Material, PropellantLoad, SolverConfig, StructuralConfig
+from .ballistics.gun import GunConfig
 from .ballistics.prop import Propellant
-from .ballistics.recoilless import Nozzle
+from .ballistics.recoilless import NozzleConfig
 
 
 @dataclass
@@ -30,7 +29,6 @@ class SimulationConfig:
     pressure_control_point: Point
     optimization_target: OptimizationTarget
 
-    # Geometry
     caliber: float
     shot_mass: float
     gun_length: float
@@ -44,7 +42,6 @@ class SimulationConfig:
     propellant: Propellant
     charge_mass: float
     charge_mass_ratio: float
-    load_fraction: float
     start_pressure: float
 
     # Constraints
@@ -74,47 +71,59 @@ class SimulationConfig:
     # Runtime-injected (not from UI)
     logger: Any = field(default=None, repr=False)
 
-
-def sim_config_to_ballistics(cfg: SimulationConfig):
-    geometry = GunGeometry(
-        caliber=cfg.caliber,
-        shot_mass=cfg.shot_mass,
-        barrel_length=cfg.gun_length,
-        chamber_volume=cfg.chamber_volume,
-        web_thickness=cfg.web,
-        chambrage=cfg.chambrage,
-    )
-    load = PropellantLoad(
-        propellant=cfg.propellant,
-        charge_mass=cfg.charge_mass,
-        start_pressure=cfg.start_pressure,
-    )
-    solver = Solver(
-        tolerance=cfg.tolerance,
-        max_iterations=cfg.max_iterations,
-        solution_method=cfg.solution_method,
-        drag_coefficient=cfg.drag_coefficient,
-    )
-
-    structural = (
-        Structural(
-            material=cfg.structural_material,
-            safety_factor=cfg.structural_safety_factor,
-            autofrettage=cfg.autofrettage,
+    @property
+    def gcfg(self) -> GunConfig:
+        return GunConfig(
+            caliber=self.caliber,
+            shot_mass=self.shot_mass,
+            barrel_length=self.gun_length,
+            chamber_volume=self.chamber_volume,
+            web_thickness=self.web,
+            chambrage=self.chambrage,
         )
-        if cfg.structural_material
-        else None
-    )
 
-    design = DesignConstraint(
-        design_pressure=cfg.design_pressure,
-        design_velocity=cfg.design_velocity,
-        min_web=cfg.min_web,
-        max_length=cfg.max_length,
-        pressure_control=cfg.pressure_control_point,
-    )
-    nozzle = Nozzle(
-        expansion_ratio=cfg.nozzle_expansion,
-        efficiency=cfg.nozzle_efficiency,
-    )
-    return geometry, load, solver, structural, design, nozzle
+    @property
+    def load(self) -> PropellantLoad:
+        return PropellantLoad(
+            propellant=self.propellant,
+            charge_mass=self.charge_mass,
+            start_pressure=self.start_pressure,
+        )
+
+    @property
+    def solver(self) -> SolverConfig:
+        return SolverConfig(
+            tolerance=self.tolerance,
+            max_iterations=self.max_iterations,
+            solution_method=self.solution_method,
+            drag_coefficient=self.drag_coefficient,
+        )
+
+    @property
+    def structural(self) -> StructuralConfig | None:
+        return (
+            StructuralConfig(
+                material=self.structural_material,
+                safety_factor=self.structural_safety_factor,
+                autofrettage=self.autofrettage,
+            )
+            if self.structural_material
+            else None
+        )
+
+    @property
+    def design(self) -> DesignConstraint:
+        return DesignConstraint(
+            design_pressure=self.design_pressure,
+            design_velocity=self.design_velocity,
+            min_web=self.min_web,
+            max_length=self.max_length,
+            pressure_control=self.pressure_control_point,
+        )
+
+    @property
+    def nozzle(self) -> NozzleConfig:
+        return NozzleConfig(
+            expansion_ratio=self.nozzle_expansion,
+            efficiency=self.nozzle_efficiency,
+        )

@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-import json
-import logging
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from math import inf, pi, tan
-from typing import Callable
 
 from . import (
     Domain,
     Point,
 )
 from .base_gun import BaseGun
-from .config import GunGeometry, Nozzle, PropellantLoad, Solver, Structural
+from .config import GunConfig, NozzleConfig, PropellantLoad, SolverConfig, StructuralConfig
 from .gun import GenericEntry, GenericResult, OutlineEntry, PressureProbePoint, PressureTraceEntry
-from .material import Material
 from .num import dekker, find_last_le, gss, merge_sorted_records, rkf
 
 
@@ -34,14 +30,14 @@ class RecoillessResult(GenericResult):
 class Recoilless(BaseGun):
     def __init__(
         self,
-        geometry: GunGeometry,
+        gcfg: GunConfig,
         load: PropellantLoad,
-        nozzle: Nozzle,
-        solver: Solver | None = None,
+        nozzle: NozzleConfig,
+        solver: SolverConfig,
         logger=None,
     ):
         super().__init__(
-            geometry=geometry,
+            gcfg=gcfg,
             load=load,
             solver=solver,
             logger=logger,
@@ -70,15 +66,6 @@ class Recoilless(BaseGun):
                 "Achieving recoilless condition necessitates a larger throat area than could be fit into breech face."
             )
         self.s_j = self.s_j_bar * self.s
-
-    def to_json(self) -> str:
-        return json.dumps(
-            {
-                **json.loads(super().to_json()),
-                "nozzle": asdict(self.nozzle),
-            },
-            ensure_ascii=False,
-        )
 
     def f_p_bar(self, z: float, l_bar: float, eta: float, tau: float, psi: None | float = None) -> float:
         psi = psi if psi else self.f_psi_z(z)
@@ -150,7 +137,7 @@ class Recoilless(BaseGun):
         tol: float | None = None,
         dom: Domain = Domain.TIME,
     ) -> RecoillessResult:
-        tol = tol if tol is not None else self.tol
+        tol: float = tol or self.tol
 
         bar_data = []
         t_scale = self.l_0 / self.v_j
@@ -163,10 +150,10 @@ class Recoilless(BaseGun):
         # Phase 1: Integrate to burnout or exit
         p_bar_max = 1e9 / p_scale  # 1 GPa
 
-        def abort_condition(z, tlv_eta_tau, _):
-            _, l_bar, v_bar, eta, tau = tlv_eta_tau
-            p_bar = self.f_p_bar(z, l_bar, eta, tau)
-            return l_bar > l_g_bar or p_bar > p_bar_max  # or p_bar < 0
+        def abort_condition(_z, t_l_v_eta_tau, _):
+            _, _l_bar, _v_bar, _eta, _tau = t_l_v_eta_tau
+            _p_bar = self.f_p_bar(_z, _l_bar, _eta, _tau)
+            return _l_bar > l_g_bar or _p_bar > p_bar_max  # or p_bar < 0
 
         z_record = [(z_0, (0, 0, 0, 0, 1))]
 
@@ -236,38 +223,38 @@ class Recoilless(BaseGun):
             )
 
         # Peak finding
-        def func_p_z(z: float, tag: Point) -> tuple[float, tuple[float, float, float, float, float]]:
-            i = find_last_le(z_record, z)
-            x = z_record[i][0]
-            ys = z_record[i][1]
+        def func_p_z(_z: float, tag: Point) -> tuple[float, tuple[float, float, float, float, float, float]]:
+            _i = find_last_le(z_record, _z)
+            _x = z_record[_i][0]
+            _ys = z_record[_i][1]
 
             r = []
-            t_bar, l_bar, v_bar, eta, tau = rkf(self.ode_z, ys, x, z, rel_tol=tol, record=r)[1]
+            _t_bar, _l_bar, _v_bar, _eta, _tau = rkf(self.ode_z, _ys, _x, _z, rel_tol=tol, record=r)[1]
             merge_sorted_records(z_record, r)
 
-            p_bar = self.f_p_bar(z, l_bar, eta, tau)
+            _p_bar = self.f_p_bar(_z, _l_bar, _eta, _tau)
 
             if tag == Point.PEAK_AVG:
-                return p_bar, (z, t_bar, l_bar, v_bar, eta, tau)
+                return _p_bar, (_z, _t_bar, _l_bar, _v_bar, _eta, _tau)
 
-            ps, p0, pb, _, _ = self.to_ps_p0_pb_vb_stag(
-                l_bar * self.l_0, v_bar * self.v_j, p_bar * self.f * self.delta, tau, eta
+            _ps, _p0, _pb, _, _ = self.to_ps_p0_pb_vb_stag(
+                _l_bar * self.l_0, _v_bar * self.v_j, _p_bar * self.f * self.delta, _tau, _eta
             )
 
-            ps_bar = ps / (self.f * self.delta)
-            p0_bar = p0 / (self.f * self.delta)
-            pb_bar = pb / (self.f * self.delta)
+            ps_bar = _ps / (self.f * self.delta)
+            p0_bar = _p0 / (self.f * self.delta)
+            pb_bar = _pb / (self.f * self.delta)
             if tag == Point.PEAK_BREECH:
-                return pb_bar, (z, t_bar, l_bar, v_bar, eta, tau)
+                return pb_bar, (_z, _t_bar, _l_bar, _v_bar, _eta, _tau)
             elif tag == Point.PEAK_STAG:
-                return p0_bar, (z, t_bar, l_bar, v_bar, eta, tau)
+                return p0_bar, (_z, _t_bar, _l_bar, _v_bar, _eta, _tau)
             elif tag == Point.PEAK_SHOT:
-                return ps_bar, (z, t_bar, l_bar, v_bar, eta, tau)
+                return ps_bar, (_z, _t_bar, _l_bar, _v_bar, _eta, _tau)
             else:
                 raise ValueError("tag not handled.")
 
         def find_peak(tag: Point) -> None:
-            z_p = 0.5 * sum(gss(lambda z: func_p_z(z, tag)[0], z_0, z_end, x_tol=tol, find_min=False))
+            z_p = 0.5 * sum(gss(lambda _z: func_p_z(_z, tag)[0], z_0, z_end, x_tol=tol, find_min=False))
             _, (z_p, t_bar_p, l_bar_p, v_bar_p, eta_p, tau_p) = func_p_z(z_p, tag)
             self.append_bar_data(
                 bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p, eta=eta_p, tau=tau_p
@@ -462,19 +449,21 @@ class Recoilless(BaseGun):
     def structure(
         self,
         recoilless_result: RecoillessResult,
-        structural: Structural,
+        structural: StructuralConfig | None,
         step: int = 33,
         tol: float | None = None,
     ) -> None:
-        tol = tol if tol is not None else self.tol
+        tol = tol or self.tol
         step = max(step, 1)
+
+        if structural is None:
+            self.logger.info("Structure calculation skipped, no material specified.")
+            return
+
         l_c = self.l_c
         l_g = self.l_g
 
         structural_material = structural.material
-        if structural_material is None:
-            raise ValueError("No structural material provided")
-
         sigma = structural_material.yield_strength
         s = self.s
         gamma = self.theta + 1

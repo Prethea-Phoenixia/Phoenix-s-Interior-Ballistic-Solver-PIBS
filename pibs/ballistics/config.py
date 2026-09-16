@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from . import VALID_PRESSURE_POINTS, VALID_SOLUTION_METHODS, Point, SolutionMethod
 
 if TYPE_CHECKING:
-    from .material import Material
     from .prop import Propellant
 
 
@@ -31,13 +30,13 @@ def _one_of(name: str, value: str, options: tuple) -> None:
 
 
 @dataclass
-class GunGeometry:
+class GunConfig:
     caliber: float
     shot_mass: float
-    barrel_length: float = 0.0
-    chamber_volume: float = 0.0
-    web_thickness: float = 0.0
-    chambrage: float = 2.0
+    barrel_length: float
+    chamber_volume: float
+    web_thickness: float
+    chambrage: float
 
     def __post_init__(self):
         _positive("caliber", self.caliber)
@@ -51,8 +50,8 @@ class GunGeometry:
 @dataclass
 class PropellantLoad:
     propellant: Propellant
-    charge_mass: float = 0.0
-    start_pressure: float = 0.0
+    charge_mass: float
+    start_pressure: float
 
     def __post_init__(self):
         _non_negative("charge_mass", self.charge_mass)
@@ -60,9 +59,9 @@ class PropellantLoad:
 
 
 @dataclass
-class Nozzle:
-    expansion_ratio: float = 0.0
-    efficiency: float = 0.92
+class NozzleConfig:
+    expansion_ratio: float
+    efficiency: float
 
     def __post_init__(self):
         _non_negative("expansion_ratio", self.expansion_ratio)
@@ -71,11 +70,11 @@ class Nozzle:
 
 @dataclass
 class DesignConstraint:
-    design_pressure: float = 0.0
-    design_velocity: float = 0.0
-    min_web: float = 1e-6
-    max_length: float = 1e3
-    pressure_control: Point = Point.PEAK_BREECH
+    design_pressure: float
+    design_velocity: float
+    min_web: float
+    max_length: float
+    pressure_control: Point
 
     def __post_init__(self):
         _non_negative("design_pressure", self.design_pressure)
@@ -86,11 +85,11 @@ class DesignConstraint:
 
 
 @dataclass
-class Solver:
-    tolerance: float = 1e-5
-    max_iterations: int = 10
-    solution_method: SolutionMethod = SolutionMethod.PIDDUCK
-    drag_coefficient: float = 0.0
+class SolverConfig:
+    tolerance: float
+    max_iterations: int
+    solution_method: SolutionMethod
+    drag_coefficient: float
 
     def __post_init__(self):
         _positive("tolerance", self.tolerance)
@@ -100,10 +99,17 @@ class Solver:
 
 
 @dataclass
-class Structural:
-    material: Material | None = None
-    safety_factor: float = 1.35
-    autofrettage: bool = False
+class StructuralConfig:
+    material: Material
+    safety_factor: float
+    autofrettage: bool
 
     def __post_init__(self):
         _positive("safety_factor", self.safety_factor)
+
+
+class Material:
+    def __init__(self, density: float, yield_strength: float, desc: str = ""):
+        self.desc = desc
+        self.yield_strength = yield_strength
+        self.density = density

@@ -1,66 +1,41 @@
 from __future__ import annotations
 
-import json
+import abc
 import logging
 import math
-from dataclasses import asdict
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Callable
 
-from . import JSONable, OptimizationTarget
-from .config import DesignConstraint, GunGeometry, PropellantLoad, Solver
+from . import OptimizationTarget
+from .config import DesignConstraint, GunConfig, PropellantLoad, SolverConfig
 from .num import gss
 from .prop import DelegatesPropellant
 
-if TYPE_CHECKING:
-    from .prop import Propellant
 
-
-def probe_func(
-    func: Callable[[float], Any],
-    start: float,
-    stop: float,
-    tol: float,
-    exceptions: tuple[type[Exception], ...] = (ValueError,),
-) -> float:
-    delta = stop - start
-    probe = new_probe = start
-    while abs(2 * delta) > tol:
-        try:
-            func(new_probe)
-            probe = new_probe
-        except exceptions:
-            delta *= 0.5
-        finally:
-            new_probe = probe + delta
-
-    return probe
-
-
-class Constrained(DelegatesPropellant, JSONable):
+class Constrained(DelegatesPropellant, abc.ABC):
     def __init__(
         self,
-        geometry: GunGeometry,
+        gcfg: GunConfig,
         load: PropellantLoad,
         design: DesignConstraint,
-        solver: Solver | None = None,
+        solver: SolverConfig,
         logger: logging.Logger | None = None,
     ):
         self.logger = logger if logger else logging.getLogger(__name__)
         super().__init__(propellant=load.propellant)
 
-        self.geometry = geometry
+        self.gcfg = gcfg
         self.load = load
         self.design = design
-        self.solver = solver if solver else Solver()
+        self.solver = solver
 
         if any(
             (
-                geometry.caliber <= 0,
-                geometry.shot_mass <= 0,
+                gcfg.caliber <= 0,
+                gcfg.shot_mass <= 0,
                 load.start_pressure <= 0,
                 self.solver.drag_coefficient < 0,
                 self.solver.drag_coefficient >= 1,
-                geometry.chambrage < 1,
+                gcfg.chambrage < 1,
             )
         ):
             raise ValueError("Invalid parameters for constrained design")
@@ -68,10 +43,10 @@ class Constrained(DelegatesPropellant, JSONable):
         if any((design.design_pressure <= 0, design.design_velocity <= 0)):
             raise ValueError("Invalid design constraint")
 
-        self.caliber = geometry.caliber
+        self.caliber = gcfg.caliber
 
-        self.s = (geometry.caliber / 2) ** 2 * math.pi
-        self.m = geometry.shot_mass
+        self.s = (gcfg.caliber / 2) ** 2 * math.pi
+        self.m = gcfg.shot_mass
         self.p_0 = load.start_pressure
         self.phi_1 = 1 / (1 - self.solver.drag_coefficient)
 
@@ -81,73 +56,47 @@ class Constrained(DelegatesPropellant, JSONable):
         self.min_web = design.min_web
         self.max_length = design.max_length
 
-        self.chi_k = geometry.chambrage
+        self.chi_k = gcfg.chambrage
         self.tol = self.solver.tolerance
-
-    def to_json(self) -> str:
-        return json.dumps(
-            {
-                "geometry": asdict(self.geometry),
-                "load": {
-                    "start_pressure": self.p_0,
-                    "propellant": json.loads(self.propellant.to_json()),
-                },
-                "design": asdict(self.design),
-                "solver": asdict(self.solver),
-            },
-            ensure_ascii=False,
-        )
-
-    @classmethod
-    def from_json(cls, json_dict: dict) -> Constrained:
-        from .prop import Propellant
-
-        geometry = GunGeometry(**json_dict["geometry"])
-        load_data = json_dict["load"]
-        load = PropellantLoad(
-            propellant=Propellant.from_json(load_data["propellant"]),
-            start_pressure=load_data["start_pressure"],
-        )
-        design = DesignConstraint(**json_dict["design"])
-        solver = Solver(**json_dict.get("solver", {}))
-
-        return cls(geometry=geometry, load=load, design=design, solver=solver)
 
     def solve(
         self,
-        *,
         load_fraction: float,
         charge_mass_ratio: float,
+        known_bore: bool,
         length_gun: float | None = None,
-        known_bore: bool = False,
-        max_iterations: int | None = None,
-        labda_1: float | None = None,
-        labda_2: float | None = None,
-        cc: float | None = None,
-        it: int = 0,
     ) -> tuple[float, float]:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     @staticmethod
     def validate_solve_inputs(solve):
         def wrapped_solve(
             self: Constrained,
-            *,
             load_fraction: float,
             charge_mass_ratio: float,
+            known_bore: bool,
+            length_gun: float | None = None,
             **kwargs,
         ):
-            if charge_mass_ratio <= 0:
-                raise ValueError("Charge mass to projectile ratio must be positive")
-
             if load_fraction < self.minimum_load_fraction:
                 raise ValueError(
                     "Design pressure cannot be achieved, in the limit of closed bomb operation, at the current load fraction."
                 )
             if load_fraction >= 1:
-                raise ValueError("Chamber is overfull (load fraction >= 1).")
+                raise ValueError("Chamber is overfull.")
 
-            return solve(self, load_fraction=load_fraction, charge_mass_ratio=charge_mass_ratio, **kwargs)
+            if known_bore:
+                if length_gun is None:
+                    raise ValueError("known_bore option requires length_gun")
+
+            return solve(
+                self,
+                load_fraction=load_fraction,
+                charge_mass_ratio=charge_mass_ratio,
+                known_bore=known_bore,
+                length_gun=length_gun,
+                **kwargs,
+            )
 
         return wrapped_solve
 
@@ -170,9 +119,22 @@ class Constrained(DelegatesPropellant, JSONable):
         return _f
 
     def maximum_load_fraction(self, charge_mass_ratio: float) -> float:
-        return probe_func(
-            self.get_f(charge_mass_ratio), start=self.minimum_load_fraction, stop=1 - self.tol, tol=self.tol
-        )
+        f = self.get_f(charge_mass_ratio)
+        start = self.minimum_load_fraction
+        stop = 1 - self.tol
+        tol = self.tol
+        delta = stop - start
+        probe = new_probe = start
+        while abs(2 * delta) > tol:
+            try:
+                f(new_probe)
+                probe = new_probe
+            except ValueError:
+                delta *= 0.5
+            finally:
+                new_probe = probe + delta
+
+        return probe
 
     def validate_load_fraction(
         self, charge_mass_ratio: float, proposed_lfs: list[float]
@@ -219,6 +181,7 @@ class Constrained(DelegatesPropellant, JSONable):
         lf_low, lf_high = gss(
             lambda load_fraction: _f(load_fraction)[_f_index], low, high, x_tol=self.tol, find_min=True
         )
+
         lf = 0.5 * (lf_high + lf_low)
         e_1 = _f(lf)[0]
         l_g = _f(lf)[1]

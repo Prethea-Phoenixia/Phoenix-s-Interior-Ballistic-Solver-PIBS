@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
 import logging
-from dataclasses import asdict
 
 from . import Point
-from .config import DesignConstraint, GunGeometry, Nozzle, PropellantLoad, Solver
-from .constrained import Constrained
+from .config import DesignConstraint, GunConfig, NozzleConfig, PropellantLoad, SolverConfig
+from .constr import Constrained
 from .num import dekker, find_last_le, gss, merge_sorted_records, rkf
 from .recoilless import Recoilless
 
@@ -14,15 +12,15 @@ from .recoilless import Recoilless
 class ConstrainedRecoilless(Constrained):
     def __init__(
         self,
-        geometry: GunGeometry,
+        gcfg: GunConfig,
         load: PropellantLoad,
         design: DesignConstraint,
-        nozzle: Nozzle,
-        solver: Solver | None = None,
+        nozzle: NozzleConfig,
+        solver: SolverConfig,
         logger: logging.Logger | None = None,
     ):
         super().__init__(
-            geometry=geometry,
+            gcfg=gcfg,
             load=load,
             design=design,
             solver=solver,
@@ -37,23 +35,13 @@ class ConstrainedRecoilless(Constrained):
         self.chi_0 = nozzle.efficiency
         self.a_bar = nozzle.expansion_ratio
 
-    def to_json(self) -> str:
-        return json.dumps(
-            {
-                **json.loads(super().to_json()),
-                "nozzle": asdict(self.nozzle),
-            },
-            ensure_ascii=False,
-        )
-
     @Constrained.validate_solve_inputs
     def solve(
         self,
-        *,
         load_fraction: float,
         charge_mass_ratio: float,
-        length_gun: float | None = None,
         known_bore: bool = False,
+        length_gun: float | None = None,
     ) -> tuple[float, float]:
 
         w = self.m * charge_mass_ratio
@@ -76,7 +64,7 @@ class ConstrainedRecoilless(Constrained):
 
         phi_2 = 1
         c_a = (0.5 * self.theta * phi * self.m / w) ** 0.5 * k_0 * phi_2
-        v_j = (2 * self.f * w / (self.theta * phi * self.m)) ** 0.5
+        v_j: float = (2 * self.f * w / (self.theta * phi * self.m)) ** 0.5
 
         t_scale = l_0 / v_j
 
@@ -222,11 +210,11 @@ class ConstrainedRecoilless(Constrained):
             return e_1_solved, length_gun
 
         v_bar_d = self.v_d / v_j
-        dp_bar_i, *vals_1 = func_p_e1(e_1_solved)
-        t_bar_i, (z_i, l_bar_i, v_bar_i, eta_i, tau_i) = vals_1
+        dp_bar_i, t_bar_i, (z_i, l_bar_i, v_bar_i, eta_i, tau_i) = func_p_e1(e_1_solved)
 
         if v_bar_i > v_bar_d:
-            raise ValueError(f"Design velocity exceeded before peak pressure point (V = {v_bar_i * v_j:.4g} m/s).")
+            v = v_bar_i * v_j
+            raise ValueError(f"Design velocity exceeded before peak pressure point (V = {v:.4g} m/s).")
 
         b = (
             (self.s**2 * e_1_solved**2)
@@ -262,8 +250,8 @@ class ConstrainedRecoilless(Constrained):
         try:
             v_bar_g, (t_bar_g, z_g, l_bar_g, eta_g, tau_g), _ = rkf(
                 d_func=ode_v,
-                ini_val=(t_bar_i, z_i, l_bar_i, eta_i, tau_i),
-                x_0=v_bar_i,
+                ini_val=v_t_z_l_eta_tau_record[-1][1],
+                x_0=v_t_z_l_eta_tau_record[-1][0],
                 x_1=v_bar_d,
                 rel_tol=self.tol,
                 abort_func=abort_v,
@@ -285,7 +273,7 @@ class ConstrainedRecoilless(Constrained):
         p_bar_g = f_p_bar_control(z_g, l_bar_g, v_bar_g, eta_g, tau_g)
 
         v_g = v_bar_g * v_j
-        l_g = l_bar_g * l_0
+        l_g: float = l_bar_g * l_0
         p_g = p_bar_g * self.f * delta
 
         if l_bar_g > l_bar_d:

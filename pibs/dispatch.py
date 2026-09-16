@@ -4,11 +4,11 @@ import traceback
 from logging.handlers import QueueHandler
 
 from .ballistics import GunType
-from .ballistics.cons_gun import ConstrainedGun
-from .ballistics.cons_rcl import ConstrainedRecoilless
+from .ballistics.constr_gun import ConstrainedGun
+from .ballistics.constr_rcl import ConstrainedRecoilless
 from .ballistics.gun import Gun
 from .ballistics.recoilless import Recoilless
-from .config import SimulationConfig, sim_config_to_ballistics
+from .config import SimulationConfig
 from .guidegraph import guide_graph
 
 
@@ -20,7 +20,6 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
     gun, gun_result, guide_results = None, None, None
     try:
         cfg.logger = logger
-        geo, load, solver, struct, design, nozzle = sim_config_to_ballistics(cfg)
 
         """
         - constrained -> match: velocity & pressure
@@ -33,59 +32,71 @@ def calculate(job_queue, log_queue, cfg: SimulationConfig):
 
         if cfg.constrained:
             if cfg.gun_type == GunType.CONVENTIONAL:
-                constrained = ConstrainedGun(geometry=geo, load=load, design=design, solver=solver, logger=logger)
+                constrained = ConstrainedGun(
+                    gcfg=cfg.gcfg, load=cfg.load, design=cfg.design, solver=cfg.solver, logger=logger
+                )
             elif cfg.gun_type == GunType.RECOILLESS:
                 constrained = ConstrainedRecoilless(
-                    geometry=geo, load=load, design=design, nozzle=nozzle, solver=solver, logger=logger
+                    gcfg=cfg.gcfg,
+                    load=cfg.load,
+                    design=cfg.design,
+                    nozzle=cfg.nozzle,
+                    solver=cfg.solver,
+                    logger=logger,
                 )
             else:
                 raise ValueError("unknown gun type")
 
             if cfg.optimize:  # constrained + optimize
-                l_f, e_1, l_g = constrained.find_min_v(
+                lf, e_1, l_g = constrained.find_min_v(
                     charge_mass_ratio=cfg.charge_mass_ratio,
                     opt_target=cfg.optimization_target,
                 )
-                cfg.load_fraction = l_f
-                cfg.chamber_volume = cfg.charge_mass / cfg.propellant.rho_p / cfg.load_fraction
+                cfg.chamber_volume = cfg.charge_mass / cfg.propellant.rho_p / lf
 
             else:  # constrained and constrained + lock_length
                 e_1, l_g = constrained.solve(
-                    load_fraction=cfg.load_fraction,
+                    load_fraction=cfg.charge_mass / cfg.chamber_volume / cfg.propellant.rho_p,
                     charge_mass_ratio=cfg.charge_mass_ratio,
-                    length_gun=geo.barrel_length,
+                    length_gun=cfg.gcfg.barrel_length,
                     known_bore=cfg.lock_length,
                 )
 
-            geo.web_thickness = 2 * e_1  # update web in all cases.
+            cfg.web = 2 * e_1  # update web in all cases.
             if not cfg.lock_length:
-                geo.barrel_length = l_g
+                cfg.gun_length = l_g
 
         if cfg.gun_type == GunType.CONVENTIONAL:
-            gun = Gun(geometry=geo, load=load, solver=solver, logger=logger)
+            gun = Gun(gcfg=cfg.gcfg, load=cfg.load, solver=cfg.solver, logger=logger)
         elif cfg.gun_type == GunType.RECOILLESS:
-            gun = Recoilless(geometry=geo, load=load, nozzle=nozzle, solver=solver, logger=logger)
+            gun = Recoilless(gcfg=cfg.gcfg, load=cfg.load, nozzle=cfg.nozzle, solver=cfg.solver, logger=logger)
         else:
             raise ValueError("unknown gun type")
 
         gun_result = gun.integrate(step=cfg.step, dom=cfg.domain)
+        gun.structure(gun_result, structural=cfg.structural, step=cfg.step)
 
-        if struct:
-            gun.structure(gun_result, structural=struct, step=cfg.step)
-
-        # Guide graph calculation
-        if cfg.compute_guide:
+        # guide graph calculation
+        if cfg.compute_guide and (cfg.constrained and not cfg.lock_length):
             try:
-                logger.info("guidance diagram calculation started")
+
                 if cfg.gun_type == GunType.CONVENTIONAL:
-                    target = ConstrainedGun(geometry=geo, load=load, design=design, solver=solver, logger=logger)
+                    target = ConstrainedGun(
+                        gcfg=cfg.gcfg, load=cfg.load, design=cfg.design, solver=cfg.solver, logger=logger
+                    )
                 elif cfg.gun_type == GunType.RECOILLESS:
                     target = ConstrainedRecoilless(
-                        geometry=geo, load=load, design=design, nozzle=nozzle, solver=solver, logger=logger
+                        gcfg=cfg.gcfg,
+                        load=cfg.load,
+                        design=cfg.design,
+                        nozzle=cfg.nozzle,
+                        solver=cfg.solver,
+                        logger=logger,
                     )
                 else:
                     raise ValueError("unknown gun type")
 
+                logger.info("guidance diagram calculation started")
                 guide_results = guide_graph(
                     target=target,
                     gun_type=cfg.gun_type,

@@ -25,7 +25,7 @@ def generate_executables(mult_file: bool = False):
     ] + (["--onefile"] if not mult_file else [])
 
     subprocess.run(["pyi-makespec"] + options, check=True)
-    
+
     new_hook = """{
         "matplotlib": {
             "backends": "TkAgg",
@@ -39,8 +39,36 @@ def generate_executables(mult_file: bool = False):
     with open(name + ".spec", "w") as f:
         f.write(stuff)
 
-    subprocess.run(["pyinstaller", f"{name}.spec", "--noconfirm", "--clean"], check=True)
+#     with open(name + ".spec", "r") as f:
+#         content = f.readlines()
+#
+#     i = content.index("pyz = PYZ(a.pure)\n")
+#
+#     dll_exclusion = """# exclude excessive DLL collected by pyinstaller
+# key_words = ['api-ms-win', 'ucrtbase']
+# new_binaries = []
+# excluded = []
+# for item in a.binaries:
+#     name, _, _ = item
+#     to_include = True
+#     for key_word in key_words:
+#         if key_word in name:
+#             to_include = False
+#     if to_include:
+#         new_binaries.append(item)
+#     else:
+#         excluded.append(item)
+#
+# a.binaries = new_binaries"""
+#
+#     for line in dll_exclusion.split("\n"):
+#         content.insert(i, line + "\n")
+#         i += 1
+#
+#     with open(name + ".spec", "w") as f:
+#         f.writelines(content)
 
+    subprocess.run(["pyinstaller", f"{name}.spec", "--noconfirm", "--clean"], check=True)
 
 
 if __name__ == "__main__":

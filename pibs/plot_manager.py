@@ -432,7 +432,6 @@ class PlotManager:
 
     def update_guide_graph(self):
         """Guide graph with contours."""
-        import tkinter.ttk as ttk
 
         style = ttk.Style(self.frame)
         fgc = str(style.lookup("TFrame", "foreground"))

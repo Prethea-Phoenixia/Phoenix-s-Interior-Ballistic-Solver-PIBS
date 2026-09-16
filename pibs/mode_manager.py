@@ -84,6 +84,7 @@ class ModeManager:
             f.drop_opt_tgt: False,
             f.tbl_mm: True,
             f.web_mm: True,
+            f.compute_guide: False,
         }
 
         if state.mode == MODE_CONSTRAINED:
@@ -98,6 +99,7 @@ class ModeManager:
                     f.p_control: True,
                     f.tbl_mm: False,
                     f.web_mm: False,
+                    f.compute_guide: True,
                 }
             )
         elif state.mode == MODE_LOCK_LG:
@@ -124,6 +126,7 @@ class ModeManager:
                     f.drop_opt_tgt: True,
                     f.tbl_mm: False,
                     f.web_mm: False,
+                    f.compute_guide: True,
                 }
             )
 
