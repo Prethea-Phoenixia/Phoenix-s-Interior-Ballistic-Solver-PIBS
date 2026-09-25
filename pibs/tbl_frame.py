@@ -133,7 +133,12 @@ class TableFrame(LocalizedFrame):
         for i, row in enumerate(loc_table_data):
             self.tv.insert("", "end", str(i + 1), values=row, tags=(row[0].strip(), "monospace"))
 
-    def export_table(self, gun_result: GunResult | RecoillessResult | None, acc_exp: int, normalized_filename: str):
+    def export_table(
+        self,
+        gun_result: GunResult | RecoillessResult | None,
+        acc_exp: int,
+        normalized_filename: str,
+    ):
         if gun_result is None:
             messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("noDataMsg"))
             return
@@ -144,6 +149,11 @@ class TableFrame(LocalizedFrame):
             initialfile=normalized_filename,
         )
 
+        if not file_name:
+            return
+
+        # The result object, not the current UI state, determines the gun type:
+        # it stays correct even if the user edits inputs after calculating.
         if isinstance(gun_result, GunResult):
             gun_type = GunType.CONVENTIONAL.value
         elif isinstance(gun_result, RecoillessResult):

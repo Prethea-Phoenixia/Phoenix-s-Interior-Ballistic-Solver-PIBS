@@ -172,8 +172,6 @@ _prefix = {
     "c": 1e-2,  # centi
     "d": 1e-1,  # deci
     " ": 1,  # unit
-    # "da": 1e1, # deca
-    # "h": 1e2,  # hecto
     "k": 1e3,  # kilo
     "M": 1e6,  # mega
     "G": 1e9,  # giga
@@ -412,7 +410,4 @@ def get_windows_locale() -> str:
 
 
 if __name__ == "__main__":
-    print(to_si(1e-4).strip())
-    from math import pi
-
-    print(round_sig(pi))
+    pass

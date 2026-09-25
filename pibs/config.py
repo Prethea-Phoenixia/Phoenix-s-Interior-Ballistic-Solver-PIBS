@@ -41,7 +41,6 @@ class SimulationConfig:
     # Propellant
     propellant: Propellant
     charge_mass: float
-    charge_mass_ratio: float
     start_pressure: float
 
     # Constraints

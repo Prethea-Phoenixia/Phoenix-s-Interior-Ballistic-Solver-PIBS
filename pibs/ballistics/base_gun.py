@@ -3,17 +3,19 @@ from __future__ import annotations
 import logging
 import math
 
-from .config import GunConfig, PropellantLoad, SolverConfig
+from .config import GunConfig, PropellantLoad, SolverConfig, StructuralConfig
 from .num import dekker
 from .prop import DelegatesPropellant
 
 
 class BaseGun(DelegatesPropellant):
+
     def __init__(
         self,
         gcfg: GunConfig,
         load: PropellantLoad,
         solver: SolverConfig,
+        structural: StructuralConfig | None = None,
         logger: logging.Logger | None = None,
     ):
         self.logger = logger if logger else logging.getLogger(__name__)
@@ -22,6 +24,7 @@ class BaseGun(DelegatesPropellant):
         self.gcfg = gcfg
         self.load = load
         self.solver = solver
+        self.structural = structural
 
         self.caliber = gcfg.caliber
         self.e_1 = 0.5 * gcfg.web_thickness
@@ -47,7 +50,7 @@ class BaseGun(DelegatesPropellant):
             raise ValueError(
                 "Initial burnup fraction is solved to be greater than unity. This indicate an excessively low loading density for start-pressure."
             )
-        self.z_0, _ = dekker(self.propellant.f_psi_z, 0, self.propellant.z_b, y=self.psi_0, y_rel_tol=self.tol)
+        self.z_0 = dekker(self.propellant.f_psi_z, 0, self.propellant.z_b, y=self.psi_0, y_rel_tol=self.tol)
 
         self.phi_1 = 1 / (1 - self.solver.drag_coefficient)
         self.phi = self.phi_1 + self.w / (3 * self.m)

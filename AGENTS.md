@@ -5,13 +5,25 @@
 - **Run app**: `.venv\Scripts\python.exe run_pibs.py` — always use project .venv. App is a tkinter GUI; run directly and
   watch terminal for errors. User will close window when done.
 - **No test suite** — verification is manual (launch app, run calculation, save/load, theme switch).
+- **In-process GUI testing (welcome method)** — construct the real window without `mainloop()` to verify behavior
+  headlessly:
+  ```python
+  root = PIBS(loc="English", debug=False)
+  root.update()                          # event-loop pass; required before map/grid state is valid
+  f.main_geom.set_by_obj(geom); f.update_geom(); root.update()   # same path a user click takes
+  assert not f.grain_r1.input_widget.winfo_ismapped()             # assert real UI state, not just "no crash"
+  root.destroy()
+  ```
+  Useful assertions: `winfo_ismapped()` (visibility), `cget("text")` (labels), `menu.entrycget(i, "label")` (menus),
+  `frame.get_save_data()` (save keys). Run with `-X utf8` and wrap `sys.stdout` in a UTF-8 `TextIOWrapper` (console is
+  GBK). Covers behavior, not visual layout — the user still eyeballs layout changes in the live window.
 
 ## Lint / Format
 
 - **black**: `line-length = 120` — run via `.venv\Scripts\python.exe -m black <files>`
 - **isort**: `profile = "black"` — run via `.venv\Scripts\python.exe -m isort <files>`
-- Pre-commit hook (`pre-commit`) also runs `sort_localization.py` and `generate_executable.py`, but isort/PyInstaller
-  are often not in PATH; black is the only reliable step.
+- Pre-commit hook (`pre-commit`) runs `black .`, `isort .`, and `sort_localization.py`. isort is often not in PATH here;
+  black is the most reliable step.
 
 ## Design Decisions
 
@@ -40,9 +52,11 @@
 
 **UI Widgets**
 
-- Widgets do **not** self-grid in `__init__`; they are placed via a `place(row, col, ...)` method called by `RowBuilder`.
-- `RowBuilder` is the single source of truth for row placement — don't mix direct `.grid()` calls.
-- For checkboxes used as LabelFrame headers: use `widget.as_labelwidget()` instead of `.place()`.
+- Widgets **self-grid in `__init__`** using `parent`/`row`/`col` passed via kwargs. `RowBuilder` injects `parent` and the
+  current `row`, then increments its counter — there is no separate `place()` method.
+- `RowBuilder` is the single source of truth for row placement — don't hand-manage row indices for builder-managed widgets.
+- For a checkbox used as a LabelFrame header: create it with `skip_grid=True`, then pass `labelwidget=check.check_widget`
+  to `add_localized_label_frame`.
 
 ## Documentation Policy
 

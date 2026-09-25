@@ -1,20 +1,15 @@
 from __future__ import annotations
 
 import logging
-from tkinter import Text, ttk
 from tkinter.ttk import Frame, Notebook
 from typing import TYPE_CHECKING
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
-from . import FONTNAME, FONTSIZE, THEMES, Theme
+from . import THEMES, Theme
 from .ballistics import GunType
-from .ballistics.gun import Gun, GunResult
-from .ballistics.prop import Propellant
-from .config import SimulationConfig
-from .guidegraph import GuideResults
-from .localized import LocalizedFrame
+from .localized import LocalizedFrame, ScrollableText
 from .plot_manager import PlotManager
 from .tbl_frame import TableFrame
 from .theme import ThemedMixin
@@ -79,20 +74,7 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         desc_frm.columnconfigure(0, weight=1)
         desc_frm.rowconfigure(0, weight=1)
 
-        desc_scroll = ttk.Scrollbar(desc_frm, orient="vertical")
-        desc_scroll.grid(row=0, column=1, sticky="nsew")
-        self.description = Text(
-            desc_frm,
-            wrap="word",
-            height=0,
-            width=0,
-            yscrollcommand=desc_scroll.set,
-            font=(FONTNAME, FONTSIZE),
-            undo=True,
-            maxundo=-1,
-        )
-        self.description.grid(row=0, column=0, sticky="nsew")
-        desc_scroll.config(command=self.description.yview)
+        self.description = ScrollableText(desc_frm, row=0, col=0, undo=True, maxundo=-1)
         self.force_update_on_theme_widget.append(self.description)
 
         ### table frame
@@ -112,19 +94,11 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         error_frm.columnconfigure(0, weight=1)
         error_frm.rowconfigure(0, weight=1)
 
-        err_scroll = ttk.Scrollbar(error_frm, orient="vertical")
-        err_scroll.grid(row=0, column=1, sticky="nsew")
-        self.error_text = Text(
-            error_frm, yscrollcommand=err_scroll.set, wrap="word", height=0, width=0, font=(FONTNAME, FONTSIZE)
-        )
-        self.error_text.grid(row=0, column=0, sticky="nsew")
-
+        self.error_text = ScrollableText(error_frm, row=0, col=0)
         self.error_text.tag_configure(str(logging.DEBUG), foreground="tan")
         self.error_text.tag_configure(str(logging.WARNING), foreground="orange")
         self.error_text.tag_configure(str(logging.ERROR), foreground="orangered")
         self.error_text.tag_configure(str(logging.CRITICAL), foreground="red")
-
-        err_scroll.config(command=self.error_text.yview)
         self.force_update_on_theme_widget.append(self.error_text)
 
         ### plot frame
@@ -291,43 +265,12 @@ class NotebookFrame(ThemedMixin, LocalizedFrame):
         self.plot_manager.update_guide_graph()
         self.plot_manager.update_geom_plot()
 
-    @property
-    def config(self) -> SimulationConfig | None:
-        """Simulation configuration from master."""
-        return self.master.config
-
-    @property
-    def gun(self) -> Gun | None:
-        """The gun object from master."""
-        return self.master.gun
-
-    @property
-    def gun_result(self) -> GunResult | None:
-        """Gun simulation result from master."""
-        return self.master.gun_result
-
-    @property
-    def guide_results(self) -> GuideResults | None:
-        """Guide graph result from master."""
-        return self.master.guide_results
-
-    @property
-    def prop(self) -> Propellant | None:
-        return self.master.prop
-
     def change_lang(self):
-        super().change_lang()
         self.tab_parent.tab(self.desc_tab, text=self.get_loc_str("descTab"))
         self.tab_parent.tab(self.plot_tab, text=self.get_loc_str("plotTab"))
         self.tab_parent.tab(self.table_tab, text=self.get_loc_str("tableTab"))
         self.tab_parent.tab(self.error_tab, text=self.get_loc_str("errorTab"))
         self.tab_parent.tab(self.guide_tab, text=self.get_loc_str("guideTab"))
-
-        self.plot_manager.update_main_plot()
-        self.plot_manager.update_aux_plot()
-        self.plot_manager.update_guide_graph()
-
-        self.table_frame.change_lang()
 
     def set_description(self, description: str):
         self.description.delete(1.0, "end")

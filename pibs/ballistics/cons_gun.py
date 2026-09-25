@@ -5,7 +5,7 @@ from math import log
 
 from . import Point, SolutionMethod
 from .config import DesignConstraint, GunConfig, PropellantLoad, SolverConfig
-from .constr import Constrained
+from .constrained import Constrained
 from .gun import pidduck
 from .num import dekker, find_last_le, gss, merge_sorted_records, rkf
 
@@ -84,12 +84,12 @@ class ConstrainedGun(Constrained):
         v_bar_d = self.v_d / v_j
 
         psi_0 = (1 / delta - 1 / self.rho_p) / (self.f / self.p_0 + self.alpha - 1 / self.rho_p)
-        z_0, _ = dekker(self.propellant.f_psi_z, 0, 1, y=psi_0, y_rel_tol=self.tol)
+        z_0 = dekker(self.propellant.f_psi_z, 0, 1, y=psi_0, y_rel_tol=self.tol)
 
         def func_p_control_bar(z: float, l_bar: float, v_bar: float) -> float:
             psi = self.f_psi_z(z)
             l_psi_bar = 1 - delta / self.rho_p - delta * (self.alpha - 1 / self.rho_p) * psi
-            p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
+            p_bar = max((psi - v_bar**2), 0) / max((l_bar + l_psi_bar), self.tol)
             if self.design.pressure_control == Point.PEAK_AVG:
                 return p_bar
             else:
@@ -136,8 +136,7 @@ class ConstrainedGun(Constrained):
                 t_bar, l_bar, v_bar = t_l_v
                 psi = self.f_psi_z(z)
                 l_psi_bar = 1 - delta / self.rho_p - delta * (self.alpha - 1 / self.rho_p) * psi
-
-                p_bar = (psi - v_bar**2) / (l_bar + l_psi_bar)
+                p_bar = max((psi - v_bar**2), 0) / max(l_bar + l_psi_bar, self.tol)
 
                 dt_bar = (2 * b_e_1 / self.theta) ** 0.5 * p_bar**-self.n
                 dl_bar = v_bar * dt_bar
@@ -177,11 +176,10 @@ class ConstrainedGun(Constrained):
                 merge_sorted_records(record, r)
                 return func_p_control_bar(z, l_bar, v_bar) - p_bar_d, z, t_bar, l_bar, v_bar
 
-            z_p = 0.5 * sum(gss(lambda z: func_p_z(z)[0], z_j, z_k, x_tol=self.tol, find_min=False))
+            z_p = gss(lambda z: func_p_z(z)[0], z_j, z_k, x_tol=self.tol, find_min=False)
             return func_p_z(z_p)
 
         probe_web = 0.5 * self.min_web
-
         dp_bar_probe = next_dp_bar_probe = func_p_e_1(probe_web)[0]
         next_probe_web = probe_web
 
@@ -192,7 +190,7 @@ class ConstrainedGun(Constrained):
             next_probe_web = probe_web * 2 if dp_bar_probe > 0 else probe_web * 0.5
             next_dp_bar_probe = func_p_e_1(next_probe_web)[0]
 
-        e_1_solved, _ = dekker(lambda _e_1: func_p_e_1(_e_1)[0], probe_web, next_probe_web, y_rel_tol=self.tol)
+        e_1_solved = dekker(lambda _e_1: func_p_e_1(_e_1)[0], probe_web, next_probe_web, y_rel_tol=self.tol)
         p_bar_dev, z_i, t_bar_i, l_bar_i, v_bar_i = func_p_e_1(e_1_solved)
 
         if known_bore:

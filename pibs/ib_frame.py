@@ -7,7 +7,7 @@ import traceback
 from logging.handlers import QueueListener
 from math import log10
 from multiprocessing import Process, Queue
-from tkinter import IntVar, Menu, StringVar, Text, messagebox, ttk
+from tkinter import IntVar, Menu, StringVar, messagebox, ttk
 from tkinter.font import Font
 from tkinter.ttk import Frame
 
@@ -18,13 +18,13 @@ from .ballistics.gun import Gun
 from .ballistics.prop import Composition, Geometry, Propellant, SimpleGeometry
 from .ballistics.recoilless import Recoilless
 from .config import SimulationConfig
-from .dispatch import calculate
 from .file_io import FileIOManager
 from .info_frame import InfoFrame
-from .localized import Descriptive, LocalizableWidget, LocalizedFrame, RowBuilder
+from .localized import Descriptive, LocalizableWidget, LocalizedFrame, RowBuilder, ScrollableText
 from .misc import filenameize, format_int_input, resolve_path, round_sig, to_si
 from .mode_manager import ModeManager
 from .nb_frame import NotebookFrame
+from .run import calculate
 from .theme import ThemedMixin
 from .tip import create_tool_tip
 
@@ -103,13 +103,11 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
         design_menu.add_command(label=self.get_loc_str("saveLabel"), command=self.file_io.save, accelerator="Ctrl+S")
         self.root.bind("<Control-s>", lambda *_: self.file_io.save())
-        self.root.bind("<Control-S>", lambda *_: self.file_io.save())
 
         design_menu.add_command(
             label=self.get_loc_str("loadLabel"), command=self.file_io.load_gun, accelerator="Ctrl+L"
         )
         self.root.bind("<Control-l>", lambda *_: self.file_io.load_gun())
-        self.root.bind("<Control-L>", lambda *_: self.file_io.load_gun())
 
         design_menu.add_command(
             label=self.get_loc_str("loadPresetLabel"),
@@ -117,11 +115,9 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         )
 
         design_menu.add_command(label=self.get_loc_str("resetLabel"), command=self.reset, accelerator="Ctrl+N")
-        self.root.bind("<Control-N>", lambda *_: self.reset())
         self.root.bind("<Control-n>", lambda *_: self.reset())
 
         design_menu.add_command(label=self.get_loc_str("calcLabel"), command=self.on_calculate, accelerator="Ctrl+R")
-        self.root.bind("<Control-R>", lambda *_: self.on_calculate())
         self.root.bind("<Control-r>", lambda *_: self.on_calculate())
 
         data_menu.add_command(
@@ -260,13 +256,8 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             skip_grid=True,
         )
 
-        self.aux_grain_frm = self.add_localized_label_frame(
-            self.grain_frame, labelwidget=self.use_aux_grain.check_widget
-        )
-        self.aux_grain_frm.grid(row=gb.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        gb.next()
+        self.aux_grain_frm = gb.label_frame(labelwidget=self.use_aux_grain.check_widget, grid_kwargs={"columnspan": 3})
         aux_row = gb.current_row
-        self.aux_grain_frm.columnconfigure(0, weight=1)
 
         ab = RowBuilder(self, self.aux_grain_frm)
         self.aux_mass_ratio = ab.input_3(
@@ -417,28 +408,10 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             grid_kwargs={"columnspan": 2},
         )
 
-        spec_scroll = ttk.Scrollbar(propellant_frame, orient="vertical")
-        spec_h_scroll = ttk.Scrollbar(propellant_frame, orient="horizontal")
-        self.propellant_specs = Text(
-            propellant_frame,
-            wrap="word",
-            height=0,
-            width=0,
-            yscrollcommand=spec_scroll.set,
-            xscrollcommand=spec_h_scroll.set,
-            font=(FONTNAME, FONTSIZE),
-        )
-
+        self.propellant_specs = ScrollableText(propellant_frame, row=pb.current_row, col=0, hscroll=True)
+        pb.next()
+        pb.next()
         self.force_update_on_theme_widget.append(self.propellant_specs)
-        spec_scroll.config(command=self.propellant_specs.yview)
-        spec_h_scroll.config(command=self.propellant_specs.xview)
-
-        spec_row = pb.current_row
-        self.propellant_specs.grid(row=spec_row, column=0, sticky="nsew")
-        spec_scroll.grid(row=spec_row, rowspan=2, column=1, sticky="nsew")
-        pb.next()
-        spec_h_scroll.grid(row=pb.current_row, column=0, sticky="nsew")
-        pb.next()
 
         self.use_combustible = self.add_localized_label_check(
             parent=propellant_frame,
@@ -448,11 +421,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             default=False,
         )
 
-        combustible_frame = self.add_localized_label_frame(
-            propellant_frame, labelwidget=self.use_combustible.check_widget
-        )
-        combustible_frame.grid(row=pb.current_row, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        pb.next()
+        combustible_frame = pb.label_frame(labelwidget=self.use_combustible.check_widget, grid_kwargs={"columnspan": 2})
 
         cb = RowBuilder(self, combustible_frame)
         self.combustible_mass_kg = cb.input_3(
@@ -514,10 +483,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             skip_grid=True,
         )
 
-        cons_frm = self.add_localized_label_frame(control_frame, labelwidget=self.use_cons.check_widget)
-        cons_frm.grid(row=ob.current_row, column=0, columnspan=3, sticky="nsew", padx=2, pady=2)
-        ob.next()
-        cons_frm.columnconfigure(0, weight=1)
+        cons_frm = ob.label_frame(labelwidget=self.use_cons.check_widget, grid_kwargs={"columnspan": 3})
 
         ccb = RowBuilder(self, cons_frm)
         self.lock_Lg = ccb.check(
@@ -574,15 +540,12 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             dtype=float,
         )
 
-        sample_frm = self.add_localized_label_frame(
-            control_frame,
+        sample_frm = ob.label_frame(
             label_loc_key="sampleFrmLabel",
             style="SubLabelFrame.TLabelframe",
             tooltip_loc_key="sampText",
+            grid_kwargs={"columnspan": 2},
         )
-        sample_frm.grid(row=ob.current_row, column=0, columnspan=2, sticky="nsew", padx=2, pady=2)
-        ob.next()
-        sample_frm.columnconfigure(0, weight=1)
 
         sb = RowBuilder(self, sample_frm)
         self.drop_domain = sb.dropdown(
@@ -836,28 +799,21 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     @lock_out
     def change_lang(self):
         super().change_lang()
-        self.info_frame.change_lang()
         self.notebook_frame.change_lang()
 
-        self.menubar.entryconfig(1, label=self.get_loc_str("dataLabel"))
-        self.menubar.entryconfig(2, label=self.get_loc_str("designLabel"))
-        self.menubar.entryconfig(3, label=self.get_loc_str("themeLabel"))
-        self.menubar.entryconfig(4, label=self.get_loc_str("debugLabel"))
+        for i, key in enumerate(("dataLabel", "designLabel", "themeLabel", "debugLabel"), start=1):
+            self.menubar.entryconfig(i, label=self.get_loc_str(key))
 
-        self.design_menu.entryconfig(0, label=self.get_loc_str("saveLabel"))
-        self.design_menu.entryconfig(1, label=self.get_loc_str("loadLabel"))
-        self.design_menu.entryconfig(2, label=self.get_loc_str("loadPresetLabel"))
-        self.design_menu.entryconfig(3, label=self.get_loc_str("resetLabel"))
-        self.design_menu.entryconfig(4, label=self.get_loc_str("calcLabel"))
-
-        self.data_menu.entryconfig(0, label=self.get_loc_str("exportMain"))
-        self.data_menu.entryconfig(1, label=self.get_loc_str("exportAux"))
-        self.data_menu.entryconfig(2, label=self.get_loc_str("exportGeom"))
-        self.data_menu.entryconfig(3, label=self.get_loc_str("exportGuide"))
-        self.data_menu.entryconfig(4, label=self.get_loc_str("exportLabel"))
-        self.data_menu.entryconfig(5, label=self.get_loc_str("reloadPropellant"))
-
-        self.debug_menu.entryconfig(0, label=self.get_loc_str("enableLabel"))
+        for menu, label_keys in (
+            (self.design_menu, ("saveLabel", "loadLabel", "loadPresetLabel", "resetLabel", "calcLabel")),
+            (
+                self.data_menu,
+                ("exportMain", "exportAux", "exportGeom", "exportGuide", "exportLabel", "reloadPropellant"),
+            ),
+            (self.debug_menu, ("enableLabel",)),
+        ):
+            for i, key in enumerate(label_keys):
+                menu.entryconfig(i, label=self.get_loc_str(key))
 
         self.calc_button_tip.set(self.get_loc_str("calcButtonText"))
         self.calc_button.config(text=self.get_loc_str("calcLabel"))
@@ -869,7 +825,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
     def config(self) -> SimulationConfig | None:
         try:
             if self.prop is None:
-                raise ValueError("Invalid propellant.")
+                return None
 
             chamber_volume = float(self.cv_L.get()) * 1e-3
             charge_mass = float(self.chg_kg.get())
@@ -896,7 +852,6 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
                 nozzle_efficiency=float(self.nozz_eff.get()) * 1e-2,
                 propellant=self.prop,
                 charge_mass=charge_mass,
-                charge_mass_ratio=charge_mass / float(self.sht_kg.get()),
                 start_pressure=float(self.stp_MPa.get()) * 1e6,
                 design_pressure=float(self.p_tgt.get()) * 1e6,
                 design_velocity=float(self.v_tgt.get()),
@@ -960,6 +915,7 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
 
             self.info_frame.update_stats(gun=self.gun, gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
             self.notebook_frame.table_frame.update_table(gun_result=self.gun_result, acc_exp=int(self.acc_exp.get()))
+
             self.notebook_frame.plot_manager.update_main_plot()
             self.notebook_frame.plot_manager.update_aux_plot()
             self.notebook_frame.plot_manager.update_guide_graph()
@@ -1014,20 +970,24 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
         self.propellant_specs.config(state="disabled")
 
     def update_geom(self, *_):
-        for geom, r1, r2 in zip(
-            (self.main_geom.get_obj(), self.aux_geom.get_obj()),
-            (self.grain_r1, self.aux_grain_r1),
-            (self.grain_r2, self.aux_grain_r2),
-        ):
-            if geom == SimpleGeometry.SPHERE:
-                r1.remove()
-                r2.remove()
-            elif geom == SimpleGeometry.CYLINDER or geom == SimpleGeometry.TUBE:
-                r1.remove()
-                r2.restore()
-            else:
-                r1.restore()
-                r2.restore()
+        # per geometry: (r1_visible, r2_visible), web label keys, r1 label keys, r2 label keys
+        geo_cfg = {
+            SimpleGeometry.SPHERE: ((False, False), ("diamLabel", "diaText"), None, None),
+            SimpleGeometry.STRIP: (
+                (True, True),
+                ("widthLabel", "widthText"),
+                ("htwLabel", "heightRText"),
+                ("ltwLabel", "stripRText"),
+            ),
+            SimpleGeometry.CYLINDER: ((False, True), ("diamLabel", "diaText"), None, ("ltdLabel", "cylLRText")),
+            SimpleGeometry.TUBE: ((False, True), ("arcLabel", "arcText"), None, ("ltarcLabel", "ltarcText")),
+        }
+        default_cfg = (
+            (True, True),
+            ("arcLabel", "arcText"),
+            ("pdtarcLabel", "pdtarcText"),
+            ("ltarcLabel", "ltarcText"),
+        )
 
         for geom, web, r1, r2 in zip(
             (self.main_geom.get_obj(), self.aux_geom.get_obj()),
@@ -1035,33 +995,15 @@ class InteriorBallisticsFrame(ThemedMixin, LocalizedFrame):
             (self.grain_r1, self.aux_grain_r1),
             (self.grain_r2, self.aux_grain_r2),
         ):
-
-            if geom == SimpleGeometry.SPHERE:
-                if web:
-                    web.localize("diamLabel", "diaText")
-
-            elif geom == SimpleGeometry.STRIP:
-                if web:
-                    web.localize("widthLabel", "widthText")
-                r1.localize("htwLabel", "heightRText")
-                r2.localize("ltwLabel", "stripRText")
-
-            elif geom == SimpleGeometry.CYLINDER:
-                if web:
-                    web.localize("diamLabel", "diaText")
-                r2.localize("ltdLabel", "cylLRText")
-
-            elif geom == SimpleGeometry.TUBE:
-                if web:
-                    web.localize("arcLabel", "arcText")
-                r2.localize("ltarcLabel", "ltarcText")
-
-            else:
-                if web:
-                    web.localize("arcLabel", "arcText")
-
-                r1.localize("pdtarcLabel", "pdtarcText")
-                r2.localize("ltarcLabel", "ltarcText")
+            (r1_vis, r2_vis), web_keys, r1_keys, r2_keys = geo_cfg.get(geom, default_cfg)
+            (r1.remove if not r1_vis else r1.restore)()
+            (r2.remove if not r2_vis else r2.restore)()
+            if web and web_keys:
+                web.localize(*web_keys)
+            if r1_keys:
+                r1.localize(*r1_keys)
+            if r2_keys:
+                r2.localize(*r2_keys)
 
     @handle_error_wrapper(logging.WARNING)
     def propellant_callback(self, *_):

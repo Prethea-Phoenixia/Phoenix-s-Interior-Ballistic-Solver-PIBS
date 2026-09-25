@@ -120,21 +120,16 @@ class Constrained(DelegatesPropellant, abc.ABC):
 
     def maximum_load_fraction(self, charge_mass_ratio: float) -> float:
         f = self.get_f(charge_mass_ratio)
-        start = self.minimum_load_fraction
-        stop = 1 - self.tol
-        tol = self.tol
-        delta = stop - start
-        probe = new_probe = start
-        while abs(2 * delta) > tol:
+        x = self.minimum_load_fraction
+        delta = 1 - self.tol - x
+        while delta > self.tol:
             try:
-                f(new_probe)
-                probe = new_probe
+                f(x + delta)
+                x += delta
             except ValueError:
                 delta *= 0.5
-            finally:
-                new_probe = probe + delta
 
-        return probe
+        return x
 
     def validate_load_fraction(
         self, charge_mass_ratio: float, proposed_lfs: list[float]
@@ -178,12 +173,14 @@ class Constrained(DelegatesPropellant, abc.ABC):
         _f: Callable[[float], tuple[float, float, float]] = self.get_f(charge_mass_ratio)
 
         self.logger.info(f"Δ/ρ range: {low:.3%} - {high:.3%}")
-        lf_low, lf_high = gss(
-            lambda load_fraction: _f(load_fraction)[_f_index], low, high, x_tol=self.tol, find_min=True
-        )
 
-        lf = 0.5 * (lf_high + lf_low)
-        e_1 = _f(lf)[0]
-        l_g = _f(lf)[1]
+        try:
+            _f(low)
+        except ValueError as e:
+            raise ValueError(f"constraint not satisfied at minimum load fraction: {e}")
+
+        lf = gss(lambda load_fraction: _f(load_fraction)[_f_index], low, high, x_tol=self.tol, find_min=True)
+
+        e_1, l_g, _ = _f(lf)
         self.logger.info(f"optimal Δ/ρ = {lf:.2f}")
         return lf, e_1, l_g
