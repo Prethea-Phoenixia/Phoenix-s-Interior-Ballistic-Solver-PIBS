@@ -1,9 +1,9 @@
 import math
-import sys
+import unittest
 from typing import Callable
 
 
-def integrate(f: Callable[[float], float], l_lim: float, u_lim: float, tol: float = 1e-3) -> tuple[float, float]:
+def intg(f: Callable[[float], float], l_lim: float, u_lim: float, tol: float = 1e-3) -> float:
     """
     Integration, a.la the HP-34C. For more info see:
     "Handheld Calculator Evaluates Integrals", William M.Kahan
@@ -66,13 +66,14 @@ def integrate(f: Callable[[float], float], l_lim: float, u_lim: float, tol: floa
 
     tol = abs(tol)  # ensure positive
 
-    it = 1  # iteration counter
-    integral = 0  # integral counter
-    count = 0  # trend counter, No. of iterations with reducing delta.
-    delta = math.inf  # delta, change per iteration
+    it: int = 1  # iteration counter
+    integral: float = 0.0  # integral counter
+    count: int = 0  # trend counter, No. of iterations with reducing delta.
+    delta: float = math.inf  # delta, change per iteration
 
     while count < 3:
-        increment = 0  # change to integral
+        increment: float = 0.0  # change to integral
+
         for i in range(1, 2**it, 2):
             v = -1 + 2 ** (1 - it) * i
             u = 1.5 * v - 0.5 * v**3
@@ -85,9 +86,30 @@ def integrate(f: Callable[[float], float], l_lim: float, u_lim: float, tol: floa
         integral = next_integral
         it += 1
 
-        if delta < tol * (abs(integral) + tol) or delta < sys.float_info.epsilon * abs(integral):
+        if delta < tol * max(abs(integral), 1):
             count += 1
         else:
             count = 0
 
-    return integral, delta
+    return integral  # , delta
+
+
+class TestIntg(unittest.TestCase):
+    def test_cos(self):
+
+        def f(x: float) -> float:
+            return math.cos(x)
+
+        v = intg(f, 0, 2 * math.pi, tol=1e-3)
+        self.assertAlmostEqual(v, 0, places=3)
+
+    def test_precision(self):
+        def f(x: float) -> float:
+            return math.exp(-(x**2))
+
+        v = intg(f, 0, 1, tol=1e-3)
+        self.assertAlmostEqual(v, math.erf(1) * math.sqrt(math.pi) / 2, places=3)
+
+
+if __name__ == "__main__":
+    unittest.main()

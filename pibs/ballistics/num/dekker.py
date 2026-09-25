@@ -1,5 +1,6 @@
 import math
 import sys
+import unittest
 from typing import Callable
 
 
@@ -12,11 +13,11 @@ def dekker(
     y_abs_tol: float = 0.0,
     y_rel_tol: float = 0.0,
     debug: bool = False,
-) -> tuple[float, float]:
+) -> float:
 
-    x_tol = max(abs(x_tol), max(abs(x_0), abs(x_1), 1.0) * sys.float_info.epsilon)
+    x_tol = max(abs(x_tol), max(abs(x_0), abs(x_1), 1) * sys.float_info.epsilon)
     y_rel_tol = abs(y_rel_tol)
-    y_abs_tol = max(abs(y_abs_tol), abs(y) * y_rel_tol, max(abs(y), 1.0) * sys.float_info.epsilon)
+    y_abs_tol = max(abs(y_abs_tol), abs(y) * y_rel_tol, max(abs(y), 1) * sys.float_info.epsilon)
 
     fx_0 = f(x_0) - y
     fx_1 = f(x_1) - y
@@ -26,11 +27,6 @@ def dekker(
             "Dekker method must be initiated by guesses bracketing root:\n"
             + "f({})-{}={}, f({})-{}={}".format(x_0, y, fx_0, x_1, y, fx_1)
         )
-
-    elif fx_0 == 0:
-        return x_0, x_0
-    elif fx_1 == 0:
-        return x_1, x_1
 
     if abs(fx_0) < abs(fx_1):
         b_j = x_0  # assign the better of the two initial guesses to b_j
@@ -88,7 +84,7 @@ def dekker(
                 for line in record:
                     print("{:>4}{:>24}{:>24}".format(*line))
 
-            return b_k, a_k  # return the best, and the bracketing solution
+            return b_k
 
         a_j = a_k
         fa_j = fa_k
@@ -108,3 +104,23 @@ def dekker(
             + "Maximum iteration exceeded at it = {}/{}".format(i, it)
             + ",\nf({})-{}={}->\nf({})-{}={}".format(b_i, y, fb_i, b_j, y, fb_j)
         )
+
+
+class TestDekker(unittest.TestCase):
+    def test_cubic(self):
+        def f(x: float) -> float:
+            return x**3
+
+        self.assertAlmostEqual(dekker(f, -1, 1), 0)
+
+    def test_quadratic(self):
+
+        def f(x: float) -> float:
+            return (x - 1) ** 2 - 1
+
+        x_0 = dekker(f, -1, 1)
+        self.assertAlmostEqual(x_0, 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -9,7 +9,7 @@ import psutil
 from tqdm import tqdm
 
 from .ballistics import GunType, Point
-from .ballistics.constr import Constrained
+from .ballistics.constrained import Constrained
 from .ballistics.gun import Gun
 from .ballistics.recoilless import Recoilless
 

@@ -19,7 +19,7 @@ from .generics import (
     PressureProbePoint,
     PressureTraceEntry,
 )
-from .num import dekker, find_last_le, gss, integrate, merge_sorted_records, rkf
+from .num import dekker, find_last_le, gss, intg, merge_sorted_records, rkf
 
 
 @dataclass
@@ -70,22 +70,22 @@ def pidduck(wpm: float, k: float, tol: float) -> tuple[float, float]:
         if om == 0:
             return -math.inf
 
-        i, _ = integrate(lambda x: f(om, x), 0, 1, tol)
+        i = intg(lambda x: f(om, x), 0, 1, tol)
 
         if k == 1:
             return i - 0.5 * wpm * math.exp(-om) / om
         else:
             return i - 0.5 * ((k - 1) / k) * wpm * ((1 - om) ** (k / (k - 1)) / om)
 
-    omega = 0.5 * sum(dekker(f_omega, 0, 1, x_tol=tol))
+    omega = dekker(f_omega, 0, 1, x_tol=tol)
 
     if k == 1:
         labda_1 = (math.exp(omega) - 1) / wpm
     else:
         labda_1 = ((1 - omega) ** (k / (1 - k)) - 1) / wpm
 
-    i_u, _ = integrate(lambda x: g(omega, x), 0, 1, tol)
-    i_l, _ = integrate(lambda x: f(omega, x), 0, 1, tol)
+    i_u = intg(lambda x: g(omega, x), 0, 1, tol)
+    i_l = intg(lambda x: f(omega, x), 0, 1, tol)
     labda_2 = i_u / i_l
 
     return labda_1, labda_2
@@ -134,12 +134,14 @@ class Gun(BaseGun):
         gcfg: GunConfig,
         load: PropellantLoad,
         solver: SolverConfig,
+        structural: StructuralConfig | None = None,
         logger: logging.Logger | None = None,
     ):
         super().__init__(
             gcfg=gcfg,
             load=load,
             solver=solver,
+            structural=structural,
             logger=logger,
         )
 
@@ -330,7 +332,7 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
             raise ValueError(f"tag {tag} not handled.")
 
         def find_peak(tag: Point) -> None:
-            z_p = 0.5 * sum(gss(lambda _z: func_p_z(_z, tag)[0], z_0, z_end, x_tol=self.tol, find_min=False))
+            z_p = gss(lambda _z: func_p_z(_z, tag)[0], z_0, z_end, x_tol=self.tol, find_min=False)
             _, (z_p, t_bar_p, l_bar_p, v_bar_p) = func_p_z(z_p, tag)
             self.append_bar_data(bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p)
 
@@ -398,7 +400,11 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
             )
 
         data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda e: e[0].time))
-        return GunResult(self, data, p_trace)
+
+        gun_result = GunResult(self, data, p_trace)
+        if self.structural:
+            self.calculate_structure(gun_result=gun_result, step=step)
+        return gun_result
 
     def append_bar_data(
         self,
@@ -462,22 +468,13 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
 
         return p_x, u
 
-    def structure(
-        self,
-        gun_result: GunResult,
-        structural: StructuralConfig | None,
-        step: int = 33,
-        tol: float | None = None,
-    ) -> None:
-        tol = tol if tol is not None else self.tol
+    def calculate_structure(self, gun_result: GunResult, step: int = 33) -> None:
+        assert self.structural
+        tol = self.tol
         step = max(step, 1)
 
-        if structural is None:
-            self.logger.info("Structure calculation skipped, no material specified.")
-            return
-
-        structural_material = structural.material
-        structural_safety_factor = structural.safety_factor
+        structural_material = self.structural.material
+        structural_safety_factor = self.structural.safety_factor
 
         r_b = 0.5 * self.caliber
         r_c = r_b * self.chi_k**0.5
@@ -508,7 +505,7 @@ be accurate due to gross violation of the applicable domain of Nobel-Abel equati
         x_c, p_c = x_probes[:i], p_probes[:i]
         x_b, p_b = x_probes[i:], p_probes[i:]
 
-        if structural.autofrettage:
+        if self.structural.autofrettage:
             v_c, k_c, m_c = self.barrel_autofrettage(
                 x_c, p_c, [self.s * self.chi_k for _ in x_c], structural_material.yield_strength
             )

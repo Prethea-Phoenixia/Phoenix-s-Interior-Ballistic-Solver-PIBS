@@ -34,12 +34,14 @@ class Recoilless(BaseGun):
         load: PropellantLoad,
         nozzle: NozzleConfig,
         solver: SolverConfig,
+        structural: StructuralConfig | None = None,
         logger=None,
     ):
         super().__init__(
             gcfg=gcfg,
             load=load,
             solver=solver,
+            structural=structural,
             logger=logger,
         )
 
@@ -254,7 +256,7 @@ class Recoilless(BaseGun):
                 raise ValueError("tag not handled.")
 
         def find_peak(tag: Point) -> None:
-            z_p = 0.5 * sum(gss(lambda _z: func_p_z(_z, tag)[0], z_0, z_end, x_tol=tol, find_min=False))
+            z_p = gss(lambda _z: func_p_z(_z, tag)[0], z_0, z_end, x_tol=tol, find_min=False)
             _, (z_p, t_bar_p, l_bar_p, v_bar_p, eta_p, tau_p) = func_p_z(z_p, tag)
             self.append_bar_data(
                 bar_data, tag=tag, t_bar=t_bar_p, l_bar=l_bar_p, z=z_p, v_bar=v_bar_p, eta=eta_p, tau=tau_p
@@ -336,7 +338,11 @@ class Recoilless(BaseGun):
             )
 
         data, p_trace = zip(*sorted(zip(data, p_trace), key=lambda e: e[0].time))
-        return RecoillessResult(self, data, p_trace)
+        recoilless_result = RecoillessResult(self, data, p_trace)
+        if self.structural:
+            self.calculate_structure(recoilless_result=recoilless_result, step=step)
+
+        return recoilless_result
 
     def abort_z(
         self,
@@ -446,19 +452,10 @@ class Recoilless(BaseGun):
 
         return cf
 
-    def structure(
-        self,
-        recoilless_result: RecoillessResult,
-        structural: StructuralConfig | None,
-        step: int = 33,
-        tol: float | None = None,
-    ) -> None:
-        tol = tol or self.tol
-        step = max(step, 1)
-
-        if structural is None:
-            self.logger.info("Structure calculation skipped, no material specified.")
-            return
+    def calculate_structure(self, recoilless_result: RecoillessResult, step: int = 33) -> None:
+        assert self.structural
+        structural = self.structural
+        tol = self.tol
 
         l_c = self.l_c
         l_g = self.l_g
@@ -604,6 +601,6 @@ class Recoilless(BaseGun):
         if ar == 1:
             return pr_c, pr_c
         else:
-            pr_sup, _ = dekker(lambda pr: Recoilless.get_ar(gamma, pr), 0, pr_c, y=ar, y_rel_tol=tol)
-            pr_sub, _ = dekker(lambda pr: Recoilless.get_ar(gamma, pr), pr_c, 1, y=ar, y_rel_tol=tol)
+            pr_sup = dekker(lambda pr: Recoilless.get_ar(gamma, pr), 0, pr_c, y=ar, y_rel_tol=tol)
+            pr_sub = dekker(lambda pr: Recoilless.get_ar(gamma, pr), pr_c, 1, y=ar, y_rel_tol=tol)
             return pr_sub, pr_sup

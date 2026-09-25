@@ -123,15 +123,15 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
         r1: float
             perforation diameter / web. d_0 / 2e_1
         r2: float
-            length/diameter (width) of grain.
             length / web, 2c / 2e_1
         """
+        if r1 <= 0 or r2 <= 0:
+            raise ValueError("Perforation ratio and length ratio must be positive.")
+
         web = 1
         e_1, d_0, c = 0.5 * web, web * r1, 0.5 * r2 * web
         a = sum(p * q for p, q in zip(self.a_factors, (d_0, e_1)))
         b = sum(p * q for p, q in zip(self.b_factors, (d_0, e_1)))
-
-        # c = 0.5 * r2 * (self.C * a**2 + self.A * b**2 + (self.n_hole - self.B) * d_0**2) ** 0.5
 
         rho = self.rho_div * (e_1 + d_0 / 2)
 
@@ -146,9 +146,20 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
 
         z_b = (e_1 + rho) / e_1  # second phase burning Z upper limit
         psi_s = chi * (1 + labda + mu)
+        if psi_s >= 1.0:
+            raise ValueError("invalid geometry specification.")
+
         # second phase of burning rate parameters, Z from 1 to z_b
         chi_s = (1 - psi_s * z_b**2) / (z_b - z_b**2)
         labda_s = psi_s / chi_s - 1
+
+        # the quadratic sliver fit must have a non-negative burning surface over
+        # the whole sliver phase [1, z_b]; since sigma_s(z) = chi_s(1 + 2 labda_s z)
+        # is a decreasing line, it suffices to check its value at z_b
+        if chi_s * (1 + 2 * labda_s * z_b) < 0:
+            raise ValueError(
+                "specified geometry cannot be accurately modelled with polynomial form function post-fracture."
+            )
 
         return chi, labda, mu, chi_s, labda_s, z_b
 
@@ -308,7 +319,7 @@ class Propellant:
         The ODE uses z as the independent variable; f_psi_z(z) and f_sigma_z(z)
         return the overall ψ and σ at main-grain burn fraction z.
         """
-        if any((main_r1 and main_r1 < 0, main_r2 and main_r2 < 0)):
+        if any((main_r1 < 0, main_r2 < 0, aux_r1 < 0, aux_r2 < 0)):
             raise ValueError("Geometry is impossible")
 
         self.main_r1 = main_r1

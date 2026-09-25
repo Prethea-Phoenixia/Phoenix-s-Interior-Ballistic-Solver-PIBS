@@ -11,9 +11,9 @@ from matplotlib import pyplot as plt
 from . import BOLDSIZE, FONTNAME, FONTSIZE, THEMES, FigureType, Theme
 from .ballistics import Domain, GunType
 from .ballistics.recoilless import RecoillessTableEntry
-from .guidegraph import GuideResults
 
 if TYPE_CHECKING:
+    from .ib_frame import InteriorBallisticsFrame
     from .nb_frame import NotebookFrame
 
 
@@ -151,24 +151,9 @@ class PlotManager:
         }
 
     @property
-    def gun(self):
-        return self.frame.gun
-
-    @property
-    def gun_result(self):
-        return self.frame.gun_result
-
-    @property
-    def config(self):
-        return self.frame.config
-
-    @property
-    def guide_results(self):
-        return self.frame.guide_results
-
-    @property
-    def prop(self):
-        return self.frame.prop
+    def master(self) -> InteriorBallisticsFrame:
+        """The top-level frame owning the simulation state."""
+        return self.frame.master
 
     @property
     def theme_cmap(self):
@@ -186,16 +171,16 @@ class PlotManager:
             canvas = self.frame.fig_canvas
             ax = self._setup_canvas(canvas)
             ax_p, ax_v = ax.twinx(), ax.twinx()
-
-            if self.gun:
-                v_tgt = self.config.design_velocity
-                p_tgt = self.config.design_pressure / 1e6  # Pa -> MPa to match axis
-                gun_type = self.config.gun_type
-                dom = self.config.domain
+            config, gun, gun_result = self.master.config, self.master.gun, self.master.gun_result
+            if config and gun and gun_result:
+                v_tgt = config.design_velocity
+                p_tgt = config.design_pressure / 1e6  # Pa -> MPa to match axis
+                gun_type = config.gun_type
+                dom = config.domain
 
                 xs, vs, vxs, pas, pss, pbs, p0s, psis, etas, stags = [], [], [], [], [], [], [], [], [], []
 
-                for entry in self.gun_result.table_data:
+                for entry in gun_result.table_data:
                     tag = entry.tag
                     time = entry.time
                     travel = entry.travel
@@ -215,7 +200,7 @@ class PlotManager:
                     p = entry.avg_pressure
                     ps = entry.shot_pressure
 
-                    if tag == self.config.pressure_control_point:
+                    if tag == config.pressure_control_point:
                         x_peak = (time * 1e3) if dom == Domain.TIME else travel
                         # noinspection PyTypeChecker
                         ax_p.spines.right.set_position(("data", x_peak))
@@ -325,9 +310,9 @@ class PlotManager:
             aux_ax = self._setup_canvas(canvas)
             aux_ax_h = aux_ax.twinx()
             aux_ax_h.yaxis.tick_right()
-
-            if self.gun_result:
-                p_trace = self.gun_result.pressure_trace
+            gun_result = self.master.gun_result
+            if gun_result:
+                p_trace = gun_result.pressure_trace
                 cmap = self.theme_cmap
                 x_max, y_max, t_min, t_max = 0.0, 0.0, math.inf, 0.0
                 for trace in p_trace:
@@ -377,10 +362,9 @@ class PlotManager:
                 aux_ax_h.yaxis.label.set_color("tab:blue")
                 aux_ax_h.set_ylabel("mm")
 
-                h_trace = self.gun_result.outline
+                h_trace = gun_result.outline
 
                 if h_trace is not None and self.frame.trace_hull.get():
-
                     x_hull = list(entry.x for entry in h_trace)
                     r_in = list(entry.r_in * 1e3 for entry in h_trace)
                     r_out = list(entry.r_ex * 1e3 for entry in h_trace)
@@ -404,10 +388,8 @@ class PlotManager:
         with plt.rc_context(self.context):
             canvas = self.frame.geom_canvas
             geom_ax = self._setup_canvas(canvas)
-
             n = 100
-
-            prop = self.prop
+            prop = self.master.prop
             if prop is not None:
                 zb = prop.z_b
                 xs = [(i / n) * zb for i in range(n + 1)]
@@ -440,8 +422,9 @@ class PlotManager:
         with plt.rc_context(self.context):
             canvas = self.frame.guide_canvas
             guide_ax = self._setup_canvas(canvas)
-            guide_results = self.guide_results
-            if isinstance(guide_results, GuideResults):
+            gun, guide_results, config = self.master.gun, self.master.guide_results, self.master.config
+
+            if guide_results:
                 load_densities = list(line.load_density for line in guide_results.lines)
                 charge_masses = list(line.charge_mass for line in guide_results.lines)
 
@@ -455,10 +438,10 @@ class PlotManager:
                 left_diagonal_chamber_volume = w_min / delta_min
                 right_diagonal_chamber_volume = w_max / delta_max
 
-                if self.gun:
+                if gun and config:
                     guide_ax.scatter(
-                        self.config.charge_mass / self.config.chamber_volume,
-                        self.config.charge_mass,
+                        config.charge_mass / config.chamber_volume,
+                        config.charge_mass,
                         c=fgc,
                         marker="x",
                         s=FONTSIZE * 4,
@@ -527,13 +510,6 @@ class PlotManager:
                 guide_ax.set_ylim(min(charge_masses), max(charge_masses))
 
             canvas.draw_idle()
-
-    def update_all(self):
-        """Update all plots."""
-        self.update_main_plot()
-        self.update_aux_plot()
-        self.update_geom_plot()
-        self.update_guide_graph()
 
     def get_figure(self, save_type: FigureType):
         """Get the matplotlib figure for the specified type."""
