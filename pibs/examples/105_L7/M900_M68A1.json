@@ -14,7 +14,7 @@
 	"Compute Guide Graph": false,
 	"Constrain Design": true,
 	"Constrain Travel": true,
-	"Description": "Ballistics of the 105x617mm M900 depleted-Uranium APFSDS-T fired from the M68A1 tank gun. Safe maximum pressure for M68/68A1 cannon is 641MPa. \n\nTube length is 5346mm, projectile travel 4770mm. Chamber volume is 6.47L. Loads 6.12kg of M43 LOVA propellant with TiO2 wear reduction agent. Projectile weighs 6.86 kg. Develops 1505 m/s at 517 MPa.\n\nCutaway images suggest long tubular grains.l\n\nReferences:\n- STANAG 4458 105mm ammunition for rifled tank guns\n- TM 43-0001-28 Army Ammunition Data Sheets for Artillery Ammunition: Guns, Howitzers, Mortars, Recoilless Rifles, Grenade Launchers and Artillery Fuzes\n- \"105mm Enhanced Gun\" (1983) US Army Armor Center Headquarters, Fort Knox",
+	"Description": "Ballistics of the 105x617mm M900 depleted-Uranium APFSDS-T fired from the M68A1 tank gun. Safe maximum pressure for M68/68A1 cannon is 641MPa. \n\nTube length is 5346mm, projectile travel 4770mm. Chamber volume is 6.47L. Loads 6.12kg of M43 LOVA propellant with TiO2 wear reduction agent. Projectile weighs 6.86 kg. Develops 1505 m/s at 517 MPa.\n\n\nReferences:\n- STANAG 4458 105mm ammunition for rifled tank guns\n- TM 43-0001-28 Army Ammunition Data Sheets for Artillery Ammunition: Guns, Howitzers, Mortars, Recoilless Rifles, Grenade Launchers and Artillery Fuzes\n- \"105mm Enhanced Gun\" (1983) US Army Armor Center Headquarters, Fort Knox",
 	"Expansion Ratio (x)": 4.0,
 	"Force Modifier (%)": 102.5,
 	"Gradient": "SOL_PIDDUCK",
