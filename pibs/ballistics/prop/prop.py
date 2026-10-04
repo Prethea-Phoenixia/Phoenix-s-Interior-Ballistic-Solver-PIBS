@@ -59,11 +59,15 @@ class SimpleGeometry(Geometry, Enum, metaclass=ABCEnum):
         if self.alpha >= 0:
             alpha = self.alpha
         else:
+            if r1 <= 0:
+                raise ValueError("Specified geometry requires a positive perforation/height ratio (r1).")
             alpha = 1.0 / r1
 
         if self.beta >= 0:
             beta = self.beta
         else:
+            if r2 <= 0:
+                raise ValueError("Specified geometry requires a positive length ratio (r2).")
             beta = 1.0 / r2
 
         if (alpha != 0 and not (1.0 >= alpha >= beta)) or (alpha == 0 and not (1.0 >= beta)):
@@ -123,15 +127,15 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
         r1: float
             perforation diameter / web. d_0 / 2e_1
         r2: float
-            length/diameter (width) of grain.
             length / web, 2c / 2e_1
         """
+        if r1 <= 0 or r2 <= 0:
+            raise ValueError("Perforation ratio and length ratio must be positive.")
+
         web = 1
         e_1, d_0, c = 0.5 * web, web * r1, 0.5 * r2 * web
         a = sum(p * q for p, q in zip(self.a_factors, (d_0, e_1)))
         b = sum(p * q for p, q in zip(self.b_factors, (d_0, e_1)))
-
-        # c = 0.5 * r2 * (self.C * a**2 + self.A * b**2 + (self.n_hole - self.B) * d_0**2) ** 0.5
 
         rho = self.rho_div * (e_1 + d_0 / 2)
 
@@ -146,9 +150,20 @@ class MultPerfGeometry(Geometry, Enum, metaclass=ABCEnum):
 
         z_b = (e_1 + rho) / e_1  # second phase burning Z upper limit
         psi_s = chi * (1 + labda + mu)
+        if psi_s >= 1.0:
+            raise ValueError("invalid geometry specification.")
+
         # second phase of burning rate parameters, Z from 1 to z_b
         chi_s = (1 - psi_s * z_b**2) / (z_b - z_b**2)
         labda_s = psi_s / chi_s - 1
+
+        # the quadratic sliver fit must have a non-negative burning surface over
+        # the whole sliver phase [1, z_b]; since sigma_s(z) = chi_s(1 + 2 labda_s z)
+        # is a decreasing line, it suffices to check its value at z_b
+        if chi_s * (1 + 2 * labda_s * z_b) < 0:
+            raise ValueError(
+                "specified geometry cannot be accurately modelled with polynomial form function post-fracture."
+            )
 
         return chi, labda, mu, chi_s, labda_s, z_b
 
@@ -195,32 +210,27 @@ class Composition:
     def read_file(file_name: str):
         compositions = []
         with open(file_name, newline="", encoding="utf-8") as csvfile:
-            sniffer = csv.Sniffer()
-            content = csvfile.read()
-            dialect = sniffer.sniff(content)
-            has_header = sniffer.has_header(content)
-            csvfile.seek(0)
-
-            prop_reader = csv.reader(csvfile, dialect=dialect)
-            for prop in prop_reader:
-                if has_header:
-                    has_header = False
+            for i, prop in enumerate(csv.reader(csvfile)):
+                if not prop:
                     continue
-                name, desc, adb, density, force, covolume, pressure_exp, burn_rate_coef, flame_temp = prop
-
-                reduced_adiabatic_index = float(adb) - 1
-
-                new_comp = Composition(
-                    name,
-                    str(desc).replace("\\n", "\n"),
-                    float(force),
-                    float(covolume),
-                    float(density),
-                    float(reduced_adiabatic_index),
-                    float(burn_rate_coef),
-                    float(pressure_exp),
-                    float(flame_temp) if flame_temp else None,
-                )
+                try:
+                    name, desc, adb, density, force, covolume, pressure_exp, burn_rate_coef, flame_temp = prop
+                    reduced_adiabatic_index = float(adb) - 1
+                    new_comp = Composition(
+                        name,
+                        str(desc).replace("\\n", "\n"),
+                        float(force),
+                        float(covolume),
+                        float(density),
+                        float(reduced_adiabatic_index),
+                        float(burn_rate_coef),
+                        float(pressure_exp),
+                        float(flame_temp) if flame_temp else None,
+                    )
+                except ValueError:
+                    if i == 0:
+                        continue  # header row
+                    raise ValueError(f"Malformed propellant entry on row {i + 1} of {file_name}: {prop}")
                 compositions.append(new_comp)
 
         Composition.all_compositions = compositions
@@ -308,8 +318,13 @@ class Propellant:
         The ODE uses z as the independent variable; f_psi_z(z) and f_sigma_z(z)
         return the overall ψ and σ at main-grain burn fraction z.
         """
-        if any((main_r1 and main_r1 < 0, main_r2 and main_r2 < 0)):
+        if any((main_r1 < 0, main_r2 < 0, aux_r1 < 0, aux_r2 < 0)):
             raise ValueError("Geometry is impossible")
+
+        if web_ratio <= 0:
+            raise ValueError(f"Web ratio must be positive, got {web_ratio}")
+        if mass_ratio < 0:
+            raise ValueError(f"Mass ratio must be non-negative, got {mass_ratio}")
 
         self.main_r1 = main_r1
         self.main_r2 = main_r2
@@ -410,46 +425,3 @@ class Propellant:
         psi_main, psi_aux = self.f_psi(z_main, self.main_params), self.f_psi(z_aux, self.aux_params)
 
         return psi_main / (self.mass_ratio + 1) + psi_aux * self.mass_ratio / (self.mass_ratio + 1)
-
-
-class DelegatesPropellant:
-    def __init__(self, propellant: Propellant):
-        self.propellant = propellant
-
-    @property
-    def f(self) -> float:
-        return self.propellant.f
-
-    @property
-    def alpha(self) -> float:
-        return self.propellant.alpha
-
-    @property
-    def rho_p(self) -> float:
-        return self.propellant.rho_p
-
-    @property
-    def theta(self) -> float:
-        return self.propellant.theta
-
-    @property
-    def u_1(self) -> float:
-        return self.propellant.u_1
-
-    @property
-    def n(self) -> float:
-        return self.propellant.n
-
-    @property
-    def temp_v(self) -> float | None:
-        return self.propellant.temp_v
-
-    @property
-    def z_b(self) -> float:
-        return self.propellant.z_b
-
-    def f_psi_z(self, *args, **kwargs):
-        return self.propellant.f_psi_z(*args, **kwargs)
-
-    def f_sigma_z(self, *args, **kwargs):
-        return self.propellant.f_sigma_z(*args, **kwargs)

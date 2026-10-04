@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeVar
 
-T = TypeVar("T")
-if TYPE_CHECKING:
-    from .gun import Gun
-
-from . import Point
+from . import GunType, Point
+from .params import Params
 
 
 @dataclass
-class GenericEntry:
+class TableEntry:
     tag: Point
     time: float
     travel: float
@@ -22,20 +18,30 @@ class GenericEntry:
     shot_pressure: float
     temperature: float | None
 
+    # recoilless-only fields (None for conventional guns)
+    outflow_velocity: float | None = None
+    stag_pressure: float | None = None
+    outflow_fraction: float | None = None
+    rel_stag_point: float | None = None
+
 
 @dataclass
-class GenericResult:
-    gun: Gun
-    table_data: list[GenericEntry]
+class SimResult:
+    params: Params
+    table_data: list[TableEntry]
     pressure_trace: list[PressureTraceEntry]
 
     tube_mass: float | None = None
     outline: list[OutlineEntry] | None = None
 
-    def read_table_data(self, tag: Point) -> GenericEntry:
-        for tableEntry in self.table_data:
-            if tableEntry.tag == tag:
-                return tableEntry
+    @property
+    def gun_type(self) -> GunType:
+        return self.params.gun_type
+
+    def read_table_data(self, tag: Point) -> TableEntry:
+        for entry in self.table_data:
+            if entry.tag == tag:
+                return entry
         raise ValueError("no entry with tag")
 
     def get_eff(self) -> tuple[float, float, float]:
@@ -44,11 +50,12 @@ class GenericResult:
         be: ballistic efficiency
         pe: piezoelectric efficiency
         """
+        params = self.params
         vg = self.read_table_data(Point.EXIT).velocity
         p_max = self.read_table_data(Point.PEAK_AVG).avg_pressure
-        te = (vg / self.gun.v_j) ** 2
-        be = te / self.gun.phi
-        pe = 0.5 * self.gun.phi * self.gun.m * vg**2 / (p_max * self.gun.s * self.gun.l_g)
+        te = (vg / params.v_j) ** 2
+        be = te / params.phi
+        pe = 0.5 * params.phi * params.m * vg**2 / (p_max * params.s * params.l_g)
         return te, be, pe
 
 

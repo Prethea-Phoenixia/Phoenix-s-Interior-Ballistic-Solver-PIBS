@@ -8,7 +8,6 @@ from . import BOLDSIZE, FONTNAME, FONTSIZE, Theme
 class ThemedMixin(object):
     def __init__(self, master, *args, dpi: int, os_dark: bool = True, **kwargs):
         super().__init__(master, *args, **kwargs)
-
         if isinstance(master, ThemedMixin):
             self.theme_name_var = master.theme_name_var
         else:
@@ -17,7 +16,7 @@ class ThemedMixin(object):
         self.force_update_on_theme_widget = []
 
     def use_theme(self):
-        style = ttk.Style()
+        style = ttk.Style(master=self)
         style.theme_use(self.theme_name_var.get())
 
         """ensure that the treeview rows are roughly the same height

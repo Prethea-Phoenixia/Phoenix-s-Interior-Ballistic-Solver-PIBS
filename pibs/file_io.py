@@ -59,8 +59,12 @@ class FileIOManager:
         frame.reset_entries()
         frame.set_name(Path(file_name).stem)
 
-        with open(file_name, "r", encoding="utf-8") as file:
-            data = json.load(file)
+        try:
+            with open(file_name, "r", encoding="utf-8") as file:
+                data = json.load(file)
+        except (OSError, json.JSONDecodeError) as e:
+            messagebox.showerror(frame.get_loc_str("excTitle"), str(e))
+            return
 
         frame.apply_loaded_data(data)
         frame.on_calculate()
@@ -74,7 +78,10 @@ class FileIOManager:
         )
 
         if file_name:
-            frame.set_propellant_options(file_name)
+            try:
+                frame.set_propellant_options(file_name)
+            except (OSError, ValueError) as e:
+                messagebox.showerror(frame.get_loc_str("excTitle"), str(e))
 
     def export_table(self):
         """Export table data."""

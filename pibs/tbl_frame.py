@@ -4,8 +4,7 @@ import csv
 from tkinter import Frame, filedialog, messagebox, ttk
 
 from .ballistics import GunType, Point
-from .ballistics.gun import GunResult
-from .ballistics.recoilless import RecoillessResult
+from .ballistics.generics import SimResult
 from .localized import LocalizedFrame
 
 
@@ -41,16 +40,16 @@ class TableFrame(LocalizedFrame):
         h_scroll.configure(command=self.tv.xview)
 
     def format_table(
-        self, gun_result: GunResult | RecoillessResult, acc_exp: int
+        self, gun_result: SimResult, acc_exp: int
     ) -> list[
         tuple[str, str, str, str, str, str, str, str, str]
         | tuple[str, str, str, str, str, str, str, str, str, str, str, str]
     ]:
-        table_data, use_sn, units = [], (), ()
+        table_data = []
 
         sigfig = acc_exp
 
-        if isinstance(gun_result, GunResult):
+        if gun_result.gun_type == GunType.CONVENTIONAL:
             table_data = [
                 (
                     self.get_loc_str(entry.tag),
@@ -66,7 +65,7 @@ class TableFrame(LocalizedFrame):
                 for entry in gun_result.table_data
             ]
 
-        elif isinstance(gun_result, RecoillessResult):
+        elif gun_result.gun_type == GunType.RECOILLESS:
             table_data = [
                 (
                     self.get_loc_str(entry.tag),
@@ -87,7 +86,7 @@ class TableFrame(LocalizedFrame):
 
         return table_data
 
-    def update_table(self, gun_result: GunResult | RecoillessResult | None, acc_exp: int):
+    def update_table(self, gun_result: SimResult | None, acc_exp: int):
 
         self.tv.delete(*self.tv.get_children())
         if gun_result is None:
@@ -95,10 +94,8 @@ class TableFrame(LocalizedFrame):
 
         loc_table_data = self.format_table(gun_result=gun_result, acc_exp=acc_exp)
 
-        if isinstance(gun_result, GunResult):
-            column_list = self.get_loc_str("columnList")[GunType.CONVENTIONAL.value]
-        elif isinstance(gun_result, RecoillessResult):
-            column_list = self.get_loc_str("columnList")[GunType.RECOILLESS.value]
+        if gun_result.gun_type in (GunType.CONVENTIONAL, GunType.RECOILLESS):
+            column_list = self.get_loc_str("columnList")[gun_result.gun_type.value]
         else:
             raise ValueError
 
@@ -113,7 +110,6 @@ class TableFrame(LocalizedFrame):
         self.tv.tag_configure(self.get_loc_str(Point.FRACTURE.value), foreground="brown")
         self.tv.tag_configure(self.get_loc_str(Point.EXIT.value), foreground="steel blue")
         self.tv.tag_configure(self.get_loc_str(Point.START.value), foreground="steel blue")
-        self.tv.tag_configure(self.get_loc_str(Point.COMPUTE.value), foreground="tan")
 
         self.tv.tag_configure("monospace", font=self.font)
         self.tv.tag_configure("error", font=self.font, foreground="dim gray")
@@ -133,7 +129,12 @@ class TableFrame(LocalizedFrame):
         for i, row in enumerate(loc_table_data):
             self.tv.insert("", "end", str(i + 1), values=row, tags=(row[0].strip(), "monospace"))
 
-    def export_table(self, gun_result: GunResult | RecoillessResult | None, acc_exp: int, normalized_filename: str):
+    def export_table(
+        self,
+        gun_result: SimResult | None,
+        acc_exp: int,
+        normalized_filename: str,
+    ):
         if gun_result is None:
             messagebox.showinfo(self.get_loc_str("excTitle"), self.get_loc_str("noDataMsg"))
             return
@@ -144,14 +145,12 @@ class TableFrame(LocalizedFrame):
             initialfile=normalized_filename,
         )
 
-        if isinstance(gun_result, GunResult):
-            gun_type = GunType.CONVENTIONAL.value
-        elif isinstance(gun_result, RecoillessResult):
-            gun_type = GunType.RECOILLESS.value
-        else:
-            raise ValueError
+        if not file_name:
+            return
 
-        column_list = self.get_loc_str("columnList")[gun_type]
+        # The result object, not the current UI state, determines the gun type:
+        # it stays correct even if the user edits inputs after calculating.
+        column_list = self.get_loc_str("columnList")[gun_result.gun_type.value]
 
         with open(file_name, "w", encoding="utf-8", newline="") as csvFile:
             # noinspection PyTypeChecker

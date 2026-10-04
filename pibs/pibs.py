@@ -70,8 +70,8 @@ class PIBS(Tk):
         return platform.system() == "Windows"
 
     def toggle_fullscreen(self):
-        self.wm_attributes("-fullscreen", self.is_fullscreen)
         self.is_fullscreen = not self.is_fullscreen
+        self.wm_attributes("-fullscreen", self.is_fullscreen)
 
     def quit(self):
         # explicitly unload the font at the end of program.

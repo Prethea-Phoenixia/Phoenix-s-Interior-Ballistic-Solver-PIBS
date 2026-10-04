@@ -172,8 +172,6 @@ _prefix = {
     "c": 1e-2,  # centi
     "d": 1e-1,  # deci
     " ": 1,  # unit
-    # "da": 1e1, # deca
-    # "h": 1e2,  # hecto
     "k": 1e3,  # kilo
     "M": 1e6,  # mega
     "G": 1e9,  # giga
@@ -286,6 +284,16 @@ def unloadfont(fontpath, private: bool = True, enumerable: bool = False) -> bool
 
 
 def to_si(v: float | str, dec: int = 4, unit: str = "", unit_dim: int = 1, use_sn: bool = False) -> str:
+    def _fmt(value: float, positive: bool, prefix: str, magnitude: float) -> str:
+        vstr = "{:#.{:}g}".format(value / magnitude**unit_dim, dec)
+        return (
+            (" " if positive else "-")
+            + vstr
+            + " " * (dec + 1 - len(vstr) + vstr.find("."))
+            + (("×⏨" + f"{int(log(magnitude, 10)): <3d}".translate(sup_trans)) if use_sn else prefix)
+            + (unit if unit is not None else "")
+        )
+
     if isinstance(v, int) or isinstance(v, float):
         if isinf(v):
             return "INF"
@@ -293,30 +301,23 @@ def to_si(v: float | str, dec: int = 4, unit: str = "", unit_dim: int = 1, use_s
             return "NAN"
         if v == 0:
             return " " + "{:#.{:}g}".format(v, dec) + ("     " if use_sn else "  ") + (unit if unit is not None else "")
+
+        positive = v > 0
+        v = abs(v)
+        for prefix, magnitude, next_magnitude in zip(
+            _prefix.keys(),
+            tuple(_prefix.values())[:-1],
+            tuple(_prefix.values())[1:],
+        ):
+            if 1 <= (v / (magnitude**unit_dim)) < (next_magnitude / (magnitude**unit_dim)):
+                # allows handling of non-uniformly log10 spaced prefixes
+                return _fmt(v, positive, prefix, magnitude)
+
+        # beyond the tabulated prefixes: clamp to the extreme one
+        if v < 1:
+            return _fmt(v, positive, "y", 1e-24)
         else:
-            if v > 0:
-                positive = True
-            else:
-                positive = False
-
-            v = abs(v)
-            for prefix, magnitude, next_magnitude in zip(
-                _prefix.keys(),
-                tuple(_prefix.values())[:-1],
-                tuple(_prefix.values())[1:],
-            ):
-                if 1 <= (v / (magnitude**unit_dim)) < (next_magnitude / (magnitude**unit_dim)):
-                    # allows handling of non-uniformly log10 spaced prefixes
-                    vstr = "{:#.{:}g}".format(v / magnitude**unit_dim, dec)
-                    return (
-                        (" " if positive else "-")
-                        + vstr
-                        + " " * (dec + 1 - len(vstr) + vstr.find("."))
-                        + (("×⏨" + f"{int(log(magnitude, 10)): <3d}".translate(sup_trans)) if use_sn else prefix)
-                        + (unit if unit is not None else "")
-                    )
-
-        raise ValueError(f"Cannot convert {v} to SI notation")
+            return _fmt(v, positive, "Y", 1e24)
 
     elif isinstance(v, str):
         return v
@@ -325,24 +326,30 @@ def to_si(v: float | str, dec: int = 4, unit: str = "", unit_dim: int = 1, use_s
 
 
 def format_float_input(event, var):
-    # v = event.widget.get()
     v = var.get()
     if v == "" or v == ".":
         var.set(0.0)
     else:
-        var.set(float(v))
+        try:
+            var.set(float(v))
+        except ValueError:
+            var.set(0.0)
 
 
 def format_int_input(event, var):
-    # v = event.widget.get()
     v = var.get()
     if v == "":
         var.set(0)
     else:
-        var.set(int(v))
+        try:
+            var.set(int(v))
+        except ValueError:
+            var.set(0)
 
 
 def round_sig(x: float, n: int = 4):
+    if x == 0:
+        return 0.0
     return round(x, (n - 1) - int(floor(log10(abs(x)))))
 
 
@@ -412,7 +419,4 @@ def get_windows_locale() -> str:
 
 
 if __name__ == "__main__":
-    print(to_si(1e-4).strip())
-    from math import pi
-
-    print(round_sig(pi))
+    pass

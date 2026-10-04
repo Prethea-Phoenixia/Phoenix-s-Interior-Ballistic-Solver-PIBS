@@ -38,7 +38,8 @@ THEMES = {
 root_logger = logging.getLogger(__name__)
 root_logger.setLevel(logging.INFO)
 root_logger.propagate = False
-log_formatter = logging.Formatter("%(asctime)s - [%(module)10s] %(message)s", datefmt="%H:%M:%S")
+log_formatter = logging.Formatter("%(asctime)s - %(message)s", datefmt="%H:%M:%S")
+
 handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(log_formatter)
 root_logger.addHandler(handler)

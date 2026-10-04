@@ -2,7 +2,6 @@
 	"English": {
 		"BURNOUT": "Burnout",
 		"CARTRIDGE": "Conventional Cartridge",
-		"COMPUTE": "Compute",
 		"CONVENTIONAL": "Conventional Gun",
 		"CYLINDER": "Cylinder",
 		"DOMAIN_LEN": "Length",
@@ -275,7 +274,6 @@
 	"中文": {
 		"BURNOUT": "火药燃尽",
 		"CARTRIDGE": "常规弹药",
-		"COMPUTE": "计算点",
 		"CONVENTIONAL": "常规火炮",
 		"CYLINDER": "圆柱",
 		"DOMAIN_LEN": "空间",

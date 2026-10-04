@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from .ballistics import Point
-from .ballistics.gun import Gun, GunResult
-from .ballistics.recoilless import Recoilless, RecoillessResult
+from .ballistics.generics import SimResult
 from .localized import LocalizedFrame, RowBuilder
 from .misc import format_mass, round_sig, to_si
 
@@ -36,31 +35,32 @@ class InfoFrame(LocalizedFrame):
 
         par_frm.rowconfigure(b.current_row + 1, weight=1)
 
-    def update_stats(self, gun: Gun | Recoilless | None, gun_result: GunResult | RecoillessResult, acc_exp: int):
+    def update_stats(self, gun_result: SimResult | None, acc_exp: int):
         for entry in (
             *(self.te, self.be, self.pe, self.va, self.lx, self.ammo, self.pa, self.gm, self.pp, self.mv, self.bop),
             *(self.sj, self.ld, self.lf),
         ):
             entry.reset()
 
-        if not gun:
+        if not gun_result:
             return
 
-        caliber = gun.caliber
+        params = gun_result.params
+        caliber = params.caliber
         eta_t, eta_b, eta_p = gun_result.get_eff()
         self.te.set(f"{eta_t * 100:.2f} %")
         self.be.set(f"{eta_b * 100:.2f} %")
         self.pe.set(f"{eta_p * 100:.2f} %")
-        self.va.set(to_si(gun.v_j, unit="m/s"))
+        self.va.set(to_si(params.v_j, unit="m/s"))
         self.lx.set(
             (
-                f"{gun.l_g / caliber:.0f}" + " " + self.get_loc_str("calLabel"),
-                f"{float((gun.l_g + gun.l_c) / caliber):.0f}" + " " + self.get_loc_str("calLabel"),
+                f"{params.l_g / caliber:.0f}" + " " + self.get_loc_str("calLabel"),
+                f"{float((params.l_g + params.l_c) / caliber):.0f}" + " " + self.get_loc_str("calLabel"),
             )
         )
-        self.ammo.set(to_si(gun.l_c, unit="m"))
+        self.ammo.set(to_si(params.l_c, unit="m"))
         ps = gun_result.read_table_data(Point.PEAK_SHOT).shot_pressure
-        self.pa.set(to_si(ps * gun.s / gun.m, unit="m/s²"))
+        self.pa.set(to_si(ps * params.s / params.m, unit="m/s²"))
 
         self.gm.set(format_mass(gun_result.tube_mass) if gun_result.tube_mass else "N/A")
 
@@ -76,16 +76,16 @@ class InfoFrame(LocalizedFrame):
         self.mv.set(to_si(muzzle_entry.velocity, unit="m/s"))
         try:
             burnout_entry = gun_result.read_table_data(Point.BURNOUT)
-            self.bop.set(f"{burnout_entry.travel / gun.l_g * 1e2:.2f} %")
+            self.bop.set(f"{burnout_entry.travel / params.l_g * 1e2:.2f} %")
         except ValueError:
             self.bop.set(self.get_loc_str("uncontained"))
 
-        self.sj.set(f"{to_si(gun.s_j, unit='m²', unit_dim=2)}" if isinstance(gun, Recoilless) else "N/A")
+        self.sj.set(f"{to_si(params.s_j, unit='m²', unit_dim=2)}" if params.is_recoilless else "N/A")
 
         sigfig = acc_exp + 1
-        w = gun.w
-        cv = gun.vol_0
+        w = params.w
+        cv = params.vol_0
 
-        rho = gun.rho_p
+        rho = params.propellant.rho_p
         self.lf.set(f"{round_sig(w / cv / rho * 100, n=sigfig)} %")
         self.ld.set(f"{round_sig(w / cv, n=sigfig)} kg/m³")

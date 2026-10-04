@@ -2,21 +2,30 @@ import math
 import sys
 from typing import Callable
 
+_EPS = sys.float_info.epsilon
+
 
 def dekker(
     f: Callable[[float], float],
     x_0: float,
     x_1: float,
     y: float = 0.0,
-    x_tol: float = 0.0,
-    y_abs_tol: float = 0.0,
-    y_rel_tol: float = 0.0,
-    debug: bool = False,
-) -> tuple[float, float]:
+    tol: float = 1e-12,
+) -> float:
+    """Dekker's bracketed root finder: solve f(x) = y for x in [x_0, x_1].
 
-    x_tol = max(abs(x_tol), max(abs(x_0), abs(x_1), 1.0) * sys.float_info.epsilon)
-    y_rel_tol = abs(y_rel_tol)
-    y_abs_tol = max(abs(y_abs_tol), abs(y) * y_rel_tol, max(abs(y), 1.0) * sys.float_info.epsilon)
+    A single relative tolerance drives both convergence criteria:
+        |f(b) - y| <= tol * |y|          (only when y != 0)
+        |b - a|     <= tol * max(|x_0|, |x_1|)
+    either of which terminates the iteration. The bracketing endpoints must
+    straddle the root (f(x_0) - y and f(x_1) - y of opposite sign).
+
+    The iteration budget assumes bisection pace plus a margin, since secant
+    steps converging one-sidedly do not halve the bracket.
+    """
+
+    x_tol = max(tol * max(abs(x_0), abs(x_1)), _EPS * max(abs(x_0), abs(x_1), 1))
+    y_tol = max(tol * abs(y), _EPS * max(abs(y), 1))
 
     fx_0 = f(x_0) - y
     fx_1 = f(x_1) - y
@@ -26,11 +35,6 @@ def dekker(
             "Dekker method must be initiated by guesses bracketing root:\n"
             + "f({})-{}={}, f({})-{}={}".format(x_0, y, fx_0, x_1, y, fx_1)
         )
-
-    elif fx_0 == 0:
-        return x_0, x_0
-    elif fx_1 == 0:
-        return x_1, x_1
 
     if abs(fx_0) < abs(fx_1):
         b_j = x_0  # assign the better of the two initial guesses to b_j
@@ -45,11 +49,9 @@ def dekker(
         b_i = a_j = x_0
         fb_i = fa_j = fx_0
 
-    record = []
-
     i = 0
 
-    it = math.ceil(math.log2(abs(x_1 - x_0) / x_tol)) + 1
+    it = math.ceil(math.log2(abs(x_1 - x_0) / x_tol)) + 10
     for i in range(it):
         m = 0.5 * (a_j + b_j)
         if fb_i != fb_j:
@@ -76,19 +78,10 @@ def dekker(
             a_k, b_k = b_k, a_k
             fa_k, fb_k = fb_k, fa_k
 
-        if debug:
-            record.append((i, b_k, fb_k))
-
         if any(
-            (abs(b_k - a_k) < x_tol, abs(fb_k) < y_abs_tol),
+            (abs(b_k - a_k) < x_tol, abs(fb_k) < y_tol),
         ):
-            if debug:
-                print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
-                record.sort(key=lambda v: v[1])
-                for line in record:
-                    print("{:>4}{:>24}{:>24}".format(*line))
-
-            return b_k, a_k  # return the best, and the bracketing solution
+            return b_k
 
         a_j = a_k
         fa_j = fa_k
@@ -97,12 +90,6 @@ def dekker(
         fb_i, fb_j = fb_j, fb_k
 
     else:
-        if debug:
-            print("{:>4}{:>24}{:>24}".format("I", "X", "FX"))
-            record.sort(key=lambda r: r[1])
-            for line in record:
-                print("{:>4}{:>24}{:>24}".format(*line))
-
         raise ValueError(
             "Dekker method called from {} to {}\n".format(x_0, x_1)
             + "Maximum iteration exceeded at it = {}/{}".format(i, it)

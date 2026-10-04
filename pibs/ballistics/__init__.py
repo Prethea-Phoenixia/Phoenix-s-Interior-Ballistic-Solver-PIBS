@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import TypeVar
 
 
 class StrEnum(str, Enum):
@@ -24,7 +23,6 @@ class Point(StrEnum):
     EXIT = "SHOT_EXIT"
     PEAK_STAG = "PEAK_STAG_P"
     SAMPLE = "SAMPLE"
-    COMPUTE = "COMPUTE"
 
 
 class SolutionMethod(StrEnum):
@@ -44,7 +42,6 @@ class GunType(StrEnum):
 
 
 # Valid value collections
-VALID_DOMAINS = tuple(d.value for d in Domain)
 VALID_SOLUTION_METHODS = tuple(s.value for s in SolutionMethod)
 VALID_PRESSURE_POINTS = (
     Point.PEAK_BREECH.value,
@@ -52,15 +49,3 @@ VALID_PRESSURE_POINTS = (
     Point.PEAK_AVG.value,
     Point.PEAK_STAG.value,
 )
-GUN_PEAK_POINTS = (Point.PEAK_AVG.value, Point.PEAK_SHOT.value, Point.PEAK_BREECH.value)
-RECOILLESS_PEAK_POINTS = (
-    Point.PEAK_AVG.value,
-    Point.PEAK_SHOT.value,
-    Point.PEAK_BREECH.value,
-    Point.PEAK_STAG.value,
-)
-VALID_OPT_TARGETS = tuple(o.value for o in OptimizationTarget)
-VALID_GUN_TYPES = tuple(g.value for g in GunType)
-
-
-T = TypeVar("T")
